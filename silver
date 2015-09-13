@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+
+import gi
+gi.require_version("Gst", "1.0")
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gst, Gtk, GObject
+
+import signal
+import logging
+
+broadcast_url = 'http://icecast.silver.cdnvideo.ru/silver'
+volume_default_level = 100.
+
+class SilverPlayer():
+    """ Gstreamer container for network audio stream
+        Use souphttpsrc from GStreamer-1.0-good-plagins """
+    def __init__(self):
+        """ sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
+        self.__playing = False
+
+        # Empty pipeline
+        self.pipeline = Gst.Pipeline.new("SilverPlayer")
+        if not self.pipeline:
+            logging.error("Couldn't create pipeline")
+            exit(-1)
+
+        # Create GStream elements
+        self.elements = dict()
+        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc', 'source')
+        self.elements["decode"] = Gst.ElementFactory.make('decodebin', 'decode')
+        self.elements["convert"] = Gst.ElementFactory.make('audioconvert', 'convert')
+        self.elements["volume"] = Gst.ElementFactory.make('volume', 'volume')
+        self.elements["sink"] = Gst.ElementFactory.make('autoaudiosink', 'sink')
+
+        for key in self.elements.keys():
+            if not self.elements[key]:
+                logging.error("Couldn't create element", key)
+                exit(-1)
+            else:
+                self.pipeline.add(self.elements[key])
+
+        self.elements["source"].set_property('location', broadcast_url)
+        self.elements["source"].set_property('is-live', True)
+        self.elements["volume"].set_property('volume', volume_default_level / 100.)
+
+        # Link elements
+        def pad_added_callback(decode, pad):
+            """ Link every decodebin source pad with audioconvert """
+            if pad.is_linked():
+                return      # Already linked. Do nothing
+            return pad.link(self.elements["convert"].get_static_pad('sink'))
+
+        self.elements["decode"].connect('pad-added', pad_added_callback)
+
+        if not Gst.Element.link(self.elements["source"], self.elements["decode"]) or \
+           not Gst.Element.link(self.elements["convert"], self.elements["volume"]) or \
+           not Gst.Element.link(self.elements["volume"], self.elements["sink"]):
+            logging.error("Elements could not be linked")
+            exit(-1)
+
+        # Create message bus
+        msg_bus = self.pipeline.get_bus()
+        msg_bus.add_signal_watch()
+        msg_bus.connect('message', self.message_handler)
+
+    def toggle_playback(self):
+        """ Play/stop trigger """
+        if not self.__playing:
+            ret = self.pipeline.set_state(Gst.State.PLAYING)
+            self.__playing = True
+        else:
+            # Switch state to READY to prevent EOS
+            ret = self.pipeline.set_state(Gst.State.READY)
+            self.__playing = False
+
+        if ret == Gst.StateChangeReturn.FAILURE:
+            logging.error("Couldn't change state")
+            exit(-1)
+
+    def clean(self):
+        self.pipeline.set_state(Gst.State.NULL)
+
+    def set_volume(self, val):
+        self.pipeline.get_by_name('volume').set_property('volume', val / 100.)
+
+    def message_handler(self, bus, msg):
+        struct = msg.get_structure()
+        if msg.type == Gst.MessageType.ERROR:
+            err, dbg = msg.parse_error()
+            logging.error("Error from element %s: %s" % (msg.src.get_name(), err))
+        elif msg.type == Gst.MessageType.EOS:
+            logging.warning("End of stream")
+            self.clean(self)
+#        elif msg.type == Gst.MessageType.STATE_CHANGED:
+#            old, new, pending = msg.parse_state_changed()
+#            logging.warning("State changed from %s to %s", old.value_nick, new.value_nick)
+        else:
+            pass
+
+class SilverWindow(Gtk.Window):
+    """ GUI """
+    def __init__(self, player):
+        self.__playing = False
+        self.__player = player
+        self.__main_win = True
+
+        self.create_main_window()
+        # Status icon
+        self.status_ico = Gtk.StatusIcon()
+        self.status_ico.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
+        self.status_ico.connect("popup-menu", self.status_ico_popup)
+        self.status_ico.connect("activate", self.status_ico_activate)
+
+    def status_ico_activate(self, icon):
+        """ Show/hide main window """
+        if not self.__main_win:
+            self.show()
+            self.__main_win = True
+        else:
+            self.hide()
+            self.__main_win = False
+
+    def status_ico_popup(self, icon, button, time):
+        """ Show application menu """
+        self.menu = Gtk.Menu()
+
+        # Playback
+        play = Gtk.MenuItem()
+        if not self.__playing:
+            play.set_label("Play")
+        else:
+            play.set_label("Stop")
+        play.connect("activate", self.menu_playback_event)
+
+        # Quit
+        quit = Gtk.MenuItem()
+        quit.set_label("Quit")
+        quit.connect("activate", Gtk.main_quit)
+
+        self.menu.append(play)
+        self.menu.append(quit)
+        self.menu.show_all()
+
+        def pos_func(menu, x, y, icon):
+            return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
+        self.menu.popup(None, None, pos_func, self.status_ico, button, time)
+
+    def menu_playback_event(self, menu):
+        self.playback_toggle(self.playback_button)
+
+    def create_main_window(self):
+        # Draw Main Window
+        Gtk.Window.__init__(self, title="Silver Rain")
+        self.set_border_width(5)
+        self.set_default_size(200, 50)
+
+        box = Gtk.Box(spacing=15)
+        self.add(box)
+
+        # Playback Button
+        if not self.__playing:
+            self.playback_button = Gtk.ToggleButton("Play")
+        else:
+            self.playback_button = Gtk.ToggleButton("Stop")
+        self.playback_button.connect("toggled", self.playback_toggle)
+        box.pack_start(self.playback_button, True, True, 0)
+
+        # Volume scale
+        ad = Gtk.Adjustment(value=volume_default_level, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
+        volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=ad)
+        volume.set_property('draw-value', False)
+        volume.connect("value-changed", self.volume_changed)
+        box.pack_start(volume, True, True, 0)
+
+        # Draw window
+        self.show_all()
+        self.connect("delete-event", self.hide_window)
+
+    def hide_window(self, window, event):
+        """ Hide top window instead on close """
+        self.__main_win = False
+        window.hide()
+        return True
+
+    def playback_toggle(self, button):
+        if not self.__playing:
+            button.set_label("Stop")
+            self.__playing = True
+        else:
+            button.set_label("Play")
+            self.__playing = False
+        self.__player.toggle_playback()
+
+    def volume_changed(self, scale):
+        value = scale.get_value()
+        self.__player.set_volume(value)
+
+GObject.threads_init()
+Gst.init(None)
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+player = SilverPlayer()
+silver = SilverWindow(player)
+
+Gtk.main()
+player.clean()
