@@ -3,7 +3,8 @@
 import gi
 gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gst, Gtk, GObject
+from gi.repository import Gst, Gtk, GObject, Gdk
+from gi.repository.GdkPixbuf import Pixbuf
 
 import signal
 import logging
@@ -97,6 +98,13 @@ class SilverPlayer():
         else:
             pass
 
+style_provider = Gtk.CssProvider()
+css = open('style.css', 'rb')
+css_data = css.read()
+css.close()
+style_provider.load_from_data(css_data)
+Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(), style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
 class SilverWindow(Gtk.Window):
     """ GUI """
     def __init__(self, player):
@@ -125,19 +133,30 @@ class SilverWindow(Gtk.Window):
         self.menu = Gtk.Menu()
 
         # Playback
-        play = Gtk.MenuItem()
+        ic = Gtk.IconTheme.get_default()
         if not self.__playing:
-            play.set_label("Play")
+            text = "Play"
+            icon = ic.load_icon("media-playback-start", 16, 0)
         else:
-            play.set_label("Stop")
+            text = "Stop"
+            icon = ic.load_icon("media-playback-stop", 16, 0)
+
+        play = Gtk.ImageMenuItem.new_with_mnemonic(text)
+        play.set_image(Gtk.Image.new_from_pixbuf(icon))
         play.connect("activate", self.menu_playback_event)
+        play.set_size_request(100, -1)
+
+        # Separator
+        sep = Gtk.SeparatorMenuItem()
 
         # Quit
-        quit = Gtk.MenuItem()
-        quit.set_label("Quit")
+        quit = Gtk.ImageMenuItem.new_with_mnemonic("Quit")
+        qicon = ic.load_icon("gtk-quit", 16, 0)
+        quit.set_image(Gtk.Image.new_from_pixbuf(qicon))
         quit.connect("activate", Gtk.main_quit)
 
         self.menu.append(play)
+        self.menu.append(sep)
         self.menu.append(quit)
         self.menu.show_all()
 
