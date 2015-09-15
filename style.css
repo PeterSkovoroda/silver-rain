@@ -3,12 +3,14 @@
 /*@define-color fg_color #000000;
 */
 
+/*
 .menuitem,
 .menu .menuitem { 
 	border-radius: 0;
 	border-style: solid;
 	border-width: 0px;
-	/* up, right, down, left */
+	[> up, right, down, left <]
 	padding: 0px 2px 0px 4px;
 }
+*/
 
