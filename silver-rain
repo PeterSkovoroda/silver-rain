@@ -6,6 +6,8 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gst, Gtk, GObject, Gdk
 from gi.repository.GdkPixbuf import Pixbuf
 
+import notify2
+
 import signal
 import logging
 
@@ -144,6 +146,7 @@ class SilverWindow(Gtk.Window):
 
         self.create_main_window()
         self.status_icon_create()
+        self.notification = notify2.Notification("", "", "")
 
 ### Status Icon
     def status_icon_create(self):
@@ -255,6 +258,19 @@ class SilverWindow(Gtk.Window):
         self.__playing = not self.__playing
         button.set_label(self.get_playback_label()[0])
         self.__player.playback_toggle()
+        self.show_notification()
+
+    def show_notification(self):
+        if self.__playing:
+            text = "Playing"
+            body = "Silver Rain"
+            img = "notification-audio-play"
+        else:
+            text = "Stopped"
+            body = "Silver Rain"
+            img = "notification-audio-stop"
+        self.notification.update(text, body, img)
+        self.notification.show()
 
     def volume_changed(self, scale):
         value = scale.get_value()
@@ -287,6 +303,7 @@ class SilverWindow(Gtk.Window):
 GObject.threads_init()
 Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+notify2.init('')
 
 player = SilverPlayer()
 silver = SilverWindow(player)
