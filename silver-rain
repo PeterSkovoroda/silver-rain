@@ -136,11 +136,99 @@ class SilverPlayer():
         else:
             pass
 
+class SilverRecorder():
+    """ Gstreamer container for audio recording
+        Use souphttpsrc from GStreamer-1.0-good-plagins """
+    def __init__(self):
+        self.__recording = False
+        self.create_pipeline()
+
+    def clean(self):
+        """ Free pipeline """
+        self.pipeline.set_state(Gst.State.NULL)
+
+    def record_get(self):
+        """ Return playback status """
+        return self.__recording
+
+    def record_toggle(self):
+        """ Playback trigger """
+        if not self.__recording:
+            ret = self.pipeline.set_state(Gst.State.PLAYING)
+            self.__recording = True
+        else:
+            # Switch state to READY to prevent EOS
+            ret = self.pipeline.set_state(Gst.State.READY)
+            self.__recording = False
+
+        if ret == Gst.StateChangeReturn.FAILURE:
+            logging.error("Couldn't change state")
+            self.clean()
+            exit(-1)
+
+    def create_pipeline(self):
+        """ sophttpsrc -> icydemux -> filesink """
+        # Empty pipeline
+        self.pipeline = Gst.Pipeline.new("SilverPlayer")
+        if not self.pipeline:
+            logging.error("Couldn't create pipeline")
+            exit(-1)
+
+        # Create GStream elements
+        self.elements = dict()
+        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc', 'source')
+        self.elements["demux"] = Gst.ElementFactory.make('icydemux', 'demux')
+        self.elements["sink"] = Gst.ElementFactory.make('filesink', 'sink')
+
+        for key in self.elements.keys():
+            if not self.elements[key]:
+                logging.error("Couldn't create element", key)
+                exit(-1)
+            else:
+                self.pipeline.add(self.elements[key])
+
+        self.elements["source"].set_property('location', broadcast_url)
+        self.elements["source"].set_property('is-live', True)
+        self.elements["sink"].set_property('location', "file.mp3")
+
+        # Link elements
+        def pad_added_callback(demux, pad):
+            """ Link every decodebin source pad with audioconvert """
+            if pad.is_linked():
+                return      # Already linked. Do nothing
+            return pad.link(self.elements["sink"].get_static_pad('sink'))
+
+        self.elements["demux"].connect('pad-added', pad_added_callback)
+
+        if not Gst.Element.link(self.elements["source"], self.elements["demux"]):
+            logging.error("Elements could not be linked")
+            exit(-1)
+
+
+        # Create message bus
+        msg_bus = self.pipeline.get_bus()
+        msg_bus.add_signal_watch()
+        msg_bus.connect('message', self.message_handler)
+
+    def message_handler(self, bus, msg):
+        """ Pipeline bus handler """
+        struct = msg.get_structure()
+        if msg.type == Gst.MessageType.ERROR:
+            err, dbg = msg.parse_error()
+            logging.error("Error from element %s: %s" % (msg.src.get_name(), err))
+        elif msg.type == Gst.MessageType.EOS:
+            logging.warning("End of stream")
+            self.clean(self)
+        else:
+            pass
+
 class SilverWindow(Gtk.Window):
     """ GUI """
-    def __init__(self, player):
+    def __init__(self, player, recorder):
         self.__playing = False
         self.__player = player
+        self.__recording = False
+        self.__recorder = recorder
         self.__volume = 100
         self.__main_win = True
 
@@ -226,7 +314,7 @@ class SilverWindow(Gtk.Window):
         """ Init main window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(5)
-        self.set_default_size(200, 50)
+        self.set_default_size(250, 50)
         # Hide main window in tray
         self.connect("delete-event", self.hide_window)
 
@@ -238,6 +326,12 @@ class SilverWindow(Gtk.Window):
         self.playback_button = Gtk.ToggleButton(text)
         self.playback_button.connect("toggled", self.playback_toggle)
         box.pack_start(self.playback_button, True, True, 0)
+
+        # Record Button
+        text = self.get_record_label()[0]
+        self.record_button = Gtk.ToggleButton(text)
+        self.record_button.connect("toggled", self.record_toggle)
+        box.pack_start(self.record_button, True, True, 0)
 
         # Volume scale
         ad = Gtk.Adjustment(value=self.__volume, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
@@ -259,6 +353,11 @@ class SilverWindow(Gtk.Window):
         button.set_label(self.get_playback_label()[0])
         self.__player.playback_toggle()
         self.show_notification()
+
+    def record_toggle(self, button):
+        self.__recording = not self.__recording
+        button.set_label(self.get_record_label()[0])
+        self.__recorder.record_toggle()
 
     def show_notification(self):
         if self.__playing:
@@ -288,6 +387,7 @@ class SilverWindow(Gtk.Window):
         about.set_website('http://silver.ru')
         about.run()
         about.destroy()
+
 ###
     def get_playback_label(self):
         """ Return label and icon for Playback menu/button """
@@ -300,13 +400,25 @@ class SilverWindow(Gtk.Window):
             icon = icontheme.load_icon("media-playback-stop", 16, 0)
         return label, icon
 
+    def get_record_label(self):
+        """ Return label and icon for Playback menu/button """
+        icontheme = Gtk.IconTheme.get_default()
+        if not self.__recording:
+            label = "Record"
+            icon = icontheme.load_icon("media-record", 16, 0)
+        else:
+            label = "Stop recording"
+            icon = icontheme.load_icon("media-playback-stop", 16, 0)
+        return label, icon
+
 GObject.threads_init()
 Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 notify2.init('')
 
 player = SilverPlayer()
-silver = SilverWindow(player)
+recorder = SilverRecorder()
+silver = SilverWindow(player, recorder)
 
 Gtk.main()
 player.clean()
