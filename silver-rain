@@ -228,6 +228,7 @@ class SilverGUI(Gtk.Window):
         self.__recording__ = False
         self.__recorder__ = recorder
         self.__volume__ = 100
+        self.__muted__ = 0
 
         self.__main_window__ = True
         self.__about_window__ = False
@@ -276,7 +277,7 @@ class SilverGUI(Gtk.Window):
         music.set_submenu(music_menu)
         ## Play
         self.menubar_play = self.create_menuitem("Play", "media-playback-start")
-        self.menubar_play.set_size_request(50, -1)
+        self.menubar_play.set_size_request(90, -1)
         self.menubar_play.connect("activate", self.playback_toggle)
         ## Stop
         self.menubar_stop = self.create_menuitem("Stop", "media-playback-stop")
@@ -290,7 +291,9 @@ class SilverGUI(Gtk.Window):
         self.menubar_stop_recording.set_sensitive(False)
         self.menubar_stop_recording.connect("activate", self.record_toggle)
         ## Mute
-        mute = self.create_menuitem("Mute", "audio-volume-muted")
+        #mute = self.create_menuitem("Mute", "audio-volume-muted")
+        self.menubar_mute = Gtk.CheckMenuItem("Mute")
+        self.menubar_mute.connect("toggled", self.mute_toggle)
         ## Preferences
         prefs = self.create_menuitem("Preferences", "gtk-preferences")
         prefs.connect("activate", self.create_prefs_window)
@@ -304,7 +307,7 @@ class SilverGUI(Gtk.Window):
 
         for item in [self.menubar_play, self.menubar_stop,
                      self.menubar_record, self.menubar_stop_recording,
-                     sep[0], mute, sep[1], prefs, sep[2], quit]:
+                     sep[0], self.menubar_mute, sep[1], prefs, sep[2], quit]:
             music_menu.append(item)
 
         # Help
@@ -313,7 +316,7 @@ class SilverGUI(Gtk.Window):
         help.set_submenu(help_menu)
         ## About
         about = self.create_menuitem("About", "gtk-about")
-        about.set_size_request(50, -1)
+        about.set_size_request(90, -1)
         about.connect("activate", self.create_about_window)
         help_menu.append(about)
 
@@ -321,38 +324,69 @@ class SilverGUI(Gtk.Window):
         menubar.append(help)
         return menubar
 
-### Control panel
+    def menubar_mute_toggle(self):
+        if self.__muted__:
+            self.menubar_mute.set_active(False)
+        else:
+            self.menubar_mute.set_active(True)
+
+    def create_toolbutton(self, icon):
+        ## Playback Button
+        button = Gtk.ToolButton()
+        button.set_icon_name(icon)
+        button.focus_on_click = False
+        return button
+
+### Toolbar
     def create_control_panel(self):
         """ Playback control buttons """
-        # Controls
-        control_panel = Gtk.Box(spacing=15)
-        control_panel.set_border_width(5)
+        toolbar = Gtk.Toolbar()
+        toolbar.set_orientation(Gtk.Orientation.HORIZONTAL)
+        toolbar.set_style(Gtk.ToolbarStyle.ICONS)
+
+        control_panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         ## Playback Button
-        text = self.get_playback_label()[0]
-        self.playback_button = Gtk.ToggleButton(text)
-        self.playback_button.connect("toggled", self.playback_toggle)
-        self.playback_button.set_size_request(60, 40)
-        control_panel.pack_start(self.playback_button, False, False, 0)
+        icon = self.get_playback_label()[1]
+        self.playback_button = self.create_toolbutton(icon)
+        self.playback_button.connect("clicked", self.playback_toggle)
         ## Record Button
-        text = self.get_record_label()[0]
-        self.record_button = Gtk.ToggleButton(text)
-        self.record_button.connect("toggled", self.record_toggle)
-        self.record_button.set_size_request(100, 40)
-        control_panel.pack_start(self.record_button, False, False, 0)
+        icon = self.get_record_label()[1]
+        self.record_button = self.create_toolbutton(icon)
+        self.record_button.connect("clicked", self.record_toggle)
+        self.record_button.focus_on_click = True
+        ## Mute Button
+        icon = self.get_volume_icon()
+        self.mute_button = self.create_toolbutton(icon)
+        self.mute_button.connect("clicked", self.tb_mute)
+
+        toolbar.insert(self.playback_button, 0)
+        toolbar.insert(self.record_button, 1)
+        toolbar.insert(self.mute_button, 2)
         ## Volume scale
         ad = Gtk.Adjustment(value=self.__volume__, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
         self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=ad)
         self.volume.set_property('draw-value', False)
         self.volume.connect("value-changed", self.cp_on_volume_changed)
         self.volume.set_size_request(80, 0)
+
+        control_panel.pack_start(toolbar, False, False, 0)
         control_panel.pack_start(self.volume, False, False, 0)
+
         return control_panel
 
+    def tb_mute(self, arg):
+        self.menubar_mute_toggle()
+
     def cp_on_volume_changed(self, scale):
-        value = scale.get_value()
-        self.__player__.volume_set(value)
+        self.__volume__ = scale.get_value()
+        if (not self.__muted__ and self.__volume__ == 0) or (self.__muted__ and self.__volume__ > 0):
+            self.menubar_mute_toggle()
+        self.__player__.volume_set(self.__volume__)
 
 ### Popup menu
+    def popup_mute(self, arg):
+        self.menubar_mute_toggle()
+
     def create_popup_menu(self, icon, button, time):
         """ Show menu on right click """
         self.popup_menu = Gtk.Menu()
@@ -366,7 +400,10 @@ class SilverGUI(Gtk.Window):
         record = self.create_menuitem(text, icon)
         record.connect("activate", self.record_toggle)
         # Mute
-        mute = self.create_menuitem("Mute", "audio-volume-muted")
+        mute = Gtk.CheckMenuItem("Mute")
+        if self.__muted__:
+            mute.set_active(True)
+        mute.connect("toggled", self.popup_mute)
         # Preferences
         preferences = self.create_menuitem("Preferences", "gtk-preferences")
         preferences.connect("activate", self.create_prefs_window)
@@ -385,6 +422,7 @@ class SilverGUI(Gtk.Window):
         def pos_func(menu, x, y, icon):
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
         self.popup_menu.popup(None, None, pos_func, self.status_icon, button, time)
+
 
 ### Status Icon
     def create_status_icon(self):
@@ -408,10 +446,13 @@ class SilverGUI(Gtk.Window):
         direction = data.direction
         if direction == Gdk.ScrollDirection.UP:
             self.__volume__ = self.__player__.volume_step(True)
+            if self.__muted__:
+                self.menubar_mute_toggle()
         elif direction == Gdk.ScrollDirection.DOWN:
             self.__volume__ = self.__player__.volume_step(False)
+            if self.__volume__ == 0:
+                self.menubar_mute_toggle()
         self.volume.set_value(self.__volume__)
-        #TODO: add mute change button
 
 ### Preferences window
     def create_prefs_window(self, something):
@@ -445,26 +486,41 @@ class SilverGUI(Gtk.Window):
 
     def playback_toggle(self, button):
         self.__playing__ = not self.__playing__
-        self.playback_button.set_label(self.get_playback_label()[0])
+        self.playback_button.set_icon_name(self.get_playback_label()[1])
+
         if self.__playing__:
             self.menubar_play.set_sensitive(False)
             self.menubar_stop.set_sensitive(True)
         else:
             self.menubar_play.set_sensitive(True)
             self.menubar_stop.set_sensitive(False)
+
         self.__player__.playback_toggle()
         self.show_notification()
 
     def record_toggle(self, button):
         self.__recording__ = not self.__recording__
-        self.record_button.set_label(self.get_record_label()[0])
+        self.record_button.set_icon_name(self.get_record_label()[1])
         if self.__recording__:
             self.menubar_record.set_sensitive(False)
             self.menubar_stop_recording.set_sensitive(True)
         else:
             self.menubar_record.set_sensitive(True)
             self.menubar_stop_recording.set_sensitive(False)
+
         self.__recorder__.record_toggle()
+
+    def mute_toggle(self, button, val=0):
+        if self.__muted__:
+            self.__volume__ = self.__muted__
+            self.__muted__ = 0
+        else:
+            self.__muted__ = self.__volume__ or 5
+            self.__volume__ = 0
+
+        self.__player__.volume_set(self.__volume__)
+        self.mute_button.set_icon_name(self.get_volume_icon())
+        self.volume.set_value(self.__volume__)
 
     def get_playback_label(self):
         """ Return label and icon for Playback menu/button """
@@ -485,6 +541,14 @@ class SilverGUI(Gtk.Window):
             label = "Stop recording"
             icon = "media-playback-stop"
         return label, icon
+
+    def get_volume_icon(self):
+        """ Return label and icon for Playback menu/button """
+        if self.__muted__:
+            icon = "audio-volume-muted"
+        else:
+            icon = "audio-volume-high"
+        return icon
 
     def show_notification(self):
         if self.__playing__:

@@ -1,16 +1,7 @@
-/*@define-color menu_separator mix (@menu_fg_color, @menu_bg_color, 0.95);
-*/
-/*@define-color fg_color #000000;
-*/
-
 /*
-.menuitem,
-.menu .menuitem { 
-	border-radius: 0;
-	border-style: solid;
-	border-width: 0px;
-	[> up, right, down, left <]
-	padding: 0px 2px 0px 4px;
+.button.flat {
+    border-color: transparent;
+    background-image: none;
+    box-shadow: none;
 }
 */
-
