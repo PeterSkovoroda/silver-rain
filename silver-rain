@@ -5,15 +5,22 @@ gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gst, Gtk, GObject, Gdk
 from gi.repository.GdkPixbuf import Pixbuf
-
+#TODO: check if exist
 import notify2
 
 import signal
 import logging
 
-broadcast_url = 'http://icecast.silver.cdnvideo.ru/silver'
+stream_url_list = [
+        'http://icecast.silver.cdnvideo.ru/silver',
+        'http://radiosilver.corbina.net:8000/silver128.mp3',
+        'http://radiosilver.corbina.net:8000/silver48.mp3'
+        ]
+broadcast_url = stream_url_list[0]
+
 css_path = 'silver-rain.css'
 
+# Own style
 #style_provider = Gtk.CssProvider()
 #css = open(css_path, 'rb')
 #css_data = css.read()
@@ -22,10 +29,10 @@ css_path = 'silver-rain.css'
 #Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(), style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
 class SilverPlayer():
-    """ Gstreamer container for network audio stream
-        Use souphttpsrc from GStreamer-1.0-good-plagins """
+    """ Gstreamer container for playing network audio stream
+        sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
     def __init__(self):
-        self.__playing = False
+        self.__playing__ = False
         self.create_pipeline()
 
     def clean(self):
@@ -34,17 +41,16 @@ class SilverPlayer():
 
     def playback_get(self):
         """ Return playback status """
-        return self.__playing
+        return self.__playing__
 
     def playback_toggle(self):
         """ Playback trigger """
-        if not self.__playing:
+        self.__playing__ = not self.__playing__
+        if self.__playing__:
             ret = self.pipeline.set_state(Gst.State.PLAYING)
-            self.__playing = True
         else:
             # Switch state to READY to prevent EOS
             ret = self.pipeline.set_state(Gst.State.READY)
-            self.__playing = False
 
         if ret == Gst.StateChangeReturn.FAILURE:
             logging.error("Couldn't change state")
@@ -62,7 +68,7 @@ class SilverPlayer():
 
     def volume_step(self, increase):
         """ Increase/decrease volume by 5
-            Return new value """
+            Returns new value """
         value = self.pipeline.get_by_name('volume').get_property('volume')
         if increase:
             if value >= 0.95:
@@ -78,8 +84,6 @@ class SilverPlayer():
         return int(value * 100.)
 
     def create_pipeline(self):
-        """ sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
-        # Empty pipeline
         self.pipeline = Gst.Pipeline.new("SilverPlayer")
         if not self.pipeline:
             logging.error("Couldn't create pipeline")
@@ -106,9 +110,9 @@ class SilverPlayer():
 
         # Link elements
         def pad_added_callback(decode, pad):
-            """ Link every decodebin source pad with audioconvert """
             if pad.is_linked():
-                return      # Already linked. Do nothing
+                # Already linked. Skip
+                return
             return pad.link(self.elements["convert"].get_static_pad('sink'))
 
         self.elements["decode"].connect('pad-added', pad_added_callback)
@@ -125,7 +129,6 @@ class SilverPlayer():
         msg_bus.connect('message', self.message_handler)
 
     def message_handler(self, bus, msg):
-        """ Pipeline bus handler """
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
@@ -138,9 +141,9 @@ class SilverPlayer():
 
 class SilverRecorder():
     """ Gstreamer container for audio recording
-        Use souphttpsrc from GStreamer-1.0-good-plagins """
+        sophttpsrc -> icydemux -> filesink """
     def __init__(self):
-        self.__recording = False
+        self.__recording__ = False
         self.create_pipeline()
 
     def clean(self):
@@ -148,18 +151,17 @@ class SilverRecorder():
         self.pipeline.set_state(Gst.State.NULL)
 
     def record_get(self):
-        """ Return playback status """
-        return self.__recording
+        """ Return recorder status """
+        return self.__recording__
 
     def record_toggle(self):
-        """ Playback trigger """
-        if not self.__recording:
+        """ Record trigger """
+        self.__recording__ = not self.__recording__
+        if self.__recording__:
             ret = self.pipeline.set_state(Gst.State.PLAYING)
-            self.__recording = True
         else:
             # Switch state to READY to prevent EOS
             ret = self.pipeline.set_state(Gst.State.READY)
-            self.__recording = False
 
         if ret == Gst.StateChangeReturn.FAILURE:
             logging.error("Couldn't change state")
@@ -167,9 +169,7 @@ class SilverRecorder():
             exit(-1)
 
     def create_pipeline(self):
-        """ sophttpsrc -> icydemux -> filesink """
-        # Empty pipeline
-        self.pipeline = Gst.Pipeline.new("SilverPlayer")
+        self.pipeline = Gst.Pipeline.new("SilverRecorder")
         if not self.pipeline:
             logging.error("Couldn't create pipeline")
             exit(-1)
@@ -193,9 +193,9 @@ class SilverRecorder():
 
         # Link elements
         def pad_added_callback(demux, pad):
-            """ Link every decodebin source pad with audioconvert """
             if pad.is_linked():
-                return      # Already linked. Do nothing
+                # Already linked. Skip
+                return
             return pad.link(self.elements["sink"].get_static_pad('sink'))
 
         self.elements["demux"].connect('pad-added', pad_added_callback)
@@ -204,14 +204,12 @@ class SilverRecorder():
             logging.error("Elements could not be linked")
             exit(-1)
 
-
         # Create message bus
         msg_bus = self.pipeline.get_bus()
         msg_bus.add_signal_watch()
         msg_bus.connect('message', self.message_handler)
 
     def message_handler(self, bus, msg):
-        """ Pipeline bus handler """
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
@@ -222,161 +220,205 @@ class SilverRecorder():
         else:
             pass
 
-class SilverWindow(Gtk.Window):
+class SilverGUI(Gtk.Window):
     """ GUI """
     def __init__(self, player, recorder):
-        self.__playing = False
-        self.__player = player
-        self.__recording = False
-        self.__recorder = recorder
-        self.__volume = 100
-        self.__main_win = True
+        self.__playing__ = False
+        self.__player__ = player
+        self.__recording__ = False
+        self.__recorder__ = recorder
+        self.__volume__ = 100
+
+        self.__main_window__ = True
+        self.__about_window__ = False
+        self.__prefs_window__ = False
 
         self.create_main_window()
-        self.status_icon_create()
+        self.create_status_icon()
+#TODO   self.create_notification()
         self.notification = notify2.Notification("", "", "")
 
-### Status Icon
-    def status_icon_create(self):
-        """ Create status icon """
-        self.status_icon = Gtk.StatusIcon()
-        self.status_icon.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
-        self.status_icon.connect("activate", self.status_icon_activate)
-        self.status_icon.connect("popup-menu", self.status_icon_popup)
-        self.status_icon.connect("scroll-event", self.status_icon_scroll)
+### Main Window
+    def create_main_window(self):
+        """ Init top window """
+        Gtk.Window.__init__(self, title="Silver Rain")
+        self.set_border_width(0)
+        self.set_default_size(250, 70)
+        self.connect("delete-event", self.mw_on_delete_event)
 
-    def status_icon_activate(self, icon):
-        """ Show/hide main window on left click """
-        self.__main_win = not self.__main_win
-        if self.__main_win:
-            self.show()
-        else:
-            self.hide()
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
-    def status_icon_popup(self, icon, button, time):
-        """ Show application menu on right click """
-        icontheme = Gtk.IconTheme.get_default()
+        menubar = self.create_menubar()
+        vbox.pack_start(menubar, False, False, 0)
+
+        sep = Gtk.Separator()
+        vbox.pack_start(sep, False, False, 0)
+
+        control_panel = self.create_control_panel()
+        vbox.pack_start(control_panel, False, False, 0)
+
+        self.add(vbox)
+        self.show_all()
+
+    def mw_on_delete_event(self, window, event):
+        """ Hide top window instead of destroying it """
+        self.__main_window__ = False
+        window.hide()
+        return True
+
+### Menubar
+    def create_menubar(self):
+        """ Menu bar """
+        menubar = Gtk.MenuBar()
+        # Music
+        music_menu = Gtk.Menu()
+        music = Gtk.MenuItem("Music")
+        music.set_submenu(music_menu)
+        ## Play
+        self.menubar_play = self.create_menuitem("Play", "media-playback-start")
+        self.menubar_play.set_size_request(50, -1)
+        self.menubar_play.connect("activate", self.playback_toggle)
+        ## Stop
+        self.menubar_stop = self.create_menuitem("Stop", "media-playback-stop")
+        self.menubar_stop.set_sensitive(False)
+        self.menubar_stop.connect("activate", self.playback_toggle)
+        ## Record
+        self.menubar_record = self.create_menuitem("Record", "media-record")
+        self.menubar_record.connect("activate", self.record_toggle)
+        ## Stop recording
+        self.menubar_stop_recording = self.create_menuitem("Stop recording", "media-playback-stop")
+        self.menubar_stop_recording.set_sensitive(False)
+        self.menubar_stop_recording.connect("activate", self.record_toggle)
+        ## Mute
+        mute = self.create_menuitem("Mute", "audio-volume-muted")
+        ## Preferences
+        prefs = self.create_menuitem("Preferences", "gtk-preferences")
+        prefs.connect("activate", self.create_prefs_window)
+        ## Quit
+        quit = self.create_menuitem("Quit", "gtk-quit")
+        quit.connect("activate", Gtk.main_quit)
+        ## Separator
+        sep = []
+        for i in range(3):
+            sep.append(Gtk.SeparatorMenuItem())
+
+        for item in [self.menubar_play, self.menubar_stop,
+                     self.menubar_record, self.menubar_stop_recording,
+                     sep[0], mute, sep[1], prefs, sep[2], quit]:
+            music_menu.append(item)
+
+        # Help
+        help_menu = Gtk.Menu()
+        help = Gtk.MenuItem("Help")
+        help.set_submenu(help_menu)
+        ## About
+        about = self.create_menuitem("About", "gtk-about")
+        about.set_size_request(50, -1)
+        about.connect("activate", self.create_about_window)
+        help_menu.append(about)
+
+        menubar.append(music)
+        menubar.append(help)
+        return menubar
+
+### Control panel
+    def create_control_panel(self):
+        """ Playback control buttons """
+        # Controls
+        control_panel = Gtk.Box(spacing=15)
+        control_panel.set_border_width(5)
+        ## Playback Button
+        text = self.get_playback_label()[0]
+        self.playback_button = Gtk.ToggleButton(text)
+        self.playback_button.connect("toggled", self.playback_toggle)
+        self.playback_button.set_size_request(60, 40)
+        control_panel.pack_start(self.playback_button, False, False, 0)
+        ## Record Button
+        text = self.get_record_label()[0]
+        self.record_button = Gtk.ToggleButton(text)
+        self.record_button.connect("toggled", self.record_toggle)
+        self.record_button.set_size_request(100, 40)
+        control_panel.pack_start(self.record_button, False, False, 0)
+        ## Volume scale
+        ad = Gtk.Adjustment(value=self.__volume__, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
+        self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=ad)
+        self.volume.set_property('draw-value', False)
+        self.volume.connect("value-changed", self.cp_on_volume_changed)
+        self.volume.set_size_request(80, 0)
+        control_panel.pack_start(self.volume, False, False, 0)
+        return control_panel
+
+    def cp_on_volume_changed(self, scale):
+        value = scale.get_value()
+        self.__player__.volume_set(value)
+
+### Popup menu
+    def create_popup_menu(self, icon, button, time):
+        """ Show menu on right click """
         self.popup_menu = Gtk.Menu()
-
         # Playback
         text, icon = self.get_playback_label()
-
-        play = Gtk.ImageMenuItem.new_with_mnemonic(text)
-        play.set_image(Gtk.Image.new_from_pixbuf(icon))
+        play = self.create_menuitem(text, icon)
+        play.connect("activate", self.playback_toggle)
         play.set_size_request(100, -1)
-        play.connect("activate", self.menu_playback_event)
-
+        # Record
+        text, icon = self.get_record_label()
+        record = self.create_menuitem(text, icon)
+        record.connect("activate", self.record_toggle)
+        # Mute
+        mute = self.create_menuitem("Mute", "audio-volume-muted")
         # Preferences
-        settings = Gtk.ImageMenuItem.new_with_mnemonic("Preferences")
-        icon = icontheme.load_icon("gtk-preferences", 16, 0)
-        settings.set_image(Gtk.Image.new_from_pixbuf(icon))
-
-        # About
-        about = Gtk.ImageMenuItem.new_with_mnemonic("About")
-        icon = icontheme.load_icon("gtk-about", 16, 0)
-        about.set_image(Gtk.Image.new_from_pixbuf(icon))
-        about.connect("activate", self.about_window_create)
-
-        # Separator
-        sep = Gtk.SeparatorMenuItem()
-
+        preferences = self.create_menuitem("Preferences", "gtk-preferences")
+        preferences.connect("activate", self.create_prefs_window)
         # Quit
-        quit = Gtk.ImageMenuItem.new_with_mnemonic("Quit")
-        icon = icontheme.load_icon("gtk-quit", 16, 0)
-        quit.set_image(Gtk.Image.new_from_pixbuf(icon))
+        quit = self.create_menuitem("Quit", "gtk-quit")
         quit.connect("activate", Gtk.main_quit)
+        # Separator
+        sep = []
+        for i in range(3):
+            sep.append(Gtk.SeparatorMenuItem())
 
-        self.popup_menu.append(play)
-        self.popup_menu.append(settings)
-        self.popup_menu.append(about)
-        self.popup_menu.append(sep)
-        self.popup_menu.append(quit)
+        for item in [play, record, sep[0], mute, sep[1], preferences, sep[2], quit]:
+            self.popup_menu.append(item)
         self.popup_menu.show_all()
 
         def pos_func(menu, x, y, icon):
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
         self.popup_menu.popup(None, None, pos_func, self.status_icon, button, time)
 
-    def status_icon_scroll(self, icon, data):
+### Status Icon
+    def create_status_icon(self):
+        self.status_icon = Gtk.StatusIcon()
+        #self.status_icon.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
+        self.status_icon.set_from_icon_name("media-tape")
+        self.status_icon.connect("activate", self.status_icon_on_activate)
+        self.status_icon.connect("popup-menu", self.create_popup_menu)
+        self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
+
+    def status_icon_on_activate(self, icon):
+        """ Show/hide main window on left click """
+        self.__main_window__ = not self.__main_window__
+        if self.__main_window__:
+            self.show()
+        else:
+            self.hide()
+
+    def status_icon_on_scroll(self, icon, data):
         """ Change volume by scrolling on status icon """
         direction = data.direction
         if direction == Gdk.ScrollDirection.UP:
-            self.__volume = self.__player.volume_step(True)
+            self.__volume__ = self.__player__.volume_step(True)
         elif direction == Gdk.ScrollDirection.DOWN:
-            self.__volume = self.__player.volume_step(False)
-        self.volume.set_value(self.__volume)
+            self.__volume__ = self.__player__.volume_step(False)
+        self.volume.set_value(self.__volume__)
+        #TODO: add mute change button
 
-    def menu_playback_event(self, menu):
-        self.playback_toggle(self.playback_button)
+### Preferences window
+    def create_prefs_window(self, something):
+        pass
 
-### Main Window
-    def create_main_window(self):
-        """ Init main window """
-        Gtk.Window.__init__(self, title="Silver Rain")
-        self.set_border_width(5)
-        self.set_default_size(250, 50)
-        # Hide main window in tray
-        self.connect("delete-event", self.hide_window)
-
-        box = Gtk.Box(spacing=15)
-        self.add(box)
-
-        # Playback Button
-        text = self.get_playback_label()[0]
-        self.playback_button = Gtk.ToggleButton(text)
-        self.playback_button.connect("toggled", self.playback_toggle)
-        box.pack_start(self.playback_button, True, True, 0)
-
-        # Record Button
-        text = self.get_record_label()[0]
-        self.record_button = Gtk.ToggleButton(text)
-        self.record_button.connect("toggled", self.record_toggle)
-        box.pack_start(self.record_button, True, True, 0)
-
-        # Volume scale
-        ad = Gtk.Adjustment(value=self.__volume, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
-        self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=ad)
-        self.volume.set_property('draw-value', False)
-        self.volume.connect("value-changed", self.volume_changed)
-        box.pack_start(self.volume, True, True, 0)
-
-        self.show_all()
-
-    def hide_window(self, window, event):
-        """ Hide top window instead on close """
-        self.__main_win = False
-        window.hide()
-        return True
-
-    def playback_toggle(self, button):
-        self.__playing = not self.__playing
-        button.set_label(self.get_playback_label()[0])
-        self.__player.playback_toggle()
-        self.show_notification()
-
-    def record_toggle(self, button):
-        self.__recording = not self.__recording
-        button.set_label(self.get_record_label()[0])
-        self.__recorder.record_toggle()
-
-    def show_notification(self):
-        if self.__playing:
-            text = "Playing"
-            body = "Silver Rain"
-            img = "notification-audio-play"
-        else:
-            text = "Stopped"
-            body = "Silver Rain"
-            img = "notification-audio-stop"
-        self.notification.update(text, body, img)
-        self.notification.show()
-
-    def volume_changed(self, scale):
-        value = scale.get_value()
-        self.__player.volume_set(value)
-
-### About Window
-    def about_window_create(self, icon):
+### About window
+    def create_about_window(self, icon):
         def uri_open(uri):
             Popen(['xdg-open', uri], stdout=PIPE)
         about = Gtk.AboutDialog()
@@ -388,28 +430,73 @@ class SilverWindow(Gtk.Window):
         about.run()
         about.destroy()
 
-###
+### Common
+    def create_menuitem(self, text, icon):
+        """ Create Menu item with icon """
+        icontheme = Gtk.IconTheme.get_default()
+        icon = icontheme.load_icon(icon, 16, 0)
+        img = Gtk.Image()
+        img.set_from_pixbuf(icon)
+
+        menuitem = Gtk.ImageMenuItem()
+        menuitem.set_image(img)
+        menuitem.set_label(text)
+        return menuitem
+
+    def playback_toggle(self, button):
+        self.__playing__ = not self.__playing__
+        self.playback_button.set_label(self.get_playback_label()[0])
+        if self.__playing__:
+            self.menubar_play.set_sensitive(False)
+            self.menubar_stop.set_sensitive(True)
+        else:
+            self.menubar_play.set_sensitive(True)
+            self.menubar_stop.set_sensitive(False)
+        self.__player__.playback_toggle()
+        self.show_notification()
+
+    def record_toggle(self, button):
+        self.__recording__ = not self.__recording__
+        self.record_button.set_label(self.get_record_label()[0])
+        if self.__recording__:
+            self.menubar_record.set_sensitive(False)
+            self.menubar_stop_recording.set_sensitive(True)
+        else:
+            self.menubar_record.set_sensitive(True)
+            self.menubar_stop_recording.set_sensitive(False)
+        self.__recorder__.record_toggle()
+
     def get_playback_label(self):
         """ Return label and icon for Playback menu/button """
-        icontheme = Gtk.IconTheme.get_default()
-        if not self.__playing:
+        if not self.__playing__:
             label = "Play"
-            icon = icontheme.load_icon("media-playback-start", 16, 0)
+            icon = "media-playback-start"
         else:
             label = "Stop"
-            icon = icontheme.load_icon("media-playback-stop", 16, 0)
+            icon = "media-playback-stop"
         return label, icon
 
     def get_record_label(self):
         """ Return label and icon for Playback menu/button """
-        icontheme = Gtk.IconTheme.get_default()
-        if not self.__recording:
+        if not self.__recording__:
             label = "Record"
-            icon = icontheme.load_icon("media-record", 16, 0)
+            icon = "media-record"
         else:
             label = "Stop recording"
-            icon = icontheme.load_icon("media-playback-stop", 16, 0)
+            icon = "media-playback-stop"
         return label, icon
+
+    def show_notification(self):
+        if self.__playing__:
+            text = "Playing"
+            body = "Silver Rain"
+            img = "notification-audio-play"
+        else:
+            text = "Stopped"
+            body = "Silver Rain"
+            img = "notification-audio-stop"
+        self.notification.update(text, body, img)
+        self.notification.show()
 
 GObject.threads_init()
 Gst.init(None)
@@ -418,7 +505,8 @@ notify2.init('')
 
 player = SilverPlayer()
 recorder = SilverRecorder()
-silver = SilverWindow(player, recorder)
+silver = SilverGUI(player, recorder)
 
 Gtk.main()
 player.clean()
+recorder.clean()
