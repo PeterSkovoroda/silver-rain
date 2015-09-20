@@ -6,7 +6,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gst, Gtk, GObject, Gdk
 from gi.repository.GdkPixbuf import Pixbuf
 #TODO: check if exist
-import notify2
+from gi.repository import Notify
 
 import signal
 import logging
@@ -246,7 +246,7 @@ class SilverGUI(Gtk.Window):
         self.create_main_window()
         self.create_status_icon()
 #TODO   self.create_notification()
-        self.notification = notify2.Notification("", "", "")
+        self.notification = Notify.Notification.new("Header", "Body", "image")
 
 ### Main Window
     def create_main_window(self):
@@ -594,7 +594,7 @@ class SilverGUI(Gtk.Window):
 GObject.threads_init()
 Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
-notify2.init('')
+Notify.init("Silver Rain")
 
 player = SilverPlayer()
 recorder = SilverRecorder()
@@ -605,5 +605,6 @@ if not os.path.exists(recordings_folder):
     os.makedirs(recordings_folder)
 
 Gtk.main()
+Notify.uninit()
 player.clean()
 recorder.clean()
