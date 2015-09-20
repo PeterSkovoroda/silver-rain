@@ -5,13 +5,14 @@ gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gst, Gtk, GObject, Gdk
 from gi.repository.GdkPixbuf import Pixbuf
-#TODO: check if exist
 from gi.repository import Notify
 
 import signal
 import logging
 import datetime
 import os
+
+import xml.etree.ElementTree as etree
 
 stream_url_list = [
         'http://icecast.silver.cdnvideo.ru/silver',
@@ -20,11 +21,11 @@ stream_url_list = [
         ]
 broadcast_url = stream_url_list[0]
 
-css_path = 'silver-rain.css'
-
 recordings_folder = "/home/petr/SilverRain/"
+sched_file = "sched.xml"
 
 # Own style
+css_path = 'silver-rain.css'
 #style_provider = Gtk.CssProvider()
 #css = open(css_path, 'rb')
 #css_data = css.read()
@@ -253,7 +254,7 @@ class SilverGUI(Gtk.Window):
         """ Init top window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(0)
-        self.set_default_size(250, 50)
+        self.set_default_size(250, 250)
         self.connect("delete-event", self.mw_on_delete_event)
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -264,8 +265,11 @@ class SilverGUI(Gtk.Window):
         sep = Gtk.Separator()
         vbox.pack_start(sep, False, False, 0)
 
+        tree = self.create_tree()
+        vbox.pack_start(tree, True, True, 0)
+
         control_panel = self.create_control_panel()
-        vbox.pack_start(control_panel, False, False, 0)
+        vbox.pack_end(control_panel, False, False, 0)
 
         self.add(vbox)
         self.show_all()
@@ -275,6 +279,56 @@ class SilverGUI(Gtk.Window):
         self.__main_window__ = False
         window.hide()
         return True
+
+### List
+    def parse_xml_sched(self):
+        sched_list = []
+        def parse_obj(obj):
+            time = obj.find('start').text + " - " + obj.find('end').text
+            title = obj.find('title').text
+            host = obj.find('host').text
+            return time, title, host
+
+        tree = etree.parse(sched_file)
+        root = tree.getroot()
+
+        for obj in root:
+            time, title, host = parse_obj(obj)
+            sched_list.append((time, title, host))
+            #for child in obj.findall('object'):
+            #    time, title, host = parse_obj(child)
+            #    sched_list.append((time, title, host))
+
+        print(sched_list)
+        return sched_list
+
+    def create_tree(self):
+        store = Gtk.ListStore(str, str, str)
+
+        sched_list_get = self.parse_xml_sched()
+        for item in sched_list_get:
+            print(item)
+            store.append(item)
+
+        #treestore = Gtk.TreeStore(str, str, str)
+
+        #it = treestore.append(None, ("18:00-19:00", "Хождение по звукам", "Лев Ганкин"))
+        #treestore.append(it, ["18:35-18:40"]) #, "Перемотка за 20 лет", "Люся Грин"])
+        #store.append(treestore)
+
+        tree = Gtk.TreeView(store)
+
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Time", renderer, text=0)
+        tree.append_column(column)
+
+        column = Gtk.TreeViewColumn("Title", renderer, text=1)
+        tree.append_column(column)
+
+        column = Gtk.TreeViewColumn("Host", renderer, text=2)
+        tree.append_column(column)
+
+        return tree
 
 ### Menubar
     def create_menubar(self):
