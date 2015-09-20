@@ -135,7 +135,7 @@ class SilverPlayer():
             logging.error("Error from element %s: %s" % (msg.src.get_name(), err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
-            self.clean(self)
+            self.clean()
         else:
             pass
 
@@ -216,7 +216,7 @@ class SilverRecorder():
             logging.error("Error from element %s: %s" % (msg.src.get_name(), err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
-            self.clean(self)
+            self.clean()
         else:
             pass
 
@@ -244,7 +244,7 @@ class SilverGUI(Gtk.Window):
         """ Init top window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(0)
-        self.set_default_size(250, 70)
+        self.set_default_size(250, 50)
         self.connect("delete-event", self.mw_on_delete_event)
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -270,6 +270,8 @@ class SilverGUI(Gtk.Window):
 ### Menubar
     def create_menubar(self):
         """ Menu bar """
+        agr = Gtk.AccelGroup()
+        self.add_accel_group(agr)
         menubar = Gtk.MenuBar()
         # Music
         music_menu = Gtk.Menu()
@@ -279,27 +281,41 @@ class SilverGUI(Gtk.Window):
         self.menubar_play = self.create_menuitem("Play", "media-playback-start")
         self.menubar_play.set_size_request(90, -1)
         self.menubar_play.connect("activate", self.playback_toggle)
+        key, mod = Gtk.accelerator_parse("F6")
+        self.menubar_play.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         ## Stop
         self.menubar_stop = self.create_menuitem("Stop", "media-playback-stop")
         self.menubar_stop.set_sensitive(False)
         self.menubar_stop.connect("activate", self.playback_toggle)
+        key, mod = Gtk.accelerator_parse("F7")
+        self.menubar_stop.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         ## Record
         self.menubar_record = self.create_menuitem("Record", "media-record")
         self.menubar_record.connect("activate", self.record_toggle)
+        key, mod = Gtk.accelerator_parse("F8")
+        self.menubar_record.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         ## Stop recording
         self.menubar_stop_recording = self.create_menuitem("Stop recording", "media-playback-stop")
         self.menubar_stop_recording.set_sensitive(False)
         self.menubar_stop_recording.connect("activate", self.record_toggle)
+        key, mod = Gtk.accelerator_parse("F9")
+        self.menubar_stop_recording.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         ## Mute
-        #mute = self.create_menuitem("Mute", "audio-volume-muted")
         self.menubar_mute = Gtk.CheckMenuItem("Mute")
         self.menubar_mute.connect("toggled", self.mute_toggle)
+        key, mod = Gtk.accelerator_parse("<Control>M")
+        self.menubar_mute.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         ## Preferences
         prefs = self.create_menuitem("Preferences", "gtk-preferences")
         prefs.connect("activate", self.create_prefs_window)
+        key, mod = Gtk.accelerator_parse("<Control>P")
+        prefs.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         ## Quit
         quit = self.create_menuitem("Quit", "gtk-quit")
         quit.connect("activate", Gtk.main_quit)
+        key, mod = Gtk.accelerator_parse("<Control>Q")
+        quit.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+
         ## Separator
         sep = []
         for i in range(3):
@@ -318,10 +334,13 @@ class SilverGUI(Gtk.Window):
         about = self.create_menuitem("About", "gtk-about")
         about.set_size_request(90, -1)
         about.connect("activate", self.create_about_window)
+        key, mod = Gtk.accelerator_parse("F1")
+        about.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
         help_menu.append(about)
 
         menubar.append(music)
         menubar.append(help)
+
         return menubar
 
     def menubar_mute_toggle(self):
@@ -329,13 +348,6 @@ class SilverGUI(Gtk.Window):
             self.menubar_mute.set_active(False)
         else:
             self.menubar_mute.set_active(True)
-
-    def create_toolbutton(self, icon):
-        ## Playback Button
-        button = Gtk.ToolButton()
-        button.set_icon_name(icon)
-        button.focus_on_click = False
-        return button
 
 ### Toolbar
     def create_control_panel(self):
@@ -357,7 +369,7 @@ class SilverGUI(Gtk.Window):
         ## Mute Button
         icon = self.get_volume_icon()
         self.mute_button = self.create_toolbutton(icon)
-        self.mute_button.connect("clicked", self.tb_mute)
+        self.mute_button.connect("clicked", self.cp_on_mute)
 
         toolbar.insert(self.playback_button, 0)
         toolbar.insert(self.record_button, 1)
@@ -374,19 +386,23 @@ class SilverGUI(Gtk.Window):
 
         return control_panel
 
-    def tb_mute(self, arg):
-        self.menubar_mute_toggle()
-
     def cp_on_volume_changed(self, scale):
         self.__volume__ = scale.get_value()
         if (not self.__muted__ and self.__volume__ == 0) or (self.__muted__ and self.__volume__ > 0):
             self.menubar_mute_toggle()
         self.__player__.volume_set(self.__volume__)
 
-### Popup menu
-    def popup_mute(self, arg):
+    def cp_on_mute(self, arg):
         self.menubar_mute_toggle()
 
+    def create_toolbutton(self, icon):
+        ## Playback Button
+        button = Gtk.ToolButton()
+        button.set_icon_name(icon)
+        button.focus_on_click = False
+        return button
+
+### Popup menu
     def create_popup_menu(self, icon, button, time):
         """ Show menu on right click """
         self.popup_menu = Gtk.Menu()
@@ -423,11 +439,12 @@ class SilverGUI(Gtk.Window):
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
         self.popup_menu.popup(None, None, pos_func, self.status_icon, button, time)
 
+    def popup_mute(self, arg):
+        self.menubar_mute_toggle()
 
 ### Status Icon
     def create_status_icon(self):
         self.status_icon = Gtk.StatusIcon()
-        #self.status_icon.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
         self.status_icon.set_from_icon_name("media-tape")
         self.status_icon.connect("activate", self.status_icon_on_activate)
         self.status_icon.connect("popup-menu", self.create_popup_menu)
