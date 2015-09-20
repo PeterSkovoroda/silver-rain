@@ -10,6 +10,8 @@ import notify2
 
 import signal
 import logging
+import datetime
+import os
 
 stream_url_list = [
         'http://icecast.silver.cdnvideo.ru/silver',
@@ -19,6 +21,8 @@ stream_url_list = [
 broadcast_url = stream_url_list[0]
 
 css_path = 'silver-rain.css'
+
+recordings_folder = "/home/petr/SilverRain/"
 
 # Own style
 #style_provider = Gtk.CssProvider()
@@ -158,6 +162,11 @@ class SilverRecorder():
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
+            filename="Silver_Rain"
+            date = datetime.datetime.now()
+            file = recordings_folder + date.strftime("%m-%d-%y-%H:%M") + "-" + filename + ".mp3"
+            print(file)
+            self.pipeline.get_by_name('sink').set_property('location', file)
             ret = self.pipeline.set_state(Gst.State.PLAYING)
         else:
             # Switch state to READY to prevent EOS
@@ -590,6 +599,10 @@ notify2.init('')
 player = SilverPlayer()
 recorder = SilverRecorder()
 silver = SilverGUI(player, recorder)
+
+# Create directory for recordings if it does not exist
+if not os.path.exists(recordings_folder):
+    os.makedirs(recordings_folder)
 
 Gtk.main()
 player.clean()
