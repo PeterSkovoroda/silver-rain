@@ -388,7 +388,10 @@ class SilverGUI(Gtk.Window):
 
     def cp_on_volume_changed(self, scale):
         self.__volume__ = scale.get_value()
-        if (not self.__muted__ and self.__volume__ == 0) or (self.__muted__ and self.__volume__ > 0):
+        if not self.__muted__ and self.__volume__ == 0:
+            self.menubar_mute_toggle()
+        if self.__muted__ and self.__volume__ > 0:
+            self.__muted__ = self.__volume__
             self.menubar_mute_toggle()
         self.__player__.volume_set(self.__volume__)
 
