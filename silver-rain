@@ -4,7 +4,7 @@ import gi
 gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gst, Gtk, GObject, Gdk
-from gi.repository.GdkPixbuf import Pixbuf
+from gi.repository import GdkPixbuf
 from gi.repository import Notify
 
 import signal
@@ -14,6 +14,7 @@ import os
 
 import xml.etree.ElementTree as etree
 
+# Stream uri
 stream_url_list = [
         'http://icecast.silver.cdnvideo.ru/silver',
         'http://radiosilver.corbina.net:8000/silver128.mp3',
@@ -21,8 +22,10 @@ stream_url_list = [
         ]
 broadcast_url = stream_url_list[0]
 
+# Schedule XML file
 recordings_folder = "/home/petr/SilverRain/"
 sched_file = "sched.xml"
+img_location = "imgs/"
 
 # Own style
 css_path = 'silver-rain.css'
@@ -33,6 +36,8 @@ css_path = 'silver-rain.css'
 #style_provider.load_from_data(css_data)
 #Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(), style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
+SCHEDULE_COLORS = ["white", "beige"]
+
 class SilverPlayer():
     """ Gstreamer container for playing network audio stream
         sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
@@ -42,6 +47,7 @@ class SilverPlayer():
 
     def clean(self):
         """ Free pipeline """
+        self.__playing__ = False
         self.pipeline.set_state(Gst.State.NULL)
 
     def playback_get(self):
@@ -141,6 +147,7 @@ class SilverPlayer():
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
             self.clean()
+            self.playback_toggle()
         else:
             pass
 
@@ -153,6 +160,7 @@ class SilverRecorder():
 
     def clean(self):
         """ Free pipeline """
+        self.__recording__ = False
         self.pipeline.set_state(Gst.State.NULL)
 
     def record_get(self):
@@ -166,7 +174,6 @@ class SilverRecorder():
             filename="Silver_Rain"
             date = datetime.datetime.now()
             file = recordings_folder + date.strftime("%m-%d-%y-%H:%M") + "-" + filename + ".mp3"
-            print(file)
             self.pipeline.get_by_name('sink').set_property('location', file)
             ret = self.pipeline.set_state(Gst.State.PLAYING)
         else:
@@ -254,20 +261,30 @@ class SilverGUI(Gtk.Window):
         """ Init top window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(0)
-        self.set_default_size(250, 250)
+        self.set_default_size(650, 450)
         self.connect("delete-event", self.mw_on_delete_event)
+        # Schedule
+        self.schedule = self.schedule_get()
+        self.week_filter = datetime.date.today().strftime("%A")
 
+        # Main box
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-
+        ## Menubar
         menubar = self.create_menubar()
         vbox.pack_start(menubar, False, False, 0)
-
         sep = Gtk.Separator()
         vbox.pack_start(sep, False, False, 0)
-
+        ## Schedule tree
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.set_min_content_height(100)
         tree = self.create_tree()
-        vbox.pack_start(tree, True, True, 0)
-
+        scrolled_window.add(tree)
+        vbox.pack_start(scrolled_window, True, True, 0)
+        ## Selection
+        selection = self.create_selection()
+        vbox.pack_start(selection, False, False, 0)
+        # Controls
         control_panel = self.create_control_panel()
         vbox.pack_end(control_panel, False, False, 0)
 
@@ -280,55 +297,145 @@ class SilverGUI(Gtk.Window):
         window.hide()
         return True
 
-### List
-    def parse_xml_sched(self):
+### Schedule
+    def schedule_get(self):
+        """ Schedule list:
+            0   Weekday             str
+            1   StartTime           str
+            2   EndTime             str
+            3   Title               str
+            4   Host                str
+            5   EventImportant      bool
+            6   BackgroundColor     str
+            7   "-"                 str
+            8   Icon                pixbuf
+        """
         sched_list = []
-        def parse_obj(obj):
-            time = obj.find('start').text + " - " + obj.find('end').text
-            title = obj.find('title').text
-            host = obj.find('host').text
-            return time, title, host
-
+        bg_dark = False
+        # Parse XML file
         tree = etree.parse(sched_file)
         root = tree.getroot()
 
-        for obj in root:
-            time, title, host = parse_obj(obj)
-            sched_list.append((time, title, host))
-            #for child in obj.findall('object'):
-            #    time, title, host = parse_obj(child)
-            #    sched_list.append((time, title, host))
+        def get_bgcolor(important, dark):
+            # Alternate row colors
+            if important:
+                if dark:
+                    bg = SCHEDULE_COLORS[1]
+                else:
+                    bg = SCHEDULE_COLORS[0]
+            else:
+                if dark:
+                    bg = "gray90"
+                else:
+                    bg = "gray95"
+            return bg, not dark
 
-        print(sched_list)
+        def parse_obj(obj, important, dark):
+            start = obj.find('start').text
+            end = obj.find('end').text
+            title = obj.find('title').text
+            host = obj.find('host').text
+            icon = obj.find('icon').text
+            if icon == None:
+                icon = "img000.png"
+            bgcolor, dark = get_bgcolor(important, dark)
+            return start, end, title, host, icon, bgcolor, dark
+
+        for obj in root:
+            weekday = obj.attrib['day']
+            start, end, title, host, icon, bgcolor, bg_dark = parse_obj(obj, True, bg_dark)
+            icon = img_location + icon
+            #picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 75, 75, True)
+            picon = GdkPixbuf.Pixbuf.new_from_file(icon)
+
+            sched_list.append((weekday, start, end, title, host, True, bgcolor, "-", picon))
+            ch_dark = bg_dark
+            for child in obj.findall('child'):
+                start, end, title, host, icon, bgcolor, ch_dark = parse_obj(child, False, ch_dark)
+                icon = img_location + icon
+                picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60, 60, True)
+                sched_list.append((weekday, start, end, title, host, False, bgcolor, "-", picon))
         return sched_list
 
+### Selection
+    def create_selection(self):
+        """ Create selection buttons """
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]:
+            button = Gtk.ToggleButton(day)
+            button.connect("toggled", self.selection_on_clicked)
+            hbox.pack_start(button, True, True, 0)
+        return hbox
+
+    def selection_on_clicked(self, button):
+        """ Filter Treeview by selected weekday """
+        self.week_filter = button.get_label()
+        self.filter.refilter()
+
+### Schedule tree
     def create_tree(self):
-        store = Gtk.ListStore(str, str, str)
+        """ Create schedule tree """
+        store = Gtk.TreeStore(str, str, str, str, str, bool, str, str, GdkPixbuf.Pixbuf)
+        self.filter = store.filter_new()
+        self.filter.set_visible_func(self.sched_filter_func)
 
-        sched_list_get = self.parse_xml_sched()
-        for item in sched_list_get:
-            print(item)
-            store.append(item)
+        it = None
+        for item in self.schedule:
+            if item[5]:
+                it = store.append(None, item)
+            else:
+                store.append(it, item)
 
-        #treestore = Gtk.TreeStore(str, str, str)
+        sched_tree = Gtk.TreeView.new_with_model(self.filter)
+        sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
 
-        #it = treestore.append(None, ("18:00-19:00", "Хождение по звукам", "Лев Ганкин"))
-        #treestore.append(it, ["18:35-18:40"]) #, "Перемотка за 20 лет", "Люся Грин"])
-        #store.append(treestore)
-
-        tree = Gtk.TreeView(store)
+        # Icon
+        renderer = Gtk.CellRendererPixbuf()
+        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=8, background=6)
+        renderer.set_alignment(1, 0.5)
+        sched_tree.append_column(column)
 
         renderer = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Time", renderer, text=0)
-        tree.append_column(column)
+        renderer.set_alignment(0.5, 0.5)
+        # Time HH:MM - HH:MM
+        column = Gtk.TreeViewColumn("Time")
+        column.set_alignment(0.5)
+        column.set_min_width(10)
+        ## Start time
+        start = Gtk.CellRendererText()
+        start.set_alignment(1, 0.5)
+        ## "-"
+        delimiter = Gtk.CellRendererText()
+        delimiter.set_alignment(0.5, 0.5)
+        ## End time
+        end = Gtk.CellRendererText()
+        end.set_alignment(0, 0.5)
+        ## Packing
+        for item in [start, delimiter, end]:
+            column.pack_start(item, True)
+            column.add_attribute(item, "background", 6)
+        column.add_attribute(start, "text", 1)
+        column.add_attribute(delimiter, "text", 7)
+        column.add_attribute(end, "text", 2)
+        sched_tree.append_column(column)
+        # Title
+        renderer.set_alignment(0, 0.5)
+        column = Gtk.TreeViewColumn("Title", renderer, text=3, background=6)
+        column.set_alignment(0.5)
+        column.set_min_width(50)
+        column.set_resizable(True)
+        sched_tree.append_column(column)
+        # Host
+        column = Gtk.TreeViewColumn("Host", renderer, text=4, background=6)
+        column.set_alignment(0.5)
+        column.set_min_width(50)
+        column.set_resizable(True)
+        sched_tree.append_column(column)
+        return sched_tree
 
-        column = Gtk.TreeViewColumn("Title", renderer, text=1)
-        tree.append_column(column)
-
-        column = Gtk.TreeViewColumn("Host", renderer, text=2)
-        tree.append_column(column)
-
-        return tree
+    def sched_filter_func(self, model, iter, data):
+        """ Filter by weekday """
+        return model[iter][0] == self.week_filter
 
 ### Menubar
     def create_menubar(self):
