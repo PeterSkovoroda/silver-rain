@@ -25,7 +25,7 @@ broadcast_url = stream_url_list[0]
 # Schedule XML file
 recordings_folder = "/home/petr/SilverRain/"
 sched_file = "sched.xml"
-img_location = "imgs/"
+IMG_LOCATION = "imgs/"
 
 # Own style
 css_path = 'silver-rain.css'
@@ -36,7 +36,14 @@ css_path = 'silver-rain.css'
 #style_provider.load_from_data(css_data)
 #Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(), style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-SCHEDULE_COLORS = ["white", "beige"]
+# Colors
+# * Silver red - #FF4545
+# * Reddit red - #FF4C4C
+# * Kinda yellow - beige
+SCHEDULE_BG_COLORS      = ["white", "#FFD9D9"]
+SCHEDULE_FONT_COLORS    = ["black", "black"]
+CHILD_BG_COLORS         = ["gray93", "#FFEBEB"]
+CHILD_FONT_COLORS       = ["black", "black"]
 
 class SilverPlayer():
     """ Gstreamer container for playing network audio stream
@@ -301,13 +308,13 @@ class SilverGUI(Gtk.Window):
     def schedule_get(self):
         """ Schedule list:
             0   Weekday             str
-            1   StartTime           str
-            2   EndTime             str
-            3   Title               str
-            4   Host                str
-            5   EventImportant      bool
+            1   IsParent            bool
+            2   StartTime           str
+            3   EndTime             str
+            4   Title               str
+            5   Host                str
             6   BackgroundColor     str
-            7   "-"                 str
+            7   FontColor           str
             8   Icon                pixbuf
         """
         sched_list = []
@@ -316,21 +323,7 @@ class SilverGUI(Gtk.Window):
         tree = etree.parse(sched_file)
         root = tree.getroot()
 
-        def get_bgcolor(important, dark):
-            # Alternate row colors
-            if important:
-                if dark:
-                    bg = SCHEDULE_COLORS[1]
-                else:
-                    bg = SCHEDULE_COLORS[0]
-            else:
-                if dark:
-                    bg = "gray90"
-                else:
-                    bg = "gray95"
-            return bg, not dark
-
-        def parse_obj(obj, important, dark):
+        def parse_obj(obj):
             start = obj.find('start').text
             end = obj.find('end').text
             title = obj.find('title').text
@@ -338,23 +331,28 @@ class SilverGUI(Gtk.Window):
             icon = obj.find('icon').text
             if icon == None:
                 icon = "img000.png"
-            bgcolor, dark = get_bgcolor(important, dark)
-            return start, end, title, host, icon, bgcolor, dark
+            return start, end, title, host, icon
 
         for obj in root:
             weekday = obj.attrib['day']
-            start, end, title, host, icon, bgcolor, bg_dark = parse_obj(obj, True, bg_dark)
-            icon = img_location + icon
+            start, end, title, host, icon = parse_obj(obj)
+            icon = IMG_LOCATION + icon
             #picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 75, 75, True)
             picon = GdkPixbuf.Pixbuf.new_from_file(icon)
-
-            sched_list.append((weekday, start, end, title, host, True, bgcolor, "-", picon))
+            bg_color = SCHEDULE_BG_COLORS[bg_dark]
+            fg_color = SCHEDULE_FONT_COLORS[bg_dark]
+            bg_dark = not bg_dark
+            sched_list.append([weekday, True, start, end, title, host, bg_color, fg_color, picon])
+            # Parse children
             ch_dark = bg_dark
             for child in obj.findall('child'):
-                start, end, title, host, icon, bgcolor, ch_dark = parse_obj(child, False, ch_dark)
-                icon = img_location + icon
+                start, end, title, host, icon = parse_obj(child)
+                icon = IMG_LOCATION + icon
                 picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60, 60, True)
-                sched_list.append((weekday, start, end, title, host, False, bgcolor, "-", picon))
+                bg_color = CHILD_BG_COLORS[ch_dark]
+                fg_color = CHILD_FONT_COLORS[ch_dark]
+                sched_list.append([weekday, False, start, end, title, host, bg_color, fg_color, picon])
+                ch_dark = not ch_dark
         return sched_list
 
 ### Selection
@@ -375,58 +373,58 @@ class SilverGUI(Gtk.Window):
 ### Schedule tree
     def create_tree(self):
         """ Create schedule tree """
-        store = Gtk.TreeStore(str, str, str, str, str, bool, str, str, GdkPixbuf.Pixbuf)
+        store = Gtk.TreeStore(str, bool, str, str, str, str, str, GdkPixbuf.Pixbuf)
+        """ Store:
+            0   Weekday             str
+            1   IsParent            bool
+            2   Time                str
+            3   Title               str
+            4   Host                str
+            5   BackgroundColor     str
+            6   FontColor           str
+            7   Icon                pixbuf
+        """
         self.filter = store.filter_new()
         self.filter.set_visible_func(self.sched_filter_func)
 
         it = None
         for item in self.schedule:
-            if item[5]:
-                it = store.append(None, item)
+            if item[1]:
+                it = store.append(None,[item[0], item[1],
+                    item[2] + " - " + item[3],
+                    item[4], item[5], item[6], item[7], item[8]])
             else:
-                store.append(it, item)
+                store.append(it, [item[0], item[1],
+                    item[2] + " - " + item[3],
+                    item[4], item[5], item[6], item[7], item[8]])
 
         sched_tree = Gtk.TreeView.new_with_model(self.filter)
         sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
 
         # Icon
         renderer = Gtk.CellRendererPixbuf()
-        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=8, background=6)
+        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=7)
         renderer.set_alignment(1, 0.5)
         sched_tree.append_column(column)
 
         renderer = Gtk.CellRendererText()
+        renderer.set_padding(10, 0)
+        renderer.set_property('font', "11")
         renderer.set_alignment(0.5, 0.5)
-        # Time HH:MM - HH:MM
-        column = Gtk.TreeViewColumn("Time")
+        # Time
+        column = Gtk.TreeViewColumn("Time", renderer, text=2, background=5, foreground=6)
         column.set_alignment(0.5)
         column.set_min_width(10)
-        ## Start time
-        start = Gtk.CellRendererText()
-        start.set_alignment(1, 0.5)
-        ## "-"
-        delimiter = Gtk.CellRendererText()
-        delimiter.set_alignment(0.5, 0.5)
-        ## End time
-        end = Gtk.CellRendererText()
-        end.set_alignment(0, 0.5)
-        ## Packing
-        for item in [start, delimiter, end]:
-            column.pack_start(item, True)
-            column.add_attribute(item, "background", 6)
-        column.add_attribute(start, "text", 1)
-        column.add_attribute(delimiter, "text", 7)
-        column.add_attribute(end, "text", 2)
         sched_tree.append_column(column)
         # Title
         renderer.set_alignment(0, 0.5)
-        column = Gtk.TreeViewColumn("Title", renderer, text=3, background=6)
+        column = Gtk.TreeViewColumn("Title", renderer, text=3, background=5, foreground=6)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
         sched_tree.append_column(column)
         # Host
-        column = Gtk.TreeViewColumn("Host", renderer, text=4, background=6)
+        column = Gtk.TreeViewColumn("Host", renderer, text=4, background=5, foreground=6)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
@@ -527,6 +525,8 @@ class SilverGUI(Gtk.Window):
         toolbar.set_style(Gtk.ToolbarStyle.ICONS)
 
         control_panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        control_panel.set_spacing(6)
+        control_panel.set_border_width(6)
         ## Playback Button
         icon = self.get_playback_label()[1]
         self.playback_button = self.create_toolbutton(icon)
@@ -536,6 +536,11 @@ class SilverGUI(Gtk.Window):
         self.record_button = self.create_toolbutton(icon)
         self.record_button.connect("clicked", self.record_toggle)
         self.record_button.focus_on_click = True
+        ## Text
+        self.text = Gtk.Label("<span size='12000'><b>Currently Playing</b></span>")
+        self.text.set_use_markup(True)
+        self.text.set_selectable(True)
+        self.text.set_yalign(0.45)
         ## Mute Button
         icon = self.get_volume_icon()
         self.mute_button = self.create_toolbutton(icon)
@@ -543,7 +548,6 @@ class SilverGUI(Gtk.Window):
 
         toolbar.insert(self.playback_button, 0)
         toolbar.insert(self.record_button, 1)
-        toolbar.insert(self.mute_button, 2)
         ## Volume scale
         ad = Gtk.Adjustment(value=self.__volume__, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
         self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=ad)
@@ -552,7 +556,9 @@ class SilverGUI(Gtk.Window):
         self.volume.set_size_request(80, 0)
 
         control_panel.pack_start(toolbar, False, False, 0)
-        control_panel.pack_start(self.volume, False, False, 0)
+        control_panel.pack_start(self.text, True, False, 0)
+        control_panel.pack_end(self.volume, False, False, 0)
+        control_panel.pack_end(self.mute_button, False, False, 0)
 
         return control_panel
 
