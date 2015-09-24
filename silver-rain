@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -11,6 +11,7 @@ import signal
 import logging
 import datetime
 import os
+import threading
 
 import xml.etree.ElementTree as etree
 
@@ -22,10 +23,12 @@ stream_url_list = [
         ]
 broadcast_url = stream_url_list[0]
 
-# Schedule XML file
-recordings_folder = "/home/petr/SilverRain/"
-sched_file = "sched.xml"
-IMG_LOCATION = "imgs/"
+# System files
+APP_DIR = ".silver/"
+IMG_DIR = APP_DIR + "imgs/"
+RECS_DIR = "/home/petr/SilverRain/"
+
+SCHED_FILE = APP_DIR + "sched.xml"
 
 # Own style
 css_path = 'silver-rain.css'
@@ -45,6 +48,123 @@ SCHEDULE_FONT_COLORS    = ["black", "black"]
 CHILD_BG_COLORS         = ["gray93", "#FFEBEB"]
 CHILD_FONT_COLORS       = ["black", "black"]
 
+### Schedule
+class SilverSchedule():
+    """ Schedule list[weekday(0-6)]:
+        0   Weekday             str
+        1   IsParent            bool
+        2   StartTime   (HH:MM) str
+        3   EndTime     (HH:MM) str
+        4   Title               str
+        5   Host                str
+        6   BackgroundColor     str
+        7   FontColor           str
+        8   Icon                pixbuf
+        9   start               int
+        10  end                 int
+    """
+    def __init__(self):
+        self.__schedule__ = [ [] for x in range(7) ]
+        self.sched_get_from_xml()
+        self.__current__ = self.sched_update_current()
+
+    def sched_get_title(self):
+        return self.__current__[4]
+
+    def sched_get_icon(self):
+        return self.__current__[8]
+
+    def sched_update_current(self):
+        now_d = datetime.datetime.now()
+        now = datetime.timedelta(hours=now_d.hour, minutes=now_d.minute).total_seconds()
+
+        for item in self.__schedule__[now_d.weekday()]:
+            if item[9] <= now and now < item[10]:
+                return item
+
+    def sched_get_from_xml(self):
+        """ Parse XML file """
+        bg_dark = False
+#TODO   # Use lxml
+        # Parse XML file
+
+        tree = etree.parse(SCHED_FILE)
+        root = tree.getroot()
+
+        for obj in root:
+            # Get weekday
+            weekday = obj.attrib['day']
+            weekday_n = datetime.datetime.strptime("2015-1-" + weekday,
+                    "%Y-%W-%A").weekday()
+            # Get attributes
+            start, end, title, host, icon = self.parse_object(obj)
+            icon = IMG_DIR + icon
+            picon = GdkPixbuf.Pixbuf.new_from_file(icon)
+            # Colors
+            bg_color = SCHEDULE_BG_COLORS[bg_dark]
+            fg_color = SCHEDULE_FONT_COLORS[bg_dark]
+            bg_dark = not bg_dark
+            # Insert
+            self.__schedule__[weekday_n].append([weekday, True,
+                start, end, title, host, bg_color, fg_color, picon,
+                self.get_time(start), self.get_time(end)])
+            # Parse children
+            ch_dark = bg_dark
+            for child in obj.findall('child'):
+                # Attributes
+                start, end, title, host, icon = self.parse_object(child)
+                icon = IMG_DIR + icon
+                picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60, 60, True)
+                # Colors
+                bg_color = CHILD_BG_COLORS[ch_dark]
+                fg_color = CHILD_FONT_COLORS[ch_dark]
+                # Insert
+                self.__schedule__[weekday_n].append([weekday, False,
+                    start, end, title, host, bg_color, fg_color, picon,
+                    self.get_time(start), self.get_time(end)])
+                ch_dark = not ch_dark
+
+    def sched_get_from_html(self):
+#TODO   # wget
+        # parse with lxml
+        pass
+
+    def parse_object(self, obj):
+        """ Return start time, end time,
+            title, host and icon name """
+        start = obj.find('start').text
+        end = obj.find('end').text
+        title = obj.find('title').text
+        host = obj.find('host').text
+        icon = obj.find('icon').text
+        if icon == None:
+            icon = "img000.png"
+        return start, end, title, host, icon
+
+    def get_time(self, str):
+        try:
+            x = datetime.datetime.strptime(str, "%H:%M")
+        except ValueError:
+            # except 24:00
+            x = datetime.time.max
+        d = datetime.timedelta(hours=x.hour, minutes=x.minute)
+
+        return d.total_seconds()
+
+    def fill_tree_strore(self, store):
+        it = None
+        for x in range(7):
+            for item in self.__schedule__[x]:
+                if item[1]:
+                    it = store.append(None,[item[0], item[1],
+                        item[2] + " - " + item[3],
+                        item[4], item[5], item[6], item[7], item[8]])
+                else:
+                    store.append(it, [item[0], item[1],
+                        item[2] + " - " + item[3],
+                        item[4], item[5], item[6], item[7], item[8]])
+
+### Gstreamer classes
 class SilverPlayer():
     """ Gstreamer container for playing network audio stream
         sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
@@ -180,7 +300,7 @@ class SilverRecorder():
         if self.__recording__:
             filename="Silver_Rain"
             date = datetime.datetime.now()
-            file = recordings_folder + date.strftime("%m-%d-%y-%H:%M") + "-" + filename + ".mp3"
+            file = recordings_folder + datetime.date.strftime("%m-%d-%y-%H:%M") + "-" + filename + ".mp3"
             self.pipeline.get_by_name('sink').set_property('location', file)
             ret = self.pipeline.set_state(Gst.State.PLAYING)
         else:
@@ -246,7 +366,7 @@ class SilverRecorder():
 
 class SilverGUI(Gtk.Window):
     """ GUI """
-    def __init__(self, player, recorder):
+    def __init__(self, player, recorder, sched):
         self.__playing__ = False
         self.__player__ = player
         self.__recording__ = False
@@ -257,11 +377,24 @@ class SilverGUI(Gtk.Window):
         self.__main_window__ = True
         self.__about_window__ = False
         self.__prefs_window__ = False
+        self.__schedule__ = sched
+        self.week_filter = datetime.date.today().strftime("%A")
 
         self.create_main_window()
         self.create_status_icon()
 #TODO   self.create_notification()
         self.notification = Notify.Notification.new("Header", "Body", "image")
+
+### Timers
+    def timer_init_new(self):
+        self.__timer_update__ = threading.Timer(time, self.timer_callback_update)
+        pass
+
+    def timer_callback_update(self):
+        self.__schedule__.sched_update_current()
+        self.toolbar_update_label()
+        self.show_notification()
+        self.timer_init_new()
 
 ### Main Window
     def create_main_window(self):
@@ -270,9 +403,6 @@ class SilverGUI(Gtk.Window):
         self.set_border_width(0)
         self.set_default_size(650, 450)
         self.connect("delete-event", self.mw_on_delete_event)
-        # Schedule
-        self.schedule = self.schedule_get()
-        self.week_filter = datetime.date.today().strftime("%A")
 
         # Main box
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -304,56 +434,6 @@ class SilverGUI(Gtk.Window):
         window.hide()
         return True
 
-### Schedule
-    def schedule_get(self):
-        """ Schedule list:
-            0   Weekday             str
-            1   IsParent            bool
-            2   StartTime           str
-            3   EndTime             str
-            4   Title               str
-            5   Host                str
-            6   BackgroundColor     str
-            7   FontColor           str
-            8   Icon                pixbuf
-        """
-        sched_list = []
-        bg_dark = False
-        # Parse XML file
-        tree = etree.parse(sched_file)
-        root = tree.getroot()
-
-        def parse_obj(obj):
-            start = obj.find('start').text
-            end = obj.find('end').text
-            title = obj.find('title').text
-            host = obj.find('host').text
-            icon = obj.find('icon').text
-            if icon == None:
-                icon = "img000.png"
-            return start, end, title, host, icon
-
-        for obj in root:
-            weekday = obj.attrib['day']
-            start, end, title, host, icon = parse_obj(obj)
-            icon = IMG_LOCATION + icon
-            #picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 75, 75, True)
-            picon = GdkPixbuf.Pixbuf.new_from_file(icon)
-            bg_color = SCHEDULE_BG_COLORS[bg_dark]
-            fg_color = SCHEDULE_FONT_COLORS[bg_dark]
-            bg_dark = not bg_dark
-            sched_list.append([weekday, True, start, end, title, host, bg_color, fg_color, picon])
-            # Parse children
-            ch_dark = bg_dark
-            for child in obj.findall('child'):
-                start, end, title, host, icon = parse_obj(child)
-                icon = IMG_LOCATION + icon
-                picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60, 60, True)
-                bg_color = CHILD_BG_COLORS[ch_dark]
-                fg_color = CHILD_FONT_COLORS[ch_dark]
-                sched_list.append([weekday, False, start, end, title, host, bg_color, fg_color, picon])
-                ch_dark = not ch_dark
-        return sched_list
 
 ### Selection
     def create_selection(self):
@@ -387,16 +467,7 @@ class SilverGUI(Gtk.Window):
         self.filter = store.filter_new()
         self.filter.set_visible_func(self.sched_filter_func)
 
-        it = None
-        for item in self.schedule:
-            if item[1]:
-                it = store.append(None,[item[0], item[1],
-                    item[2] + " - " + item[3],
-                    item[4], item[5], item[6], item[7], item[8]])
-            else:
-                store.append(it, [item[0], item[1],
-                    item[2] + " - " + item[3],
-                    item[4], item[5], item[6], item[7], item[8]])
+        self.__schedule__.fill_tree_strore(store)
 
         sched_tree = Gtk.TreeView.new_with_model(self.filter)
         sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
@@ -536,11 +607,11 @@ class SilverGUI(Gtk.Window):
         self.record_button = self.create_toolbutton(icon)
         self.record_button.connect("clicked", self.record_toggle)
         self.record_button.focus_on_click = True
-        ## Text
-        self.text = Gtk.Label("<span size='12000'><b>Currently Playing</b></span>")
-        self.text.set_use_markup(True)
+        ## Label
+        self.text = Gtk.Label()
         self.text.set_selectable(True)
         self.text.set_yalign(0.45)
+        self.toolbar_update_label()
         ## Mute Button
         icon = self.get_volume_icon()
         self.mute_button = self.create_toolbutton(icon)
@@ -561,6 +632,10 @@ class SilverGUI(Gtk.Window):
         control_panel.pack_end(self.mute_button, False, False, 0)
 
         return control_panel
+
+    def toolbar_update_label(self):
+        self.text.set_text("<span size='12000'><b>" + self.__schedule__.sched_get_title() + "</b></span>")
+        self.text.set_use_markup(True)
 
     def cp_on_volume_changed(self, scale):
         self.__volume__ = scale.get_value()
@@ -748,14 +823,15 @@ class SilverGUI(Gtk.Window):
 
     def show_notification(self):
         if self.__playing__:
-            text = "Playing"
-            body = "Silver Rain"
-            img = "notification-audio-play"
+            text = "Silver Rain"
+            body = self.__schedule__.sched_get_title()
+            self.notification.set_icon_from_pixbuf(self.__schedule__.sched_get_icon())
+            self.notification.update(text, body)
         else:
-            text = "Stopped"
-            body = "Silver Rain"
+            text = "Silver Rain"
+            body = "Stopped"
             img = "notification-audio-stop"
-        self.notification.update(text, body, img)
+            self.notification.update(text, body, img)
         self.notification.show()
 
 GObject.threads_init()
@@ -763,15 +839,19 @@ Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 Notify.init("Silver Rain")
 
+# Create directory for recordings if it does not exist
+for dir in [APP_DIR, IMG_DIR, RECS_DIR]:
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
 player = SilverPlayer()
 recorder = SilverRecorder()
-silver = SilverGUI(player, recorder)
-
-# Create directory for recordings if it does not exist
-if not os.path.exists(recordings_folder):
-    os.makedirs(recordings_folder)
+sched = SilverSchedule()
+silver = SilverGUI(player, recorder, sched)
 
 Gtk.main()
+
+# Cleanup
 Notify.uninit()
 player.clean()
 recorder.clean()
