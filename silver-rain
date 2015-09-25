@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -12,6 +12,8 @@ import logging
 import datetime
 import os
 import threading
+
+from collections import deque
 
 import xml.etree.ElementTree as etree
 
@@ -48,56 +50,171 @@ SCHEDULE_FONT_COLORS    = ["black", "black"]
 CHILD_BG_COLORS         = ["gray93", "#FFEBEB"]
 CHILD_FONT_COLORS       = ["black", "black"]
 
+### Timers
+class SilverTimer():
+    def __init__(self, sched, window):
+        self.__sched__ = sched
+        self.__window__ = window
+
+        self.init_new_day_timer()
+        self.init_main_timer()
+        self.init_child_timer()
+
+    def clean(self):
+        self.__t_newday__.cancel()
+        self.__t_main__.cancel()
+        self.__t_child__.cancel()
+        self.__t_newday__.join()
+        self.__t_main__.join()
+        self.__t_child__.join()
+
+    def init_main_timer(self):
+        """ Event timer """
+        print("MAIN TIMER")
+        today = datetime.datetime.now()
+        now = datetime.timedelta(hours=today.hour,
+                minutes=today.minute, seconds=today.second).total_seconds()
+        event = self.__sched__.get_next_event()
+        if event:
+            time = int(event[9] - now)
+            print("-->MAIN TIMER ON EVENT:", event, "WITH TIMEOUT", time)
+            self.__t_main__ = threading.Timer(time, self.t_callback_main)
+            self.__t_main__.start()
+            print("-->MAIN TIMER STARTED")
+
+    def init_child_timer(self):
+        """ Children timer """
+        print("CHILD TIMER")
+        today = datetime.datetime.now()
+        now = datetime.timedelta(hours=today.hour,
+                minutes=today.minute, seconds=today.second).total_seconds()
+        event = self.__sched__.get_current()
+        if event[1]:
+            event = self.__sched__.get_next_child()
+            if event:
+                time = int(event[9] - now)
+                print("-->CHILD TIMER ON EVENT:", event, "WITH TIMEOUT", time)
+                self.__t_child__ = threading.Timer(time,
+                        self.t_callback_child)
+                self.__t_child__.start()
+        else:
+            # Already started. Timer on end
+            time = int(event[10] - now)
+            print("-->CHILD TIMER ON ENDING:", event, "WITH TIMEOUT", time)
+            self.__t_child__ = threading.Timer(time,
+                    self.t_callback_child)
+            self.__t_child__.start()
+
+    def init_new_day_timer(self):
+        """ Updater timer """
+        print("UPDATER TIMER")
+        today = datetime.datetime.now()
+        now = datetime.timedelta(hours=today.hour,
+                minutes=today.minute, seconds=today.second).total_seconds()
+        next = datetime.time.max
+        tomorrow = datetime.timedelta(hours=next.hour,
+                minutes=next.minute, seconds=next.second).total_seconds()
+        time = int(tomorrow - now) + 1
+        print("-->UPDATER TIMER WITH TIMEOUT", time)
+        self.__t_newday__ = threading.Timer(time, self.t_callback_newday)
+        self.__t_newday__.start()
+
+    def t_callback_newday(self):
+        """ Update agenda at 00:00 """
+        print("Newday callback")
+        self.__sched__.sched_update_current()
+        self.__window__.update_status()
+        self.init_main_timer()
+        self.init_child_timer()
+        self.init_new_day_timer()
+        self.__t_newday__.start()
+
+    def t_callback_main(self):
+        print("Main event callback")
+        self.__sched__.sched_update_current()
+        self.__window__.update_status()
+        self.init_main_timer()
+        self.__t_main__.start()
+
+    def t_callback_child(self):
+        print("Child event callback on start")
+        self.__sched__.sched_update_current()
+        self.__window__.update_status()
+        self.init_child_timer()
+        self.__t_child__.start()
+
 ### Schedule
 class SilverSchedule():
-    """ Schedule list[weekday(0-6)]:
-        0   Weekday             str
-        1   IsParent            bool
-        2   StartTime   (HH:MM) str
-        3   EndTime     (HH:MM) str
-        4   Title               str
-        5   Host                str
-        6   BackgroundColor     str
-        7   FontColor           str
-        8   Icon                pixbuf
-        9   start               int
-        10  end                 int
+    """
+        __sched_week__      - full schedule
+        __sched_day__       - daily agenda
+        __event__           - currently playing
+        __main_event__      - current event
+
+        Schedule list[weekday(0-6)]:
+            0   Weekday             str
+            1   IsParent            bool
+            2   StartTime   (HH:MM) str
+            3   EndTime     (HH:MM) str
+            4   Title               str
+            5   Host                str
+            6   BackgroundColor     str
+            7   FontColor           str
+            8   Icon                pixbuf
+            9   start               int
+            10  end                 int
     """
     def __init__(self):
-        self.__schedule__ = [ [] for x in range(7) ]
+        self.__sched_week__ = [ [] for x in range(7) ]
+        self.__sched_day__ = deque()
+        # Get schedule from file
         self.sched_get_from_xml()
-        self.__current__ = self.sched_update_current()
+        self.sched_gen_daily_agenda()
+        # Update current events
+        self.sched_update_current()
 
-    def sched_get_title(self):
-        return self.__current__[4]
-
-    def sched_get_icon(self):
-        return self.__current__[8]
+    def sched_gen_daily_agenda(self):
+        today = datetime.datetime.now()
+        now = datetime.timedelta(hours=today.hour,
+                minutes=today.minute).total_seconds()
+        for item in self.__sched_week__[today.weekday()]:
+            if item[10] < now:
+                # Already happened
+                continue
+            self.__sched_day__.append(item)
+        print("Daily agenda:", self.__sched_day__)
 
     def sched_update_current(self):
-        now_d = datetime.datetime.now()
-        now = datetime.timedelta(hours=now_d.hour, minutes=now_d.minute).total_seconds()
+        if not self.__sched_day__:
+            # It's a new day..
+            # It's so mundane. What exciting things will happen today?..
+            self.sched_gen_daily_agenda()
 
-        for item in self.__schedule__[now_d.weekday()]:
-            if item[9] <= now and now < item[10]:
-                return item
+        today = datetime.datetime.now()
+        now = datetime.timedelta(hours=today.hour, minutes=today.minute).total_seconds()
+
+        if self.__sched_day__[0][9] > now:
+            # Last child ended,
+            # Event not happened yet
+            self.__event__ = self.__main_event__
+        else:
+            item = self.__sched_day__.popleft()
+            if item[1]:
+                self.__main_event__ = item
+            self.__event__ = item
 
     def sched_get_from_xml(self):
         """ Parse XML file """
         bg_dark = False
-#TODO   # Use lxml
-        # Parse XML file
-
         tree = etree.parse(SCHED_FILE)
         root = tree.getroot()
-
         for obj in root:
             # Get weekday
             weekday = obj.attrib['day']
             weekday_n = datetime.datetime.strptime("2015-1-" + weekday,
                     "%Y-%W-%A").weekday()
             # Get attributes
-            start, end, title, host, icon = self.parse_object(obj)
+            start, end, title, host, icon = self.sched_parse_object(obj)
             icon = IMG_DIR + icon
             picon = GdkPixbuf.Pixbuf.new_from_file(icon)
             # Colors
@@ -105,31 +222,26 @@ class SilverSchedule():
             fg_color = SCHEDULE_FONT_COLORS[bg_dark]
             bg_dark = not bg_dark
             # Insert
-            self.__schedule__[weekday_n].append([weekday, True,
+            self.__sched_week__[weekday_n].append([weekday, True,
                 start, end, title, host, bg_color, fg_color, picon,
-                self.get_time(start), self.get_time(end)])
+                self.sched_parse_time(start), self.sched_parse_time(end)])
             # Parse children
             ch_dark = bg_dark
             for child in obj.findall('child'):
                 # Attributes
-                start, end, title, host, icon = self.parse_object(child)
+                start, end, title, host, icon = self.sched_parse_object(child)
                 icon = IMG_DIR + icon
                 picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60, 60, True)
                 # Colors
                 bg_color = CHILD_BG_COLORS[ch_dark]
                 fg_color = CHILD_FONT_COLORS[ch_dark]
                 # Insert
-                self.__schedule__[weekday_n].append([weekday, False,
+                self.__sched_week__[weekday_n].append([weekday, False,
                     start, end, title, host, bg_color, fg_color, picon,
-                    self.get_time(start), self.get_time(end)])
+                    self.sched_parse_time(start), self.sched_parse_time(end)])
                 ch_dark = not ch_dark
 
-    def sched_get_from_html(self):
-#TODO   # wget
-        # parse with lxml
-        pass
-
-    def parse_object(self, obj):
+    def sched_parse_object(self, obj):
         """ Return start time, end time,
             title, host and icon name """
         start = obj.find('start').text
@@ -141,20 +253,22 @@ class SilverSchedule():
             icon = "img000.png"
         return start, end, title, host, icon
 
-    def get_time(self, str):
+    def sched_parse_time(self, str):
+        """ Return time in seconds """
         try:
             x = datetime.datetime.strptime(str, "%H:%M")
         except ValueError:
             # except 24:00
             x = datetime.time.max
         d = datetime.timedelta(hours=x.hour, minutes=x.minute)
-
         return d.total_seconds()
 
+### Public
     def fill_tree_strore(self, store):
+        """ Fill TreeStore object """
         it = None
         for x in range(7):
-            for item in self.__schedule__[x]:
+            for item in self.__sched_week__[x]:
                 if item[1]:
                     it = store.append(None,[item[0], item[1],
                         item[2] + " - " + item[3],
@@ -163,6 +277,33 @@ class SilverSchedule():
                     store.append(it, [item[0], item[1],
                         item[2] + " - " + item[3],
                         item[4], item[5], item[6], item[7], item[8]])
+
+    def get_title(self):
+        """ Get title of current event """
+        return self.__event__[4]
+
+    def get_icon(self):
+        """ Get icon of current event """
+        return self.__event__[8]
+
+    def get_current(self):
+        return self.__event__
+
+    def get_next_event(self):
+        """ Get next main event for today """
+        for item in self.__sched_day__:
+            if item[1]:
+                print("Next event:", item)
+                return item
+        return None
+
+    def get_next_child(self):
+        """ Get next child event for today """
+        for item in self.__sched_day__:
+            if not item[1]:
+                print("Next child:", item)
+                return item
+        return None
 
 ### Gstreamer classes
 class SilverPlayer():
@@ -385,16 +526,10 @@ class SilverGUI(Gtk.Window):
 #TODO   self.create_notification()
         self.notification = Notify.Notification.new("Header", "Body", "image")
 
-### Timers
-    def timer_init_new(self):
-        self.__timer_update__ = threading.Timer(time, self.timer_callback_update)
-        pass
-
-    def timer_callback_update(self):
-        self.__schedule__.sched_update_current()
+### Updater
+    def update_status(self):
         self.toolbar_update_label()
         self.show_notification()
-        self.timer_init_new()
 
 ### Main Window
     def create_main_window(self):
@@ -634,7 +769,7 @@ class SilverGUI(Gtk.Window):
         return control_panel
 
     def toolbar_update_label(self):
-        self.text.set_text("<span size='12000'><b>" + self.__schedule__.sched_get_title() + "</b></span>")
+        self.text.set_text("<span size='12000'><b>" + self.__schedule__.get_title() + "</b></span>")
         self.text.set_use_markup(True)
 
     def cp_on_volume_changed(self, scale):
@@ -824,8 +959,8 @@ class SilverGUI(Gtk.Window):
     def show_notification(self):
         if self.__playing__:
             text = "Silver Rain"
-            body = self.__schedule__.sched_get_title()
-            self.notification.set_icon_from_pixbuf(self.__schedule__.sched_get_icon())
+            body = self.__schedule__.get_title()
+            self.notification.set_icon_from_pixbuf(self.__schedule__.get_icon())
             self.notification.update(text, body)
         else:
             text = "Silver Rain"
@@ -834,24 +969,25 @@ class SilverGUI(Gtk.Window):
             self.notification.update(text, body, img)
         self.notification.show()
 
+### Boom, baby
 GObject.threads_init()
 Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 Notify.init("Silver Rain")
-
-# Create directory for recordings if it does not exist
+# Create directories if they don't exist
 for dir in [APP_DIR, IMG_DIR, RECS_DIR]:
     if not os.path.exists(dir):
         os.makedirs(dir)
-
+# Init
 player = SilverPlayer()
 recorder = SilverRecorder()
 sched = SilverSchedule()
 silver = SilverGUI(player, recorder, sched)
-
+timer = SilverTimer(sched, silver)
+# Main loop
 Gtk.main()
-
 # Cleanup
 Notify.uninit()
 player.clean()
 recorder.clean()
+timer.clean()
