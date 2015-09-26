@@ -39,7 +39,9 @@ css_path = 'silver-rain.css'
 #css_data = css.read()
 #css.close()
 #style_provider.load_from_data(css_data)
-#Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(), style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+#Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(),
+#                                       style_provider,
+#                                       Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
 # Colors
 # * Silver red - #FF4545
@@ -56,6 +58,10 @@ class SilverTimer():
         self.__sched__ = sched
         self.__window__ = window
 
+        self.__t_newday__ = threading.Timer(0, None)
+        self.__t_main__ = threading.Timer(0, None)
+        self.__t_child__ = threading.Timer(0, None)
+
         self.init_new_day_timer()
         self.init_main_timer()
         self.init_child_timer()
@@ -64,9 +70,6 @@ class SilverTimer():
         self.__t_newday__.cancel()
         self.__t_main__.cancel()
         self.__t_child__.cancel()
-        self.__t_newday__.join()
-        self.__t_main__.join()
-        self.__t_child__.join()
 
     def init_main_timer(self):
         """ Event timer """
@@ -127,21 +130,18 @@ class SilverTimer():
         self.init_main_timer()
         self.init_child_timer()
         self.init_new_day_timer()
-        self.__t_newday__.start()
 
     def t_callback_main(self):
         print("Main event callback")
         self.__sched__.sched_update_current()
         self.__window__.update_status()
         self.init_main_timer()
-        self.__t_main__.start()
 
     def t_callback_child(self):
         print("Child event callback on start")
         self.__sched__.sched_update_current()
         self.__window__.update_status()
         self.init_child_timer()
-        self.__t_child__.start()
 
 ### Schedule
 class SilverSchedule():
@@ -185,13 +185,16 @@ class SilverSchedule():
         print("Daily agenda:", self.__sched_day__)
 
     def sched_update_current(self):
+        print("**SCHED_UPDATE_CURRENT")
         if not self.__sched_day__:
             # It's a new day..
             # It's so mundane. What exciting things will happen today?..
             self.sched_gen_daily_agenda()
 
         today = datetime.datetime.now()
-        now = datetime.timedelta(hours=today.hour, minutes=today.minute).total_seconds()
+        now = datetime.timedelta(hours=today.hour,
+                                 minutes=today.minute,
+                                 seconds=today.second).total_seconds()
 
         if self.__sched_day__[0][9] > now:
             # Last child ended,
@@ -201,6 +204,10 @@ class SilverSchedule():
             item = self.__sched_day__.popleft()
             if item[1]:
                 self.__main_event__ = item
+            self.__event__ = item
+        # Check, if next is child and started already
+        if not self.__sched_day__[0][1] and self.__sched_day__[0][9] <= now:
+            item = self.__sched_day__.popleft()
             self.__event__ = item
 
     def sched_get_from_xml(self):
@@ -231,7 +238,8 @@ class SilverSchedule():
                 # Attributes
                 start, end, title, host, icon = self.sched_parse_object(child)
                 icon = IMG_DIR + icon
-                picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60, 60, True)
+                picon = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon, 60,
+                                                                60, True)
                 # Colors
                 bg_color = CHILD_BG_COLORS[ch_dark]
                 fg_color = CHILD_FONT_COLORS[ch_dark]
@@ -287,6 +295,7 @@ class SilverSchedule():
         return self.__event__[8]
 
     def get_current(self):
+        print("CURRENT<----", self.__event__)
         return self.__event__
 
     def get_next_event(self):
@@ -370,9 +379,11 @@ class SilverPlayer():
 
         # Create GStream elements
         self.elements = dict()
-        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc', 'source')
+        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
+                                                          'source')
         self.elements["decode"] = Gst.ElementFactory.make('decodebin', 'decode')
-        self.elements["convert"] = Gst.ElementFactory.make('audioconvert', 'convert')
+        self.elements["convert"] = Gst.ElementFactory.make('audioconvert',
+                                                           'convert')
         self.elements["volume"] = Gst.ElementFactory.make('volume', 'volume')
         self.elements["sink"] = Gst.ElementFactory.make('autoaudiosink', 'sink')
 
@@ -396,9 +407,12 @@ class SilverPlayer():
 
         self.elements["decode"].connect('pad-added', pad_added_callback)
 
-        if not Gst.Element.link(self.elements["source"], self.elements["decode"]) or \
-           not Gst.Element.link(self.elements["convert"], self.elements["volume"]) or \
-           not Gst.Element.link(self.elements["volume"], self.elements["sink"]):
+        if not Gst.Element.link(self.elements["source"],
+                                self.elements["decode"]) or \
+           not Gst.Element.link(self.elements["convert"],
+                                self.elements["volume"]) or \
+           not Gst.Element.link(self.elements["volume"],
+                                self.elements["sink"]):
             logging.error("Elements could not be linked")
             exit(-1)
 
@@ -411,7 +425,8 @@ class SilverPlayer():
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
-            logging.error("Error from element %s: %s" % (msg.src.get_name(), err))
+            logging.error("Error from element %s: %s" % (msg.src.get_name(),
+                                                         err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
             self.clean()
@@ -435,13 +450,13 @@ class SilverRecorder():
         """ Return recorder status """
         return self.__recording__
 
-    def record_toggle(self):
+    def record_toggle(self, name):
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
-            filename="Silver_Rain"
-            date = datetime.datetime.now()
-            file = recordings_folder + datetime.date.strftime("%m-%d-%y-%H:%M") + "-" + filename + ".mp3"
+            file = RECS_DIR + \
+                   datetime.datetime.now().strftime("%m-%d-%y-%H:%M") + \
+                   "-" + name + ".mp3"
             self.pipeline.get_by_name('sink').set_property('location', file)
             ret = self.pipeline.set_state(Gst.State.PLAYING)
         else:
@@ -461,7 +476,8 @@ class SilverRecorder():
 
         # Create GStream elements
         self.elements = dict()
-        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc', 'source')
+        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
+                                                          'source')
         self.elements["demux"] = Gst.ElementFactory.make('icydemux', 'demux')
         self.elements["sink"] = Gst.ElementFactory.make('filesink', 'sink')
 
@@ -485,7 +501,8 @@ class SilverRecorder():
 
         self.elements["demux"].connect('pad-added', pad_added_callback)
 
-        if not Gst.Element.link(self.elements["source"], self.elements["demux"]):
+        if not Gst.Element.link(self.elements["source"],
+                                self.elements["demux"]):
             logging.error("Elements could not be linked")
             exit(-1)
 
@@ -498,7 +515,8 @@ class SilverRecorder():
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
-            logging.error("Error from element %s: %s" % (msg.src.get_name(), err))
+            logging.error("Error from element %s: %s" % (msg.src.get_name(),
+                                                         err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
             self.clean()
@@ -548,7 +566,8 @@ class SilverGUI(Gtk.Window):
         vbox.pack_start(sep, False, False, 0)
         ## Schedule tree
         scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.set_policy(Gtk.PolicyType.NEVER,
+                                   Gtk.PolicyType.AUTOMATIC)
         scrolled_window.set_min_content_height(100)
         tree = self.create_tree()
         scrolled_window.add(tree)
@@ -574,7 +593,8 @@ class SilverGUI(Gtk.Window):
     def create_selection(self):
         """ Create selection buttons """
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        for day in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]:
+        for day in ["Sunday", "Monday", "Tuesday",
+                    "Wednesday", "Thursday", "Friday", "Saturday"]:
             button = Gtk.ToggleButton(day)
             button.connect("toggled", self.selection_on_clicked)
             hbox.pack_start(button, True, True, 0)
@@ -588,7 +608,8 @@ class SilverGUI(Gtk.Window):
 ### Schedule tree
     def create_tree(self):
         """ Create schedule tree """
-        store = Gtk.TreeStore(str, bool, str, str, str, str, str, GdkPixbuf.Pixbuf)
+        store = Gtk.TreeStore(str, bool, str, str, str,
+                              str, str, GdkPixbuf.Pixbuf)
         """ Store:
             0   Weekday             str
             1   IsParent            bool
@@ -618,19 +639,22 @@ class SilverGUI(Gtk.Window):
         renderer.set_property('font', "11")
         renderer.set_alignment(0.5, 0.5)
         # Time
-        column = Gtk.TreeViewColumn("Time", renderer, text=2, background=5, foreground=6)
+        column = Gtk.TreeViewColumn("Time", renderer,
+                                    text=2, background=5, foreground=6)
         column.set_alignment(0.5)
         column.set_min_width(10)
         sched_tree.append_column(column)
         # Title
         renderer.set_alignment(0, 0.5)
-        column = Gtk.TreeViewColumn("Title", renderer, text=3, background=5, foreground=6)
+        column = Gtk.TreeViewColumn("Title", renderer,
+                                    text=3, background=5, foreground=6)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
         sched_tree.append_column(column)
         # Host
-        column = Gtk.TreeViewColumn("Host", renderer, text=4, background=5, foreground=6)
+        column = Gtk.TreeViewColumn("Host", renderer,
+                                    text=4, background=5, foreground=6)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
@@ -656,39 +680,47 @@ class SilverGUI(Gtk.Window):
         self.menubar_play.set_size_request(90, -1)
         self.menubar_play.connect("activate", self.playback_toggle)
         key, mod = Gtk.accelerator_parse("F6")
-        self.menubar_play.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        self.menubar_play.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Stop
         self.menubar_stop = self.create_menuitem("Stop", "media-playback-stop")
         self.menubar_stop.set_sensitive(False)
         self.menubar_stop.connect("activate", self.playback_toggle)
         key, mod = Gtk.accelerator_parse("F7")
-        self.menubar_stop.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        self.menubar_stop.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Record
         self.menubar_record = self.create_menuitem("Record", "media-record")
         self.menubar_record.connect("activate", self.record_toggle)
         key, mod = Gtk.accelerator_parse("F8")
-        self.menubar_record.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        self.menubar_record.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Stop recording
-        self.menubar_stop_recording = self.create_menuitem("Stop recording", "media-playback-stop")
+        self.menubar_stop_recording = self.create_menuitem("Stop recording",
+                                          "media-playback-stop")
         self.menubar_stop_recording.set_sensitive(False)
         self.menubar_stop_recording.connect("activate", self.record_toggle)
         key, mod = Gtk.accelerator_parse("F9")
-        self.menubar_stop_recording.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        self.menubar_stop_recording.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Mute
         self.menubar_mute = Gtk.CheckMenuItem("Mute")
         self.menubar_mute.connect("toggled", self.mute_toggle)
         key, mod = Gtk.accelerator_parse("<Control>M")
-        self.menubar_mute.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        self.menubar_mute.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Preferences
         prefs = self.create_menuitem("Preferences", "gtk-preferences")
         prefs.connect("activate", self.create_prefs_window)
         key, mod = Gtk.accelerator_parse("<Control>P")
-        prefs.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        prefs.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Quit
         quit = self.create_menuitem("Quit", "gtk-quit")
         quit.connect("activate", Gtk.main_quit)
         key, mod = Gtk.accelerator_parse("<Control>Q")
-        quit.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        quit.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
 
         ## Separator
         sep = []
@@ -755,8 +787,11 @@ class SilverGUI(Gtk.Window):
         toolbar.insert(self.playback_button, 0)
         toolbar.insert(self.record_button, 1)
         ## Volume scale
-        ad = Gtk.Adjustment(value=self.__volume__, lower=0, upper=100, step_increment=5, page_increment=10, page_size=0)
-        self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=ad)
+        ad = Gtk.Adjustment(value=self.__volume__, lower=0,
+                            upper=100, step_increment=5,
+                            page_increment=10, page_size=0)
+        self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL,
+                                adjustment=ad)
         self.volume.set_property('draw-value', False)
         self.volume.connect("value-changed", self.cp_on_volume_changed)
         self.volume.set_size_request(80, 0)
@@ -769,7 +804,8 @@ class SilverGUI(Gtk.Window):
         return control_panel
 
     def toolbar_update_label(self):
-        self.text.set_text("<span size='12000'><b>" + self.__schedule__.get_title() + "</b></span>")
+        self.text.set_text("<span size='12000'><b>" +
+                self.__schedule__.get_title() + "</b></span>")
         self.text.set_use_markup(True)
 
     def cp_on_volume_changed(self, scale):
@@ -820,13 +856,15 @@ class SilverGUI(Gtk.Window):
         for i in range(3):
             sep.append(Gtk.SeparatorMenuItem())
 
-        for item in [play, record, sep[0], mute, sep[1], preferences, sep[2], quit]:
+        for item in [play, record, sep[0], mute,
+                     sep[1], preferences, sep[2], quit]:
             self.popup_menu.append(item)
         self.popup_menu.show_all()
 
         def pos_func(menu, x, y, icon):
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
-        self.popup_menu.popup(None, None, pos_func, self.status_icon, button, time)
+        self.popup_menu.popup(None, None, pos_func,
+                              self.status_icon, button, time)
 
     def popup_mute(self, arg):
         self.menubar_mute_toggle()
@@ -914,7 +952,8 @@ class SilverGUI(Gtk.Window):
             self.menubar_record.set_sensitive(True)
             self.menubar_stop_recording.set_sensitive(False)
 
-        self.__recorder__.record_toggle()
+        name = self.__schedule__.get_title()
+        self.__recorder__.record_toggle(name)
 
     def mute_toggle(self, button, val=0):
         if self.__muted__:
