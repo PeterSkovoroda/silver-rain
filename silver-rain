@@ -553,7 +553,7 @@ class SilverGUI(Gtk.Window):
 ### Updater
     def update_status(self):
         self.toolbar_update_label()
-        self.show_notification()
+        self.show_notification_event()
 
 ### Main Window
     def create_main_window(self):
@@ -944,7 +944,7 @@ class SilverGUI(Gtk.Window):
             self.menubar_stop.set_sensitive(False)
 
         self.__player__.playback_toggle()
-        self.show_notification()
+        self.show_notification_playback()
 
     def record_toggle(self, button):
         self.__recording__ = not self.__recording__
@@ -999,18 +999,24 @@ class SilverGUI(Gtk.Window):
             icon = "audio-volume-high"
         return icon
 
-    def show_notification(self):
+    def show_notification_event(self):
         if self.__playing__:
             text = "Silver Rain"
             body = self.__schedule__.get_title()
-            self.notification.set_icon_from_pixbuf(self.__schedule__.get_icon())
+            self.notification.set_icon_from_pixbuf(
+                    self.__schedule__.get_icon())
             self.notification.update(text, body)
+            self.notification.show()
+
+    def show_notification_playback(self):
+        if self.__playing__:
+            self.show_notification_event()
         else:
             text = "Silver Rain"
             body = "Stopped"
             img = "notification-audio-stop"
             self.notification.update(text, body, img)
-        self.notification.show()
+            self.notification.show()
 
 ########################################################################
 # Threading
