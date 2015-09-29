@@ -1,29 +1,31 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-__program__ = 'silver-rain'
-
-import datetime
 import gi
+gi.require_version("Gst", "1.0")
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gst, Gtk, GObject, Gdk, GdkPixbuf, Notify
+
+import json
 import logging
 import os
 import re
 import signal
 import threading
 import urllib.request
-import json
 
 from collections import deque
-
-gi.require_version("Gst", "1.0")
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gst, Gtk, GObject, Gdk
-from gi.repository import GdkPixbuf
-from gi.repository import Notify
+from datetime import date
+from datetime import datetime
+from datetime import timedelta
 
 try:
     from lxml import etree
 except ImportError as err:
     import xml.etree.ElementTree as etree
+
+########################################################################
+# Default values
+#TODO: should be configured in settings
 
 # Stream
 STREAM_URL_LIST = [
@@ -38,9 +40,7 @@ APP_DIR = ".silver/"
 IMG_DIR = APP_DIR + "imgs/"
 RECS_DIR = os.getenv("HOME") + "/SilverRain/"
 SILVER_URL = "http://silver.ru"
-SCHED_FILE = APP_DIR + "sched.xml"
-SCHED_HTML = APP_DIR + "sched.html"
-SCHED_JSON = APP_DIR + "sched.dump"
+SCHED_FILE = APP_DIR + "sched.dump"
 SCHED_URL = "http://silver.ru/programms/"
 
 # Own style
@@ -63,344 +63,14 @@ SCHEDULE_FONT_COLORS    = ["black", "black"]
 CHILD_BG_COLORS         = ["#FFEBEB", "gray93"]
 CHILD_FONT_COLORS       = ["black", "black"]
 
-# If one day I'll try to translate this shit
+# If one day I'll have to translate this shit
 WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday',
                 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-### Timers
-class SilverTimer():
-    def __init__(self, sched, window):
-        self.__sched__ = sched
-        self.__window__ = window
+########################################################################
+# GStreamer classes
 
-        self.__t_newday__ = threading.Timer(0, None)
-        self.__t_main__ = threading.Timer(0, None)
-        self.__t_child__ = threading.Timer(0, None)
-
-        self.init_new_day_timer()
-        self.init_main_timer()
-        self.init_child_timer()
-
-    def clean(self):
-        self.__t_newday__.cancel()
-        self.__t_main__.cancel()
-        self.__t_child__.cancel()
-
-    def init_main_timer(self):
-        """ Event timer """
-        today = datetime.datetime.now()
-        now = datetime.timedelta(hours=today.hour,
-                minutes=today.minute, seconds=today.second).total_seconds()
-        event = self.__sched__.get_next_event()
-        if event:
-            time = int(event[8] - now)
-            #print("-->MAIN TIMER ON EVENT:", event, "WITH TIMEOUT", time)
-            self.__t_main__ = threading.Timer(time, self.t_callback_main)
-            self.__t_main__.start()
-
-    def init_child_timer(self):
-        """ Children timer """
-        today = datetime.datetime.now()
-        now = datetime.timedelta(hours=today.hour,
-                minutes=today.minute, seconds=today.second).total_seconds()
-        event = self.__sched__.get_current()
-        if event[1]:
-            event = self.__sched__.get_next_child()
-            if event:
-                time = int(event[8] - now)
-                #print("-->CHILD TIMER ON EVENT:", event, "WITH TIMEOUT", time)
-                self.__t_child__ = threading.Timer(time,
-                        self.t_callback_child)
-                self.__t_child__.start()
-        else:
-            # Already started. Timer on end
-            time = int(event[9] - now)
-            #print("-->CHILD TIMER ON ENDING:", event, "WITH TIMEOUT", time)
-            self.__t_child__ = threading.Timer(time,
-                    self.t_callback_child)
-            self.__t_child__.start()
-
-    def init_new_day_timer(self):
-        """ Updater timer """
-        today = datetime.datetime.now()
-        now = datetime.timedelta(hours=today.hour,
-                minutes=today.minute, seconds=today.second).total_seconds()
-        next = datetime.time.max
-        tomorrow = datetime.timedelta(hours=next.hour,
-                minutes=next.minute, seconds=next.second).total_seconds()
-        time = int(tomorrow - now) + 1
-        #print("-->UPDATER TIMER WITH TIMEOUT", time)
-        self.__t_newday__ = threading.Timer(time, self.t_callback_newday)
-        self.__t_newday__.start()
-
-    def t_callback_newday(self):
-        """ Update agenda at 00:00 """
-        #print("Newday callback")
-        self.__sched__.sched_update_current()
-        self.__window__.update_status()
-        self.init_main_timer()
-        self.init_child_timer()
-        self.init_new_day_timer()
-
-    def t_callback_main(self):
-        self.__sched__.sched_update_current()
-        self.__window__.update_status()
-        self.init_main_timer()
-
-    def t_callback_child(self):
-        self.__sched__.sched_update_current()
-        self.__window__.update_status()
-        self.init_child_timer()
-
-### Schedule
-class SilverSchedule():
-    """
-        __sched_week__      - full schedule
-        __sched_day__       - daily agenda
-        __event__           - currently playing
-        __main_event__      - current event
-
-        Schedule list[weekday(0-6)]:
-            0   Weekday             str
-            1   IsParent            bool
-            2   Time  (HH:MM-HH:MM) str
-            3   Title               str
-            4   URL                 str
-            5   Host                [str]
-            6   Host URL            [str]
-            7   Icon                pixbuf
-            8   start (seconds)     float
-            9   end   (seconds)     float
-    """
-    def __init__(self):
-        self.__sched_week__ = [ [] for x in range(7) ]
-        self.__sched_day__ = deque()
-        # Get schedule from file
-        if not os.path.exists(SCHED_JSON):
-            self.sched_get_from_html()
-        else:
-            f = open(SCHED_JSON, "r")
-            self.__sched_week__ = json.load(f)
-            f.close()
-        self.sched_gen_daily_agenda()
-        # Update current events
-        self.sched_update_current()
-
-    def sched_gen_daily_agenda(self):
-        today = datetime.datetime.now()
-        now = datetime.timedelta(hours=today.hour,
-                minutes=today.minute).total_seconds()
-        for item in self.__sched_week__[today.weekday()]:
-            if item[9] < now:
-                # Already happened
-                continue
-            self.__sched_day__.append(item)
-
-    def sched_update_current(self):
-        if not self.__sched_day__:
-            # It's a new day..
-            # It's so mundane. What exciting things will happen today?..
-            self.sched_gen_daily_agenda()
-
-        today = datetime.datetime.now()
-        now = datetime.timedelta(hours=today.hour,
-                                 minutes=today.minute,
-                                 seconds=today.second).total_seconds()
-
-        if self.__sched_day__[0][8] > now:
-            # Last child ended,
-            # Event not happened yet
-            self.__event__ = self.__main_event__
-        else:
-            item = self.__sched_day__.popleft()
-            if item[1]:
-                self.__main_event__ = item
-            self.__event__ = item
-        # Check, if next is child and started already
-        if len(self.__sched_day__) and \
-                not self.__sched_day__[0][1] and \
-                self.__sched_day__[0][8] <= now:
-            item = self.__sched_day__.popleft()
-            self.__event__ = item
-        print(self.__event__)
-
-    def sched_get_from_html(self):
-        # Download sched
-        #TODO: come up with something better
-        text = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
-        text = re.sub(r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$', r'\1', text)
-        text = re.sub(r'(<img.*?"\s*)>', r'\1/>', text)
-
-        root = etree.fromstring(text)
-        wd_name_list = {'Вс' : [6], 'Пн' : [0], 'Вт' : [1], 'Ср' : [2],
-                        'Чт' : [3], 'Пт' : [4], 'Сб' : [5],
-                        'По будням' : list(range(0,5)),
-                        'По выходным' : [5, 6]}
-        default_icon_src = ''
-        # Parse HTML
-        for obj in root:
-            #
-            if not len(obj[3]):
-                continue
-            # Don't parse music. Just fill spaces with it
-            if obj[1][0][0].text == "Музыка":
-                default_icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
-                continue
-            # Get icon
-            icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
-            icon_name = icon_src.split("/")[-1]
-            if not os.path.exists(IMG_DIR + icon_name):
-                urllib.request.urlretrieve(icon_src, IMG_DIR + icon_name)
-            # Get title
-            title = obj[1][0][0].text
-            # Get program url
-            url = SILVER_URL + obj[1][0][0].attrib['href']
-            # Get host
-            host = []
-            host_url = []
-            if len(obj[2]):
-                for it in obj[2][0]:
-                    host.append(it[0][0].text)
-                    host_url.append(SILVER_URL + it[0][0].attrib['href'])
-            # Get schedule
-            sched = []
-            for t in obj[3][0]:
-                weekday, time = t.text.split(' : ')
-                wd_list = weekday.split(', ')
-                start, end = time.split('-')
-                for wd in wd_list:
-                    sched.append([wd_name_list[wd], time,
-                                  self.sched_parse_time(start),
-                                  self.sched_parse_time(end)])
-            # Event type
-            is_main = False
-            if sched[0][3] - sched[0][2] >= 3600:
-                is_main = True
-
-            # Insert
-            for it in sched:
-                for weekday in it[0]:
-                    self.__sched_week__[weekday].append([WEEKDAY_LIST[weekday],
-                        is_main, it[1], title, url, host, host_url, IMG_DIR + icon_name,
-                        it[2], it[3]])
-
-
-        # Default icon
-        icon_name = default_icon_src.split("/")[-1]
-        if not os.path.exists(IMG_DIR + icon_name):
-            urllib.request.urlretrieve(default_icon_src, IMG_DIR + icon_name)
-        icon = IMG_DIR + icon_name
-
-        for x in range(7):
-            # Sort
-            self.__sched_week__[x].sort(key = lambda x : (x[8], -x[1]))
-            # Fill spaces with music
-            time = 0.0
-            pos = 0
-            last = []
-
-            for item in self.__sched_week__[x]:
-                if not item[1]:
-                    continue
-                if item[8] > time:
-                    self.__sched_week__[x].insert(pos, [WEEKDAY_LIST[x], True,
-                         self.sched_str_time(time, item[8]), "Музыка",
-                         "http://silver.ru/programms/muzyka/",
-                         [], [], icon, time, item[8]])
-                    pos = pos + 1
-                time = item[9]
-                pos = pos + 1
-                last = item
-            # Fill empty gap to 24:00
-            if last[9] < 86400.0:
-                self.__sched_week__[x].append([WEEKDAY_LIST[x], True,
-                     self.sched_str_time(last[9], 86400.0), "Музыка",
-                     "http://silver.ru/programms/muzyka/",
-                     [], [], icon, last[9], 86400.0])
-
-            # Sort again
-            self.__sched_week__[x].sort(key = lambda x : (x[8], -x[1]))
-
-        f = open(SCHED_JSON, "w")
-        json.dump(self.__sched_week__, f)
-        f.close()
-
-    def sched_str_time(self, start, end):
-        """ Return time in HH:MM-HH:MM """
-        s_h, s_m = divmod(int(start), 3600)
-        e_h, e_m = divmod(int(end), 3600)
-        return "{0:0=2d}:{1:0=2d}-{2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
-
-    def sched_parse_time(self, str):
-        """ Return time in seconds """
-        try:
-            x = datetime.datetime.strptime(str, "%H:%M")
-        except ValueError:
-            # except 24:00
-            # Fuck python's floating point shit and just return the
-            # right value
-            return 86400.0
-        d = datetime.timedelta(hours=x.hour, minutes=x.minute)
-        return d.total_seconds()
-
-### Public
-    def fill_tree_strore(self, store):
-        """ Fill TreeStore object """
-        it = None
-        sep = '\n'
-
-        for x in range(7):
-            bg_dark = False
-            ch_dark = bg_dark
-
-            for item in self.__sched_week__[x]:
-                host = sep.join(item[5])
-                host_url = sep.join(item[6])
-                if item[1]:
-                    bg_color = SCHEDULE_BG_COLORS[bg_dark]
-                    fg_color = SCHEDULE_FONT_COLORS[bg_dark]
-                    icon = GdkPixbuf.Pixbuf.new_from_file(item[7])
-                    it = store.append(None, [item[0], item[1], item[2],
-                        item[3], item[4], host, host_url, icon,
-                        bg_color, fg_color])
-                    ch_dark = bg_dark
-                    bg_dark = not bg_dark
-                else:
-                    bg_color = CHILD_BG_COLORS[ch_dark]
-                    fg_color = CHILD_FONT_COLORS[ch_dark]
-                    icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(item[7],
-                                                            60, 60, True)
-                    store.append(it, [item[0], item[1], item[2],
-                        item[3], item[4], host, host_url, icon,
-                        bg_color, fg_color])
-                    ch_dark = not ch_dark
-
-    def get_title(self):
-        """ Get title of current event """
-        return self.__event__[3]
-
-    def get_icon(self):
-        """ Get icon of current event """
-        return GdkPixbuf.Pixbuf.new_from_file(self.__event__[7])
-
-    def get_current(self):
-        return self.__event__
-
-    def get_next_event(self):
-        """ Get next main event for today """
-        for item in self.__sched_day__:
-            if item[1]:
-                return item
-        return None
-
-    def get_next_child(self):
-        """ Get next child event for today """
-        for item in self.__sched_day__:
-            if not item[1]:
-                return item
-        return None
-
-### Gstreamer classes
+## Player
 class SilverPlayer():
     """ Gstreamer container for playing network audio stream
         sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
@@ -432,17 +102,19 @@ class SilverPlayer():
             exit(-1)
 
     def volume_get(self):
-        """ Return volume """
-        value = int(self.pipeline.get_by_name('volume').get_property('volume') * 100.)
+        """ Return volume status """
+        value = int(
+            self.pipeline.get_by_name('volume').get_property('volume') * 100.)
         return value
 
     def volume_set(self, value):
         """ Set player volume [0-100] """
-        self.pipeline.get_by_name('volume').set_property('volume', value / 100.)
+        self.pipeline.get_by_name('volume').set_property('volume',
+                                                         value / 100.)
 
     def volume_step(self, increase):
         """ Increase/decrease volume by 5
-            Returns new value """
+            Return new value """
         value = self.pipeline.get_by_name('volume').get_property('volume')
         if increase:
             if value >= 0.95:
@@ -458,24 +130,33 @@ class SilverPlayer():
         return int(value * 100.)
 
     def create_pipeline(self):
+        self.elements = dict()
         self.pipeline = Gst.Pipeline.new("SilverPlayer")
         if not self.pipeline:
             logging.error("Couldn't create pipeline")
             exit(-1)
-
         # Create GStream elements
-        self.elements = dict()
-        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
-                                                          'source')
-        self.elements["decode"] = Gst.ElementFactory.make('decodebin', 'decode')
-        self.elements["convert"] = Gst.ElementFactory.make('audioconvert',
-                                                           'convert')
-        self.elements["volume"] = Gst.ElementFactory.make('volume', 'volume')
-        self.elements["sink"] = Gst.ElementFactory.make('autoaudiosink', 'sink')
+        try:
+            self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
+                                                              'source')
+            self.elements["decode"] = Gst.ElementFactory.make('decodebin',
+                                                              'decode')
+            self.elements["convert"] = Gst.ElementFactory.make('audioconvert',
+                                                               'convert')
+            self.elements["volume"] = Gst.ElementFactory.make('volume',
+                                                              'volume')
+            self.elements["sink"] = Gst.ElementFactory.make('autoaudiosink',
+                                                            'sink')
+        except Gst.ElementNotFoundError:
+            logging.error("Couldn't find elements", "Check if packages ",
+                          "'GStreamer Good Plugins 1.0' ",
+                          "'GStreamer Base Plugins 1.0' ",
+                          "are installed")
+            exit(-1)
 
-        for key in self.elements.keys():
+        for key in self.elements:
             if not self.elements[key]:
-                logging.error("Couldn't create element", key)
+                logging.error("Couldn't create element:", key)
                 exit(-1)
             else:
                 self.pipeline.add(self.elements[key])
@@ -493,12 +174,12 @@ class SilverPlayer():
 
         self.elements["decode"].connect('pad-added', pad_added_callback)
 
-        if not Gst.Element.link(self.elements["source"],
-                                self.elements["decode"]) or \
-           not Gst.Element.link(self.elements["convert"],
-                                self.elements["volume"]) or \
-           not Gst.Element.link(self.elements["volume"],
-                                self.elements["sink"]):
+        if (not Gst.Element.link(self.elements["source"],
+                                 self.elements["decode"]) or
+            not Gst.Element.link(self.elements["convert"],
+                                 self.elements["volume"]) or 
+            not Gst.Element.link(self.elements["volume"],
+                                 self.elements["sink"])):
             logging.error("Elements could not be linked")
             exit(-1)
 
@@ -515,14 +196,19 @@ class SilverPlayer():
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
-            self.clean()
+#TODO
+            # Try again
+            self.__playing__ = False
+            self.pipeline.set_state(Gst.State.READY)
             self.playback_toggle()
         else:
             pass
 
+## Recorder
 class SilverRecorder():
+#TODO: Merge souphttpsrc container with player
     """ Gstreamer container for audio recording
-        sophttpsrc -> icydemux -> filesink """
+        souphttpsrc -> icydemux -> filesink """
     def __init__(self):
         self.__recording__ = False
         self.create_pipeline()
@@ -540,8 +226,7 @@ class SilverRecorder():
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
-            file = RECS_DIR + \
-                   datetime.datetime.now().strftime("%m-%d-%y-%H:%M") + \
+            file = RECS_DIR + datetime.now().strftime("%m-%d-%y-%H:%M") + \
                    "-" + name + ".mp3"
             self.pipeline.get_by_name('sink').set_property('location', file)
             ret = self.pipeline.set_state(Gst.State.PLAYING)
@@ -555,19 +240,28 @@ class SilverRecorder():
             exit(-1)
 
     def create_pipeline(self):
+        self.elements = dict()
         self.pipeline = Gst.Pipeline.new("SilverRecorder")
         if not self.pipeline:
             logging.error("Couldn't create pipeline")
             exit(-1)
 
         # Create GStream elements
-        self.elements = dict()
-        self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
-                                                          'source')
-        self.elements["demux"] = Gst.ElementFactory.make('icydemux', 'demux')
-        self.elements["sink"] = Gst.ElementFactory.make('filesink', 'sink')
+        try:
+            self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
+                                                              'source')
+            self.elements["demux"] = Gst.ElementFactory.make('icydemux',
+                                                             'demux')
+            self.elements["sink"] = Gst.ElementFactory.make('filesink',
+                                                            'sink')
+        except Gst.ElementNotFoundError:
+            logging.error("Couldn't find elements", "Check if packages ",
+                          "'GStreamer Good Plugins 1.0' ",
+                          "'GStreamer Base Plugins 1.0' ",
+                          "are installed")
+            exit(-1)
 
-        for key in self.elements.keys():
+        for key in self.elements:
             if not self.elements[key]:
                 logging.error("Couldn't create element", key)
                 exit(-1)
@@ -604,11 +298,238 @@ class SilverRecorder():
             logging.error("Error from element %s: %s" % (msg.src.get_name(),
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
+#TODO:
             logging.warning("End of stream")
             self.clean()
         else:
             pass
 
+########################################################################
+# Schedule
+#TODO: Delete child event notifications
+class SilverSchedule():
+    """
+        __sched_week__      - full schedule
+        __sched_day__       - daily agenda
+        __event__           - currently playing
+
+        Schedule list[weekday(0-6)]:
+            0   Weekday             str
+            1   IsParent            bool
+            2   Time  (HH:MM-HH:MM) str
+            3   Title               str
+            4   URL                 str
+            5   Host                [str]
+            6   Host URL            [str]
+            7   Icon                str
+            8   start (seconds)     float
+            9   end   (seconds)     float
+            10  Icon URL            str
+    """
+    def __init__(self):
+        self.__sched_week__ = [ [] for x in range(7) ]
+        self.__sched_day__ = deque()
+        # Retrieve schedule
+        if os.path.exists(SCHED_FILE):
+            f = open(SCHED_FILE, "r")
+            self.__sched_week__ = json.load(f)
+            f.close()
+        else:
+            # Load from website
+            self.sched_get_from_html()
+        self.sched_gen_daily_agenda()
+        # Update current event
+        self.sched_update_current()
+
+    def fill_tree_strore(self, store):
+        """ Fill TreeStore object """
+        it = None
+
+        for x in range(7):
+            bg_dark = False
+            ch_dark = bg_dark
+
+            for item in self.__sched_week__[x]:
+                host = '\n'.join(item[5])
+                host_url = '\n'.join(item[6])
+                # Download icon if it doesn't exist
+                if not os.path.exists(item[7]):
+                    urllib.request.urlretrieve(item[10], item[7])
+                if item[1]:
+                    # Main event
+                    bg_color = SCHEDULE_BG_COLORS[bg_dark]
+                    fg_color = SCHEDULE_FONT_COLORS[bg_dark]
+                    # Get pixbuf
+                    icon = GdkPixbuf.Pixbuf.new_from_file(item[7])
+                    # Insert item
+                    it = store.append(None, [item[0], item[1], item[2],
+                        item[3], item[4], host, host_url, icon,
+                        bg_color, fg_color])
+                    # Alternate row color
+                    ch_dark = bg_dark
+                    bg_dark = not bg_dark
+                else:
+                    # Secondary event
+                    bg_color = CHILD_BG_COLORS[ch_dark]
+                    fg_color = CHILD_FONT_COLORS[ch_dark]
+                    # Get pixbuf
+                    icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(item[7],
+                                                            60, 60, True)
+                    # Insert item
+                    store.append(it, [item[0], item[1], item[2],
+                        item[3], item[4], host, host_url, icon,
+                        bg_color, fg_color])
+                    # Alternate row color
+                    ch_dark = not ch_dark
+
+    def get_title(self):
+        """ Return title of current event """
+        return self.__event__[3]
+
+    def get_icon(self):
+        """ Return pixbuf """
+        # Download icon if it doesn't exist
+        if not os.path.exists(self.__event__[7]):
+            urllib.request.urlretrieve(self.__event__[10], self.__event__[7])
+        return GdkPixbuf.Pixbuf.new_from_file(self.__event__[7])
+
+    def get_event(self):
+        return self.__event__
+
+    def sched_gen_daily_agenda(self):
+        """ Create a list of main events for today """
+        today = datetime.now()
+        now = timedelta(hours=today.hour, minutes=today.minute,
+                        seconds=today.second).total_seconds()
+        for item in self.__sched_week__[today.weekday()]:
+            if not item[1] or item[9] < now:
+                # Already ended. Skip
+                continue
+            self.__sched_day__.append(item)
+
+    def sched_update_current(self):
+        """ Update current event """
+        if not len(self.__sched_day__):
+            # It's a new day..
+            # It's so mundane. What exciting things will happen today?..
+            self.sched_gen_daily_agenda()
+
+        item = self.__sched_day__.popleft()
+        self.__event__ = item
+
+    def sched_get_from_html(self):
+        # Download sched
+        #TODO: come up with something better
+        text = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
+        text = re.sub(r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$', r'\1', text)
+        text = re.sub(r'(<img.*?"\s*)>', r'\1/>', text)
+        # Parse xhtml text
+        root = etree.fromstring(text)
+        wd_name_list = {'Вс' : [6], 'Пн' : [0], 'Вт' : [1], 'Ср' : [2],
+                        'Чт' : [3], 'Пт' : [4], 'Сб' : [5],
+                        'По будням' : list(range(0,5)),
+                        'По выходным' : [5, 6]}
+        default_icon_src = ''
+        # Parse HTML
+        for obj in root:
+            if not len(obj[3]):
+                continue
+            # Don't parse music. Just fill spaces with it
+            if obj[1][0][0].text == "Музыка":
+                default_icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
+                continue
+            # Get icon
+            icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
+            icon_name = icon_src.split("/")[-1]
+            # Get title
+            title = obj[1][0][0].text
+            # Get program url
+            url = SILVER_URL + obj[1][0][0].attrib['href']
+            # Get host
+            host = []
+            host_url = []
+            if len(obj[2]):
+                for it in obj[2][0]:
+                    host.append(it[0][0].text)
+                    host_url.append(SILVER_URL + it[0][0].attrib['href'])
+            # Get schedule
+            sched = []
+            for t in obj[3][0]:
+                weekday, time = t.text.split(' : ')
+                wd_list = weekday.split(', ')
+                start, end = time.split('-')
+                for wd in wd_list:
+                    sched.append([wd_name_list[wd], time,
+                                  self.sched_parse_time(start),
+                                  self.sched_parse_time(end)])
+            # Event type
+            is_main = False
+            if sched[0][3] - sched[0][2] >= 3600:
+                # At least 1 hour
+                is_main = True
+            # Insert
+            for it in sched:
+                for weekday in it[0]:
+                    self.__sched_week__[weekday].append([WEEKDAY_LIST[weekday],
+                        is_main, it[1], title, url, host, host_url, IMG_DIR + icon_name,
+                        it[2], it[3], icon_src])
+
+        # Fill spaces with music
+        icon_name = default_icon_src.split("/")[-1]
+        icon = IMG_DIR + icon_name
+        for x in range(7):
+            # Sort
+            self.__sched_week__[x].sort(key = lambda x : (x[8], -x[1]))
+            time = 0.0
+            pos = 0
+            last = []
+
+            for item in self.__sched_week__[x]:
+                if not item[1]:
+                    continue
+                if item[8] > time:
+                    self.__sched_week__[x].insert(pos, [WEEKDAY_LIST[x], True,
+                        self.sched_str_time(time, item[8]), "Музыка",
+                        "http://silver.ru/programms/muzyka/",
+                        [], [], icon, time, item[8], default_icon_src])
+                    pos = pos + 1
+                time = item[9]
+                pos = pos + 1
+                last = item
+            # Fill empty gap to 24:00
+            if last[9] < 86400.0:
+                self.__sched_week__[x].append([WEEKDAY_LIST[x], True,
+                     self.sched_str_time(last[9], 86400.0), "Музыка",
+                     "http://silver.ru/programms/muzyka/",
+                     [], [], icon, last[9], 86400.0, default_icon_src])
+            # Sort again
+            self.__sched_week__[x].sort(key = lambda x : (x[8], -x[1]))
+
+        # Save to file
+        f = open(SCHED_FILE, "w")
+        json.dump(self.__sched_week__, f)
+        f.close()
+
+    def sched_str_time(self, start, end):
+        """ Return time in HH:MM-HH:MM """
+        s_h, s_m = divmod(int(start), 3600)
+        e_h, e_m = divmod(int(end), 3600)
+        return "{0:0=2d}:{1:0=2d}-{2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
+
+    def sched_parse_time(self, str):
+        """ Return time in seconds """
+        try:
+            x = datetime.strptime(str, "%H:%M")
+        except ValueError:
+            # except 24:00
+            # Fuck timedelta and python-floating-point-approximation shit
+            # Just return the value
+            return 86400.0
+        d = timedelta(hours=x.hour, minutes=x.minute)
+        return d.total_seconds()
+
+########################################################################
+# GUI
 class SilverGUI(Gtk.Window):
     """ GUI """
     def __init__(self, player, recorder, sched):
@@ -623,7 +544,7 @@ class SilverGUI(Gtk.Window):
         self.__about_window__ = False
         self.__prefs_window__ = False
         self.__schedule__ = sched
-        self.week_filter = datetime.date.today().strftime("%A")
+        self.week_filter = date.today().strftime("%A")
 
         self.create_main_window()
         self.create_status_icon()
@@ -1091,7 +1012,39 @@ class SilverGUI(Gtk.Window):
             self.notification.update(text, body, img)
         self.notification.show()
 
-### Boom, baby
+########################################################################
+# Threading
+class SilverTimer():
+    def __init__(self, sched, window):
+        self.__sched__ = sched
+        self.__window__ = window
+        # On event timer
+        self.__t_event__ = threading.Timer(0, None)
+        self.init_event_timer()
+
+    def clean(self):
+        """ Cancel timer """
+        self.__t_event__.cancel()
+
+    def init_event_timer(self):
+        """ Event timer """
+        today = datetime.now()
+        now = timedelta(hours=today.hour,
+                minutes=today.minute, seconds=today.second).total_seconds()
+        event = self.__sched__.get_event()
+        timeout = int(event[9] - now)   # On event ending
+        self.__t_event__ = threading.Timer(timeout, self.t_callback_event)
+        self.__t_event__.start()
+
+    def t_callback_event(self):
+        """ Update schedule """
+        self.__sched__.sched_update_current()
+        self.__window__.update_status()
+        # Init new timer
+        self.init_event_timer()
+
+########################################################################
+# Boom, baby
 GObject.threads_init()
 Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
