@@ -196,7 +196,7 @@ class SilverPlayer():
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
-#TODO
+#TODO: What should I do, mom?..
             # Try again
             self.__playing__ = False
             self.pipeline.set_state(Gst.State.READY)
@@ -419,9 +419,11 @@ class SilverSchedule():
 
     def sched_get_from_html(self):
         # Download sched
-        #TODO: come up with something better
         text = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
-        text = re.sub(r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$', r'\1', text)
+        #TODO: come up with something better
+        text = re.sub(
+                r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$',
+                r'\1', text)
         text = re.sub(r'(<img.*?"\s*)>', r'\1/>', text)
         # Parse xhtml text
         root = etree.fromstring(text)
@@ -436,7 +438,8 @@ class SilverSchedule():
                 continue
             # Don't parse music. Just fill spaces with it
             if obj[1][0][0].text == "Музыка":
-                default_icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
+                default_icon_src = "http:" + \
+                                    obj[0][0][0].attrib['src'].split("?")[0]
                 continue
             # Get icon
             icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
@@ -471,8 +474,8 @@ class SilverSchedule():
             for it in sched:
                 for weekday in it[0]:
                     self.__sched_week__[weekday].append([WEEKDAY_LIST[weekday],
-                        is_main, it[1], title, url, host, host_url, IMG_DIR + icon_name,
-                        it[2], it[3], icon_src])
+                        is_main, it[1], title, url, host, host_url,
+                        IMG_DIR + icon_name, it[2], it[3], icon_src])
 
         # Fill spaces with music
         icon_name = default_icon_src.split("/")[-1]
@@ -496,7 +499,7 @@ class SilverSchedule():
                 time = item[9]
                 pos = pos + 1
                 last = item
-            # Fill empty gap to 24:00
+
             if last[9] < 86400.0:
                 self.__sched_week__[x].append([WEEKDAY_LIST[x], True,
                      self.sched_str_time(last[9], 86400.0), "Музыка",
@@ -682,7 +685,8 @@ class SilverGUI(Gtk.Window):
         music = Gtk.MenuItem("Music")
         music.set_submenu(music_menu)
         ## Play
-        self.menubar_play = self.create_menuitem("Play", "media-playback-start")
+        self.menubar_play = self.create_menuitem("Play",
+                                                 "media-playback-start")
         self.menubar_play.set_size_request(90, -1)
         self.menubar_play.connect("activate", self.playback_toggle)
         key, mod = Gtk.accelerator_parse("F6")
@@ -747,7 +751,8 @@ class SilverGUI(Gtk.Window):
         about.set_size_request(90, -1)
         about.connect("activate", self.create_about_window)
         key, mod = Gtk.accelerator_parse("F1")
-        about.add_accelerator("activate", agr, key, mod, Gtk.AccelFlags.VISIBLE)
+        about.add_accelerator("activate", agr, key,
+                              mod, Gtk.AccelFlags.VISIBLE)
         help_menu.append(about)
 
         menubar.append(music)
