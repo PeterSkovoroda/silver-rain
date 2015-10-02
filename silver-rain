@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import signal
+import subprocess
 import threading
 import urllib.request
 
@@ -44,9 +45,9 @@ SCHED_FILE = APP_DIR + "sched.dump"
 SCHED_URL = "http://silver.ru/programms/"
 
 # Own style
-css_path = 'silver-rain.css'
+CSS_PATH = 'silver-rain.css'
 #style_provider = Gtk.CssProvider()
-#css = open(css_path, 'rb')
+#css = open(CSS_PATH, 'rb')
 #css_data = css.read()
 #css.close()
 #style_provider.load_from_data(css_data)
@@ -57,11 +58,17 @@ css_path = 'silver-rain.css'
 # Colors
 # * Silver red - #FF4545
 # * Reddit red - #FF4C4C
+# * Silver light red - #FFD9D9
 # * Kinda yellow - beige
-SCHEDULE_BG_COLORS      = ["white", "#FFD9D9"]
-SCHEDULE_FONT_COLORS    = ["black", "black"]
-CHILD_BG_COLORS         = ["#FFEBEB", "gray93"]
-CHILD_FONT_COLORS       = ["black", "black"]
+SCHED_BG_COLORS         = ["white", "gray95"]
+SCHED_FG_COLORS         = ["black", "black"]
+SCHED_CHILD_BG_COLORS   = ["gray90", "#FFEBEB"]
+SCHED_CHILD_FG_COLORS   = ["black", "black"]
+SCHED_CURRENT_BG_COLOR  = "#FF4545"
+SCHED_CURRENT_FG_COLOR  = "white"
+# Fonts
+SCHED_FONT              = "Ubuntu 11"
+SCHED_CURRENT_FONT      = "Ubuntu bold 11"
 
 # If one day I'll have to translate this shit
 WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday',
@@ -69,7 +76,6 @@ WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday',
 
 ########################################################################
 # GStreamer classes
-
 ## Player
 class SilverPlayer():
     """ Gstreamer container for playing network audio stream
@@ -79,13 +85,9 @@ class SilverPlayer():
         self.create_pipeline()
 
     def clean(self):
-        """ Free pipeline """
+        """ Unref pipeline """
         self.__playing__ = False
         self.pipeline.set_state(Gst.State.NULL)
-
-    def playback_get(self):
-        """ Return playback status """
-        return self.__playing__
 
     def playback_toggle(self):
         """ Playback trigger """
@@ -93,7 +95,7 @@ class SilverPlayer():
         if self.__playing__:
             ret = self.pipeline.set_state(Gst.State.PLAYING)
         else:
-            # Switch state to READY to prevent EOS
+            # Switch state to READY instead of STOP to prevent EOS
             ret = self.pipeline.set_state(Gst.State.READY)
 
         if ret == Gst.StateChangeReturn.FAILURE:
@@ -177,7 +179,7 @@ class SilverPlayer():
         if (not Gst.Element.link(self.elements["source"],
                                  self.elements["decode"]) or
             not Gst.Element.link(self.elements["convert"],
-                                 self.elements["volume"]) or 
+                                 self.elements["volume"]) or
             not Gst.Element.link(self.elements["volume"],
                                  self.elements["sink"])):
             logging.error("Elements could not be linked")
@@ -196,7 +198,7 @@ class SilverPlayer():
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
-#TODO: What should I do, mom?..
+#TODO: What should I do?..
             # Try again
             self.__playing__ = False
             self.pipeline.set_state(Gst.State.READY)
@@ -306,12 +308,12 @@ class SilverRecorder():
 
 ########################################################################
 # Schedule
-#TODO: Delete child event notifications
 class SilverSchedule():
     """
         __sched_week__      - full schedule
         __sched_day__       - daily agenda
         __event__           - currently playing
+        __event_pos__       - event position
 
         Schedule list[weekday(0-6)]:
             0   Weekday             str
@@ -320,26 +322,49 @@ class SilverSchedule():
             3   Title               str
             4   URL                 str
             5   Host                [str]
-            6   Host URL            [str]
-            7   Icon                str
-            8   start (seconds)     float
-            9   end   (seconds)     float
-            10  Icon URL            str
+            6   Icon                str
+            7   start (seconds)     float
+            8   end   (seconds)     float
+            9   Icon URL            str
     """
     def __init__(self):
+        #self.__sched_week__ = [ [] for x in range(7) ]
         self.__sched_week__ = [ [] for x in range(7) ]
         self.__sched_day__ = deque()
+        self.__event_pos__ = -1
         # Retrieve schedule
         if os.path.exists(SCHED_FILE):
-            f = open(SCHED_FILE, "r")
-            self.__sched_week__ = json.load(f)
-            f.close()
+            # Read from file
+            self.sched_get_from_file()
         else:
             # Load from website
             self.sched_get_from_html()
+        # Generate schedule for today
         self.sched_gen_daily_agenda()
         # Update current event
         self.sched_update_current()
+
+    def set_timer(self, timer):
+#TODO:  Need something better
+        self.__timer__ = timer
+
+    def update_schedule(self):
+        """ Force downloading sched from internet """
+        # Backup
+        sched_week_bak = self.__sched_week__
+        sched_day_bak = self.__sched_day__
+        # Clear
+        self.__sched_week__ = [ [] for x in range(7) ]
+        self.__sched_day__ = deque()
+        if not self.sched_get_from_html():
+#TODO:      Raise alert
+            logging.warning("Couldn't update")
+            self.__sched_week__ = sched_week_bak
+            self.__sched_day__ = sched_day_bak
+        else:
+            self.sched_gen_daily_agenda()
+            self.sched_update_current()
+            self.__timer__.reset()
 
     def fill_tree_strore(self, store):
         """ Fill TreeStore object """
@@ -350,96 +375,128 @@ class SilverSchedule():
             ch_dark = bg_dark
 
             for item in self.__sched_week__[x]:
-                host = '\n'.join(item[5])
-                host_url = '\n'.join(item[6])
+                host = '\n'.join(item["host"])
+                font = SCHED_FONT
                 # Download icon if it doesn't exist
-                if not os.path.exists(item[7]):
-                    urllib.request.urlretrieve(item[10], item[7])
-                if item[1]:
+                if not os.path.exists(item["icon"]):
+                    urllib.request.urlretrieve(item["icon_url"], item["icon"])
+                if item["is_main"]:
                     # Main event
-                    bg_color = SCHEDULE_BG_COLORS[bg_dark]
-                    fg_color = SCHEDULE_FONT_COLORS[bg_dark]
+                    bg_color = SCHED_BG_COLORS[bg_dark]
+                    fg_color = SCHED_FG_COLORS[bg_dark]
                     # Get pixbuf
-                    icon = GdkPixbuf.Pixbuf.new_from_file(item[7])
+                    icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
                     # Insert item
-                    it = store.append(None, [item[0], item[1], item[2],
-                        item[3], item[4], host, host_url, icon,
-                        bg_color, fg_color])
+                    it = store.append(None, [item["weekday"], item["is_main"],
+                                             item["time"], item["title"],
+                                             item["url"], host, icon,
+                                             bg_color, fg_color, font])
                     # Alternate row color
                     ch_dark = bg_dark
                     bg_dark = not bg_dark
                 else:
-                    # Secondary event
-                    bg_color = CHILD_BG_COLORS[ch_dark]
-                    fg_color = CHILD_FONT_COLORS[ch_dark]
+                    # Child event
+                    bg_color = SCHED_CHILD_BG_COLORS[ch_dark]
+                    fg_color = SCHED_CHILD_FG_COLORS[ch_dark]
                     # Get pixbuf
-                    icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(item[7],
+                    icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                                                            item["icon"],
                                                             60, 60, True)
                     # Insert item
-                    store.append(it, [item[0], item[1], item[2],
-                        item[3], item[4], host, host_url, icon,
-                        bg_color, fg_color])
+                    store.append(it, [item["weekday"], item["is_main"],
+                                 item["time"], item["title"], item["url"],
+                                 host, icon, bg_color, fg_color, font])
                     # Alternate row color
                     ch_dark = not ch_dark
 
-    def get_title(self):
+    def get_event_title(self):
         """ Return title of current event """
-        return self.__event__[3]
+        return self.__event__["title"]
 
-    def get_icon(self):
+    def get_event_icon(self):
         """ Return pixbuf """
         # Download icon if it doesn't exist
-        if not os.path.exists(self.__event__[7]):
-            urllib.request.urlretrieve(self.__event__[10], self.__event__[7])
-        return GdkPixbuf.Pixbuf.new_from_file(self.__event__[7])
+        if not os.path.exists(self.__event__["icon"]):
+            urllib.request.urlretrieve(self.__event__["icon_url"], self.__event__["icon"])
+        return GdkPixbuf.Pixbuf.new_from_file(self.__event__["icon"])
 
     def get_event(self):
+        """ Return current event """
         return self.__event__
+
+    def get_event_position(self):
+        """ Return current event """
+        return self.__event_pos__
 
     def sched_gen_daily_agenda(self):
         """ Create a list of main events for today """
+        self.__event_pos__ = -1
         today = datetime.now()
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
         for item in self.__sched_week__[today.weekday()]:
-            if not item[1] or item[9] < now:
-                # Already ended. Skip
+            if not item["is_main"]:
+                continue
+            elif item["end"] < now:
+                # Child or already ended. Skip
+                self.__event_pos__ = self.__event_pos__ + 1
                 continue
             self.__sched_day__.append(item)
 
     def sched_update_current(self):
         """ Update current event """
         if not len(self.__sched_day__):
-            # It's a new day..
-            # It's so mundane. What exciting things will happen today?..
+            # It's a new day.
+            # It's so mundane. What exciting things will happen today?
             self.sched_gen_daily_agenda()
 
         item = self.__sched_day__.popleft()
         self.__event__ = item
+        self.__event_pos__ = self.__event_pos__ + 1
+
+    def sched_get_from_file(self):
+        f = open(SCHED_FILE, "r")
+        self.__sched_week__ = json.load(f)
+        f.close()
+
+    def sched_write_to_file(self):
+        f = open(SCHED_FILE, 'w')
+        json.dump(self.__sched_week__, f)
+        f.close()
 
     def sched_get_from_html(self):
-        # Download sched
-        text = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
-        #TODO: come up with something better
-        text = re.sub(
-                r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$',
-                r'\1', text)
-        text = re.sub(r'(<img.*?"\s*)>', r'\1/>', text)
-        # Parse xhtml text
-        root = etree.fromstring(text)
+        # Default event icon
+        music_icon_src = ''
+        # Weekdays parser
         wd_name_list = {'Вс' : [6], 'Пн' : [0], 'Вт' : [1], 'Ср' : [2],
                         'Чт' : [3], 'Пт' : [4], 'Сб' : [5],
                         'По будням' : list(range(0,5)),
                         'По выходным' : [5, 6]}
-        default_icon_src = ''
-        # Parse HTML
+        # Download sched
+        try:
+            xhtml = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
+        except urllib.error.URLError as e:
+            logging.error("Connection error:", e)
+#TODO       handle error
+            return False
+
+        #TODO: come up with something better
+        xhtml = re.sub(
+                r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$',
+                r'\1', xhtml)
+        # Close unclosed img tags /* make it xhtml style */
+        xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
+
+        root = etree.fromstring(xhtml)
+        # Parse xhtml text
         for obj in root:
             if not len(obj[3]):
+                # Event happens randomly or never
                 continue
-            # Don't parse music. Just fill spaces with it
             if obj[1][0][0].text == "Музыка":
-                default_icon_src = "http:" + \
-                                    obj[0][0][0].attrib['src'].split("?")[0]
+                # Don't parse music. Just fill spaces with it
+                music_icon_src = "http:" + \
+                                 obj[0][0][0].attrib['src'].split("?")[0]
                 continue
             # Get icon
             icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
@@ -448,20 +505,24 @@ class SilverSchedule():
             title = obj[1][0][0].text
             # Get program url
             url = SILVER_URL + obj[1][0][0].attrib['href']
-            # Get host
+            # Get hosts
             host = []
-            host_url = []
             if len(obj[2]):
+                # If hosts exist
                 for it in obj[2][0]:
                     host.append(it[0][0].text)
-                    host_url.append(SILVER_URL + it[0][0].attrib['href'])
             # Get schedule
             sched = []
             for t in obj[3][0]:
+                # Expecting "WD, WD, WD : HH:MM" format
                 weekday, time = t.text.split(' : ')
                 wd_list = weekday.split(', ')
                 start, end = time.split('-')
                 for wd in wd_list:
+                    #  Weekday number,
+                    #  HH:MM,
+                    #  start in seconds,
+                    #  end in seconds
                     sched.append([wd_name_list[wd], time,
                                   self.sched_parse_time(start),
                                   self.sched_parse_time(end)])
@@ -473,45 +534,74 @@ class SilverSchedule():
             # Insert
             for it in sched:
                 for weekday in it[0]:
-                    self.__sched_week__[weekday].append([WEEKDAY_LIST[weekday],
-                        is_main, it[1], title, url, host, host_url,
-                        IMG_DIR + icon_name, it[2], it[3], icon_src])
+                    show = {}
+                    show["weekday"] = WEEKDAY_LIST[weekday]
+                    show["is_main"] = is_main
+                    show["time"] = it[1]
+                    show["title"] = title
+                    show["url"] = url
+                    show["host"] = host
+                    show["icon"] = IMG_DIR + icon_name
+                    show["start"] = it[2]
+                    show["end"] = it[3]
+                    show["icon_url"] = icon_src
+                    self.__sched_week__[weekday].append(show)
+
+        # Sort schedule by start/parent
+        for wd in range(7):
+            self.__sched_week__[wd].sort(key = lambda x : (x["start"], -x["is_main"]))
 
         # Fill spaces with music
-        icon_name = default_icon_src.split("/")[-1]
-        icon = IMG_DIR + icon_name
-        for x in range(7):
-            # Sort
-            self.__sched_week__[x].sort(key = lambda x : (x[8], -x[1]))
+        for wd in range(7):
             time = 0.0
             pos = 0
             last = []
 
-            for item in self.__sched_week__[x]:
-                if not item[1]:
+            for item in self.__sched_week__[wd]:
+                if not item["is_main"]:
                     continue
-                if item[8] > time:
-                    self.__sched_week__[x].insert(pos, [WEEKDAY_LIST[x], True,
-                        self.sched_str_time(time, item[8]), "Музыка",
-                        "http://silver.ru/programms/muzyka/",
-                        [], [], icon, time, item[8], default_icon_src])
+                if item["start"] > time:
+                    # If doesn't start right after the last one
+                    show = {}
+                    show["is_main"] = True
+                    show["title"] = "Музыка"
+                    show["url"] = "http://silver.ru/programms/muzyka/"
+                    show["host"] = []
+                    show["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
+                    show["icon_url"] = music_icon_src
+
+                    show["weekday"] = WEEKDAY_LIST[wd]
+                    show["time"] = self.sched_str_time(time, item["start"])
+                    show["start"] = time
+                    show["end"] = item["start"]
+                    self.__sched_week__[wd].insert(pos, show)
                     pos = pos + 1
-                time = item[9]
+                    print("ADDED MUSIC:", show)
+                time = item["end"]
                 pos = pos + 1
                 last = item
+            # Check if last event doesn't go till 24:00
+            if last["end"] < 86400.0:
+                show = {}
+                show["is_main"] = True
+                show["title"] = "Музыка"
+                show["url"] = "http://silver.ru/programms/muzyka/"
+                show["host"] = []
+                show["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
+                show["icon_url"] = music_icon_src
 
-            if last[9] < 86400.0:
-                self.__sched_week__[x].append([WEEKDAY_LIST[x], True,
-                     self.sched_str_time(last[9], 86400.0), "Музыка",
-                     "http://silver.ru/programms/muzyka/",
-                     [], [], icon, last[9], 86400.0, default_icon_src])
-            # Sort again
-            self.__sched_week__[x].sort(key = lambda x : (x[8], -x[1]))
+                show["weekday"] = WEEKDAY_LIST[wd]
+                show["time"] = self.sched_str_time(last["end"], 86400.0)
+                show["start"] = last["end"]
+                show["end"] = 86400.0
+                self.__sched_week__[wd].insert(pos, show)
+            # Sort by start/parent
+            self.__sched_week__[wd].sort(key = lambda x : (x["start"], -x["is_main"]))
 
-        # Save to file
-        f = open(SCHED_FILE, "w")
-        json.dump(self.__sched_week__, f)
-        f.close()
+        # Save sched to file
+        self.sched_write_to_file()
+
+        return True
 
     def sched_str_time(self, start, end):
         """ Return time in HH:MM-HH:MM """
@@ -526,7 +616,7 @@ class SilverSchedule():
         except ValueError:
             # except 24:00
             # Fuck timedelta and python-floating-point-approximation shit
-            # Just return the value
+            # Just return the correct value
             return 86400.0
         d = timedelta(hours=x.hour, minutes=x.minute)
         return d.total_seconds()
@@ -542,6 +632,8 @@ class SilverGUI(Gtk.Window):
         self.__recorder__ = recorder
         self.__volume__ = 100
         self.__muted__ = 0
+        self.cell_bg_old = ''
+        self.cell_fg_old = ''
 
         self.__main_window__ = True
         self.__about_window__ = False
@@ -555,8 +647,34 @@ class SilverGUI(Gtk.Window):
 
 ### Updater
     def update_status(self):
+        """ Update label, bg of current event, show notifications """
+        self.tree_mark_current_row()
         self.toolbar_update_label()
         self.show_notification_event()
+
+    def tree_mark_current_row(self):
+        pos = self.__schedule__.get_event_position()
+
+        if self.cell_bg_old:
+            # Reset previous row
+            path = Gtk.TreePath(pos - 1)
+            iter = self.sched_model.get_iter(path)
+            self.sched_model[iter][7] = self.cell_bg_old
+            self.sched_model[iter][8] = self.cell_fg_old
+            self.sched_model[iter][9] = SCHED_FONT
+            self.cell_bg_old = ''
+            self.cell_fg_old = ''
+
+        path = Gtk.TreePath(pos)
+        iter = self.sched_model.get_iter(path)
+        self.cell_bg_old = self.sched_model[iter][7]
+        self.cell_fg_old = self.sched_model[iter][8]
+        self.sched_model[iter][7] = SCHED_CURRENT_BG_COLOR
+        self.sched_model[iter][8] = SCHED_CURRENT_FG_COLOR
+        self.sched_model[iter][9] = SCHED_CURRENT_FONT
+
+        # Scroll to current cell
+        self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
 
 ### Main Window
     def create_main_window(self):
@@ -578,9 +696,11 @@ class SilverGUI(Gtk.Window):
         scrolled_window.set_policy(Gtk.PolicyType.NEVER,
                                    Gtk.PolicyType.AUTOMATIC)
         scrolled_window.set_min_content_height(100)
-        tree = self.create_tree()
-        scrolled_window.add(tree)
+        self.sched_tree = self.create_tree()
+        scrolled_window.add(self.sched_tree)
         vbox.pack_start(scrolled_window, True, True, 0)
+        ## Mark current
+        self.tree_mark_current_row()
         ## Selection
         selection = self.create_selection()
         vbox.pack_start(selection, False, False, 0)
@@ -596,83 +716,6 @@ class SilverGUI(Gtk.Window):
         self.__main_window__ = False
         window.hide()
         return True
-
-### Selection
-    def create_selection(self):
-        """ Create selection buttons """
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        for day in WEEKDAY_LIST:
-            button = Gtk.ToggleButton(day)
-            button.connect("toggled", self.selection_on_clicked)
-            hbox.pack_start(button, True, True, 0)
-        return hbox
-
-    def selection_on_clicked(self, button):
-        """ Filter Treeview by selected weekday """
-        self.week_filter = button.get_label()
-        self.filter.refilter()
-
-### Schedule tree
-    def create_tree(self):
-        """ Create schedule tree """
-        store = Gtk.TreeStore(str, bool, str, str, str, str,
-                              str, GdkPixbuf.Pixbuf, str, str)
-        """ Store:
-            0   Weekday             str
-            1   IsParent            bool
-            2   Time                str
-            3   Title               str
-            4   URL                 str
-            5   Host                str
-            6   Host URL            str
-            7   Icon                pixbuf
-            8   BackgroundColor     str
-            9   FontColor           str
-        """
-        self.filter = store.filter_new()
-        self.filter.set_visible_func(self.sched_filter_func)
-
-        self.__schedule__.fill_tree_strore(store)
-
-        sched_tree = Gtk.TreeView.new_with_model(self.filter)
-        sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
-
-        # Icon
-        renderer = Gtk.CellRendererPixbuf()
-        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=7)
-        renderer.set_alignment(1, 0.5)
-        sched_tree.append_column(column)
-
-        renderer = Gtk.CellRendererText()
-        renderer.set_padding(10, 0)
-        renderer.set_property('font', "11")
-        renderer.set_alignment(0.5, 0.5)
-        # Time
-        column = Gtk.TreeViewColumn("Time", renderer,
-                                    text=2, background=8, foreground=9)
-        column.set_alignment(0.5)
-        column.set_min_width(10)
-        sched_tree.append_column(column)
-        # Title
-        renderer.set_alignment(0, 0.5)
-        column = Gtk.TreeViewColumn("Title", renderer,
-                                    text=3, background=8, foreground=9)
-        column.set_alignment(0.5)
-        column.set_min_width(50)
-        column.set_resizable(True)
-        sched_tree.append_column(column)
-        # Host
-        column = Gtk.TreeViewColumn("Host", renderer,
-                                    text=5, background=8, foreground=9)
-        column.set_alignment(0.5)
-        column.set_min_width(50)
-        column.set_resizable(True)
-        sched_tree.append_column(column)
-        return sched_tree
-
-    def sched_filter_func(self, model, iter, data):
-        """ Filter by weekday """
-        return model[iter][0] == self.week_filter
 
 ### Menubar
     def create_menubar(self):
@@ -731,7 +774,6 @@ class SilverGUI(Gtk.Window):
         key, mod = Gtk.accelerator_parse("<Control>Q")
         quit.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
-
         ## Separator
         sep = []
         for i in range(3):
@@ -765,6 +807,113 @@ class SilverGUI(Gtk.Window):
         else:
             self.menubar_mute.set_active(True)
 
+### TreeView
+    def create_sched_list_model(self):
+        """ Create schedule tree """
+        store = Gtk.TreeStore(str,              # Weekday
+                              bool,             # IsParent
+                              str,              # Time
+                              str,              # Title
+                              str,              # URL
+                              str,              # Host
+                              GdkPixbuf.Pixbuf, # Icon
+                              str,              # BackgroundColor
+                              str,              # FontColor
+                              str)              # Font
+        self.sched_model = store.filter_new()
+        self.sched_model.set_visible_func(self.sched_model_func)
+        self.__schedule__.fill_tree_strore(store)
+
+    def sched_model_func(self, model, iter, data):
+        """ Filter by weekday """
+        return model[iter][0] == self.week_filter
+
+    def sched_on_button_release_event(self, widget, event):
+        if not event.button == 3:
+            return
+        selection = self.sched_tree.get_selection()
+        model, iter = selection.get_selected()
+        # Create popup menu
+        self.sched_popup = Gtk.Menu()
+        # Program url
+        url = Gtk.MenuItem.new_with_label("Event page")
+        url.set_size_request(100, -1)
+        event_url = model.get_value(iter, 4)
+        url.connect("activate", self.url_open, event_url)
+        self.sched_popup.append(url)
+        # Record program
+        icon = self.get_record_label()[1]
+        rec = self.create_menuitem("Record", icon)
+        event_time = model.get_value(iter, 2)
+        rec.connect("activate", self.sched_rec, event_time)
+        self.sched_popup.append(rec)
+        self.sched_popup.show_all()
+        self.sched_popup.popup(None, None,
+                               None, None,
+                               event.button, event.time)
+
+    def url_open(self, button, url):
+        subprocess.Popen(['xdg-open', url], stdout=subprocess.PIPE)
+
+    def sched_rec(self, button, time):
+        pass
+
+    def create_tree(self):
+        """ Create schedule tree """
+        self.create_sched_list_model()
+
+        sched_tree = Gtk.TreeView.new_with_model(self.sched_model)
+        sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
+        sched_tree.connect('button-release-event',
+                           self.sched_on_button_release_event)
+        # Icon
+        renderer = Gtk.CellRendererPixbuf()
+        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=6)
+        renderer.set_alignment(1, 0.5)
+        sched_tree.append_column(column)
+
+        renderer = Gtk.CellRendererText()
+        renderer.set_padding(10, 0)
+        renderer.set_alignment(0.5, 0.5)
+        # Time
+        column = Gtk.TreeViewColumn("Time", renderer,
+                                    text=2, background=7, foreground=8, font=9)
+        column.set_alignment(0.5)
+        column.set_min_width(10)
+        sched_tree.append_column(column)
+        # Title
+        renderer.set_alignment(0, 0.5)
+        column = Gtk.TreeViewColumn("Title", renderer,
+                                    text=3, background=7, foreground=8, font=9)
+        column.set_alignment(0.5)
+        column.set_min_width(50)
+        column.set_resizable(True)
+        sched_tree.append_column(column)
+        # Host
+        column = Gtk.TreeViewColumn("Host", renderer,
+                                    text=5, background=7, foreground=8, font=9)
+        column.set_alignment(0.5)
+        column.set_min_width(50)
+        column.set_resizable(True)
+        sched_tree.append_column(column)
+        return sched_tree
+
+### Selection
+    def create_selection(self):
+        """ Create selection buttons """
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        for day in WEEKDAY_LIST:
+            button = Gtk.ToggleButton(day)
+            button.set_size_request(80, 0)
+            button.connect("toggled", self.selection_on_clicked)
+            hbox.pack_start(button, True, True, 0)
+        return hbox
+
+    def selection_on_clicked(self, button):
+        """ Filter Treeview by selected weekday """
+        self.week_filter = button.get_label()
+        self.sched_model.refilter()
+
 ### Toolbar
     def create_control_panel(self):
         """ Playback control buttons """
@@ -775,6 +924,10 @@ class SilverGUI(Gtk.Window):
         control_panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         control_panel.set_spacing(6)
         control_panel.set_border_width(6)
+        ## Update schedule Button
+        self.sched_refresh = self.create_toolbutton("gtk-refresh")
+        self.sched_refresh.connect("clicked", self.tb_sched_update)
+        self.sched_refresh.focus_on_click = True
         ## Playback Button
         icon = self.get_playback_label()[1]
         self.playback_button = self.create_toolbutton(icon)
@@ -794,8 +947,9 @@ class SilverGUI(Gtk.Window):
         self.mute_button = self.create_toolbutton(icon)
         self.mute_button.connect("clicked", self.cp_on_mute)
 
-        toolbar.insert(self.playback_button, 0)
-        toolbar.insert(self.record_button, 1)
+        toolbar.insert(self.sched_refresh, 0)
+        toolbar.insert(self.playback_button, 1)
+        toolbar.insert(self.record_button, 2)
         ## Volume scale
         ad = Gtk.Adjustment(value=self.__volume__, lower=0,
                             upper=100, step_increment=5,
@@ -814,7 +968,7 @@ class SilverGUI(Gtk.Window):
 
     def toolbar_update_label(self):
         self.text.set_text("<span size='12000'><b>" +
-                self.__schedule__.get_title() + "</b></span>")
+                           self.__schedule__.get_event_title() + "</b></span>")
         self.text.set_use_markup(True)
 
     def cp_on_volume_changed(self, scale):
@@ -835,6 +989,12 @@ class SilverGUI(Gtk.Window):
         button.set_icon_name(icon)
         button.focus_on_click = False
         return button
+
+    def tb_sched_update(self, arg):
+        self.__schedule__.update_schedule()
+        self.create_sched_list_model()
+        self.sched_tree.set_model(self.sched_model)
+        self.update_status()
 
 ### Popup menu
     def create_popup_menu(self, icon, button, time):
@@ -961,7 +1121,7 @@ class SilverGUI(Gtk.Window):
             self.menubar_record.set_sensitive(True)
             self.menubar_stop_recording.set_sensitive(False)
 
-        name = self.__schedule__.get_title()
+        name = self.__schedule__.get_event_title()
         self.__recorder__.record_toggle(name)
 
     def mute_toggle(self, button, val=0):
@@ -1005,13 +1165,12 @@ class SilverGUI(Gtk.Window):
         return icon
 
     def show_notification_event(self):
-        if self.__playing__:
-            text = "Silver Rain"
-            body = self.__schedule__.get_title()
-            self.notification.set_icon_from_pixbuf(
-                    self.__schedule__.get_icon())
-            self.notification.update(text, body)
-            self.notification.show()
+        text = "Silver Rain"
+        body = self.__schedule__.get_event_title()
+        self.notification.set_icon_from_pixbuf(
+                self.__schedule__.get_event_icon())
+        self.notification.update(text, body)
+        self.notification.show()
 
     def show_notification_playback(self):
         if self.__playing__:
@@ -1032,18 +1191,24 @@ class SilverTimer():
         # On event timer
         self.__t_event__ = threading.Timer(0, None)
         self.init_event_timer()
+        self.__sched__.set_timer(self)
 
     def clean(self):
         """ Cancel timer """
         self.__t_event__.cancel()
 
+    def reset(self):
+        """ Reset timer """
+        self.clean()
+        self.init_event_timer()
+
     def init_event_timer(self):
-        """ Event timer """
+        """ Raise handler when event ends """
         today = datetime.now()
         now = timedelta(hours=today.hour,
                 minutes=today.minute, seconds=today.second).total_seconds()
         event = self.__sched__.get_event()
-        timeout = int(event[9] - now)   # On event ending
+        timeout = int(event["end"] - now)
         self.__t_event__ = threading.Timer(timeout, self.t_callback_event)
         self.__t_event__.start()
 
@@ -1065,15 +1230,15 @@ for dir in [APP_DIR, IMG_DIR, RECS_DIR]:
     if not os.path.exists(dir):
         os.makedirs(dir)
 # Init
-player = SilverPlayer()
-recorder = SilverRecorder()
-sched = SilverSchedule()
-silver = SilverGUI(player, recorder, sched)
-timer = SilverTimer(sched, silver)
+silver_player = SilverPlayer()
+silver_recorder = SilverRecorder()
+silver_schedule = SilverSchedule()
+silver_window = SilverGUI(silver_player, silver_recorder, silver_schedule)
+silver_timer = SilverTimer(silver_schedule, silver_window)
 # Main loop
 Gtk.main()
 # Cleanup
 Notify.uninit()
-player.clean()
-recorder.clean()
-timer.clean()
+silver_player.clean()
+silver_recorder.clean()
+silver_timer.clean()
