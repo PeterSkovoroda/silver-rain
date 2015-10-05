@@ -9,10 +9,10 @@ import json
 import logging
 import os
 import re
+import requests
 import signal
 import subprocess
 import threading
-import urllib.request
 
 from collections import deque
 from datetime import date
@@ -328,7 +328,6 @@ class SilverSchedule():
             9   Icon URL            str
     """
     def __init__(self):
-        #self.__sched_week__ = [ [] for x in range(7) ]
         self.__sched_week__ = [ [] for x in range(7) ]
         self.__sched_day__ = deque()
         self.__event_pos__ = -1
@@ -413,6 +412,10 @@ class SilverSchedule():
         """ Return title of current event """
         return self.__event__["title"]
 
+    def get_event_url(self):
+        """ Return title of current event """
+        return self.__event__["url"]
+
     def get_event_icon(self):
         """ Return pixbuf """
         # Download icon if it doesn't exist
@@ -465,6 +468,11 @@ class SilverSchedule():
         f.close()
 
     def sched_get_from_html(self):
+        session = requests.Session()
+        session.headers['User-Agent'] = \
+                'Mozilla/5.0 (X11; Linux x86_64) ' + \
+                'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
+                'Chrome/41.0.2227.0 Safari/537.36'
         # Default event icon
         music_icon_src = ''
         # Weekdays parser
@@ -473,12 +481,15 @@ class SilverSchedule():
                         'По будням' : list(range(0,5)),
                         'По выходным' : [5, 6]}
         # Download sched
-        try:
-            xhtml = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
-        except urllib.error.URLError as e:
-            logging.error("Connection error:", e)
-#TODO       handle error
-            return False
+        #try:
+            #xhtml = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
+        #except urllib.error.URLError as e:
+            #logging.error("Connection error:", e)
+##TODO       handle error
+            #return False
+        resp = session.get(SCHED_URL)
+        resp = session.get(resp.url)
+        xhtml = resp.text
 
         #TODO: come up with something better
         xhtml = re.sub(
@@ -495,11 +506,20 @@ class SilverSchedule():
                 continue
             if obj[1][0][0].text == "Музыка":
                 # Don't parse music. Just fill spaces with it
-                music_icon_src = "http:" + \
-                                 obj[0][0][0].attrib['src'].split("?")[0]
+                if obj[0][0][0].attrib['src'][0] == '/':
+                    music_icon_src = SILVER_URL + \
+                                     obj[0][0][0].attrib['src'].split("?")[0]
+                else:
+                    music_icon_src = "http://" + \
+                                     obj[0][0][0].attrib['src'].split("?")[0]
                 continue
             # Get icon
-            icon_src = "http:" + obj[0][0][0].attrib['src'].split("?")[0]
+            if obj[0][0][0].attrib['src'][0] == '/':
+                icon_src = SILVER_URL + \
+                           obj[0][0][0].attrib['src'].split("?")[0]
+            else:
+                icon_src = "http://" + \
+                                 obj[0][0][0].attrib['src'].split("?")[0]
             icon_name = icon_src.split("/")[-1]
             # Get title
             title = obj[1][0][0].text
@@ -524,8 +544,8 @@ class SilverSchedule():
                     #  start in seconds,
                     #  end in seconds
                     sched.append([wd_name_list[wd], time,
-                                  self.sched_parse_time(start),
-                                  self.sched_parse_time(end)])
+                                  parse_time(start),
+                                  parse_time(end)])
             # Event type
             is_main = False
             if sched[0][3] - sched[0][2] >= 3600:
@@ -534,18 +554,18 @@ class SilverSchedule():
             # Insert
             for it in sched:
                 for weekday in it[0]:
-                    show = {}
-                    show["weekday"] = WEEKDAY_LIST[weekday]
-                    show["is_main"] = is_main
-                    show["time"] = it[1]
-                    show["title"] = title
-                    show["url"] = url
-                    show["host"] = host
-                    show["icon"] = IMG_DIR + icon_name
-                    show["start"] = it[2]
-                    show["end"] = it[3]
-                    show["icon_url"] = icon_src
-                    self.__sched_week__[weekday].append(show)
+                    program = {}
+                    program["weekday"] = WEEKDAY_LIST[weekday]
+                    program["is_main"] = is_main
+                    program["time"] = it[1]
+                    program["title"] = title
+                    program["url"] = url
+                    program["host"] = host
+                    program["icon"] = IMG_DIR + icon_name
+                    program["start"] = it[2]
+                    program["end"] = it[3]
+                    program["icon_url"] = icon_src
+                    self.__sched_week__[weekday].append(program)
 
         # Sort schedule by start/parent
         for wd in range(7):
@@ -562,39 +582,36 @@ class SilverSchedule():
                     continue
                 if item["start"] > time:
                     # If doesn't start right after the last one
-                    show = {}
-                    show["is_main"] = True
-                    show["title"] = "Музыка"
-                    show["url"] = "http://silver.ru/programms/muzyka/"
-                    show["host"] = []
-                    show["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
-                    show["icon_url"] = music_icon_src
-
-                    show["weekday"] = WEEKDAY_LIST[wd]
-                    show["time"] = self.sched_str_time(time, item["start"])
-                    show["start"] = time
-                    show["end"] = item["start"]
-                    self.__sched_week__[wd].insert(pos, show)
+                    program = {}
+                    program["is_main"] = True
+                    program["title"] = "Музыка"
+                    program["url"] = "http://silver.ru/programms/muzyka/"
+                    program["host"] = []
+                    program["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
+                    program["icon_url"] = music_icon_src
+                    program["weekday"] = WEEKDAY_LIST[wd]
+                    program["time"] = str_time(time, item["start"])
+                    program["start"] = time
+                    program["end"] = item["start"]
+                    self.__sched_week__[wd].insert(pos, program)
                     pos = pos + 1
-                    print("ADDED MUSIC:", show)
                 time = item["end"]
                 pos = pos + 1
                 last = item
             # Check if last event doesn't go till 24:00
             if last["end"] < 86400.0:
-                show = {}
-                show["is_main"] = True
-                show["title"] = "Музыка"
-                show["url"] = "http://silver.ru/programms/muzyka/"
-                show["host"] = []
-                show["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
-                show["icon_url"] = music_icon_src
-
-                show["weekday"] = WEEKDAY_LIST[wd]
-                show["time"] = self.sched_str_time(last["end"], 86400.0)
-                show["start"] = last["end"]
-                show["end"] = 86400.0
-                self.__sched_week__[wd].insert(pos, show)
+                program = {}
+                program["is_main"] = True
+                program["title"] = "Музыка"
+                program["url"] = "http://silver.ru/programms/muzyka/"
+                program["host"] = []
+                program["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
+                program["icon_url"] = music_icon_src
+                program["weekday"] = WEEKDAY_LIST[wd]
+                program["time"] = str_time(last["end"], 86400.0)
+                program["start"] = last["end"]
+                program["end"] = 86400.0
+                self.__sched_week__[wd].insert(pos, program)
             # Sort by start/parent
             self.__sched_week__[wd].sort(key = lambda x : (x["start"], -x["is_main"]))
 
@@ -602,24 +619,6 @@ class SilverSchedule():
         self.sched_write_to_file()
 
         return True
-
-    def sched_str_time(self, start, end):
-        """ Return time in HH:MM-HH:MM """
-        s_h, s_m = divmod(int(start), 3600)
-        e_h, e_m = divmod(int(end), 3600)
-        return "{0:0=2d}:{1:0=2d}-{2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
-
-    def sched_parse_time(self, str):
-        """ Return time in seconds """
-        try:
-            x = datetime.strptime(str, "%H:%M")
-        except ValueError:
-            # except 24:00
-            # Fuck timedelta and python-floating-point-approximation shit
-            # Just return the correct value
-            return 86400.0
-        d = timedelta(hours=x.hour, minutes=x.minute)
-        return d.total_seconds()
 
 ########################################################################
 # GUI
@@ -649,7 +648,7 @@ class SilverGUI(Gtk.Window):
     def update_status(self):
         """ Update label, bg of current event, show notifications """
         self.tree_mark_current_row()
-        self.toolbar_update_label()
+        self.cp_update_label()
         self.show_notification_event()
 
     def tree_mark_current_row(self):
@@ -673,6 +672,7 @@ class SilverGUI(Gtk.Window):
         self.sched_model[iter][8] = SCHED_CURRENT_FG_COLOR
         self.sched_model[iter][9] = SCHED_CURRENT_FONT
 
+        path = Gtk.TreePath(pos)
         # Scroll to current cell
         self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
 
@@ -823,6 +823,8 @@ class SilverGUI(Gtk.Window):
         self.sched_model = store.filter_new()
         self.sched_model.set_visible_func(self.sched_model_func)
         self.__schedule__.fill_tree_strore(store)
+        self.cell_bg_old = ''
+        self.cell_fg_old = ''
 
     def sched_model_func(self, model, iter, data):
         """ Filter by weekday """
@@ -836,16 +838,16 @@ class SilverGUI(Gtk.Window):
         # Create popup menu
         self.sched_popup = Gtk.Menu()
         # Program url
-        url = Gtk.MenuItem.new_with_label("Event page")
+        url = self.create_menuitem("Program page", "web-browser")
         url.set_size_request(100, -1)
         event_url = model.get_value(iter, 4)
         url.connect("activate", self.url_open, event_url)
         self.sched_popup.append(url)
         # Record program
         icon = self.get_record_label()[1]
-        rec = self.create_menuitem("Record", icon)
+        rec = self.create_menuitem("Set recording", icon)
         event_time = model.get_value(iter, 2)
-        rec.connect("activate", self.sched_rec, event_time)
+        rec.connect("activate", self.sched_record, event_time)
         self.sched_popup.append(rec)
         self.sched_popup.show_all()
         self.sched_popup.popup(None, None,
@@ -855,7 +857,8 @@ class SilverGUI(Gtk.Window):
     def url_open(self, button, url):
         subprocess.Popen(['xdg-open', url], stdout=subprocess.PIPE)
 
-    def sched_rec(self, button, time):
+    def sched_record(self, button, time):
+        print(time)
         pass
 
     def create_tree(self):
@@ -914,7 +917,7 @@ class SilverGUI(Gtk.Window):
         self.week_filter = button.get_label()
         self.sched_model.refilter()
 
-### Toolbar
+### Control panel
     def create_control_panel(self):
         """ Playback control buttons """
         toolbar = Gtk.Toolbar()
@@ -924,32 +927,39 @@ class SilverGUI(Gtk.Window):
         control_panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         control_panel.set_spacing(6)
         control_panel.set_border_width(6)
-        ## Update schedule Button
-        self.sched_refresh = self.create_toolbutton("gtk-refresh")
-        self.sched_refresh.connect("clicked", self.tb_sched_update)
-        self.sched_refresh.focus_on_click = True
         ## Playback Button
         icon = self.get_playback_label()[1]
         self.playback_button = self.create_toolbutton(icon)
         self.playback_button.connect("clicked", self.playback_toggle)
+        self.playback_button.set_tooltip_text("Play")
         ## Record Button
         icon = self.get_record_label()[1]
         self.record_button = self.create_toolbutton(icon)
         self.record_button.connect("clicked", self.record_toggle)
-        self.record_button.focus_on_click = True
+        self.record_button.set_tooltip_text("Record")
+        ## Separator
+        sep = Gtk.SeparatorToolItem()
+        ## Update schedule Button
+        self.sched_refresh = self.create_toolbutton("gtk-refresh")
+        self.sched_refresh.connect("clicked", self.cp_sched_update)
+        self.sched_refresh.set_tooltip_text("Update schedule")
         ## Label
         self.text = Gtk.Label()
         self.text.set_selectable(True)
         self.text.set_yalign(0.45)
-        self.toolbar_update_label()
+        self.cp_update_label()
         ## Mute Button
         icon = self.get_volume_icon()
         self.mute_button = self.create_toolbutton(icon)
         self.mute_button.connect("clicked", self.cp_on_mute)
-
-        toolbar.insert(self.sched_refresh, 0)
-        toolbar.insert(self.playback_button, 1)
-        toolbar.insert(self.record_button, 2)
+        ## Pack toolbar
+        for x, el in enumerate ([
+                                 self.playback_button,
+                                 self.record_button,
+                                 sep,
+                                 self.sched_refresh,
+                                 ]):
+            toolbar.insert(el, x)
         ## Volume scale
         ad = Gtk.Adjustment(value=self.__volume__, lower=0,
                             upper=100, step_increment=5,
@@ -959,14 +969,14 @@ class SilverGUI(Gtk.Window):
         self.volume.set_property('draw-value', False)
         self.volume.connect("value-changed", self.cp_on_volume_changed)
         self.volume.set_size_request(80, 0)
-
+        ## Pack panel
         control_panel.pack_start(toolbar, False, False, 0)
         control_panel.pack_start(self.text, True, False, 0)
         control_panel.pack_end(self.volume, False, False, 0)
         control_panel.pack_end(self.mute_button, False, False, 0)
         return control_panel
 
-    def toolbar_update_label(self):
+    def cp_update_label(self):
         self.text.set_text("<span size='12000'><b>" +
                            self.__schedule__.get_event_title() + "</b></span>")
         self.text.set_use_markup(True)
@@ -987,10 +997,9 @@ class SilverGUI(Gtk.Window):
         ## Playback Button
         button = Gtk.ToolButton()
         button.set_icon_name(icon)
-        button.focus_on_click = False
         return button
 
-    def tb_sched_update(self, arg):
+    def cp_sched_update(self, button):
         self.__schedule__.update_schedule()
         self.create_sched_list_model()
         self.sched_tree.set_model(self.sched_model)
@@ -1045,6 +1054,7 @@ class SilverGUI(Gtk.Window):
         self.status_icon.connect("activate", self.status_icon_on_activate)
         self.status_icon.connect("popup-menu", self.create_popup_menu)
         self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
+        self.status_icon.set_tooltip_text("Silver Rain")
 
     def status_icon_on_activate(self, icon):
         """ Show/hide main window on left click """
@@ -1104,9 +1114,11 @@ class SilverGUI(Gtk.Window):
         if self.__playing__:
             self.menubar_play.set_sensitive(False)
             self.menubar_stop.set_sensitive(True)
+            self.playback_button.set_tooltip_text("Stop")
         else:
             self.menubar_play.set_sensitive(True)
             self.menubar_stop.set_sensitive(False)
+            self.playback_button.set_tooltip_text("Play")
 
         self.__player__.playback_toggle()
         self.show_notification_playback()
@@ -1117,9 +1129,11 @@ class SilverGUI(Gtk.Window):
         if self.__recording__:
             self.menubar_record.set_sensitive(False)
             self.menubar_stop_recording.set_sensitive(True)
+            self.record_button.set_tooltip_text("Stop recording")
         else:
             self.menubar_record.set_sensitive(True)
             self.menubar_stop_recording.set_sensitive(False)
+            self.record_button.set_tooltip_text("Record")
 
         name = self.__schedule__.get_event_title()
         self.__recorder__.record_toggle(name)
@@ -1218,6 +1232,26 @@ class SilverTimer():
         self.__window__.update_status()
         # Init new timer
         self.init_event_timer()
+
+########################################################################
+# Common
+def str_time(start, end):
+    """ Return time in HH:MM-HH:MM """
+    s_h, s_m = divmod(int(start), 3600)
+    e_h, e_m = divmod(int(end), 3600)
+    return "{0:0=2d}:{1:0=2d}-{2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
+
+def parse_time(str):
+    """ Return time in seconds """
+    try:
+        x = datetime.strptime(str, "%H:%M")
+    except ValueError:
+        # except 24:00
+        # Fuck timedelta and python-floating-point-approximation shit
+        # Just return the correct value
+        return 86400.0
+    d = timedelta(hours=x.hour, minutes=x.minute)
+    return d.total_seconds()
 
 ########################################################################
 # Boom, baby
