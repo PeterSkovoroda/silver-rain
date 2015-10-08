@@ -46,7 +46,7 @@ SCHED_FILE = APP_DIR + "sched.dump"
 SCHED_URL = "http://silver.ru/programms/"
 
 # Own style
-CSS_PATH = 'silver-rain.css'
+CSS_PATH = APP_DIR + 'silver-rain.css'
 style_provider = Gtk.CssProvider()
 css = open(CSS_PATH, 'rb')
 css_data = css.read()
@@ -341,7 +341,8 @@ class SilverSchedule():
         """ Return pixbuf """
         # Download icon if it doesn't exist
         if not os.path.exists(self.__event__["icon"]):
-            urllib.request.urlretrieve(self.__event__["icon_url"], self.__event__["icon"])
+            urllib.request.urlretrieve(self.__event__["icon_url"],
+                                       self.__event__["icon"])
         return GdkPixbuf.Pixbuf.new_from_file(self.__event__["icon"])
 
     def update_current_event(self):
