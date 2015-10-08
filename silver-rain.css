@@ -1,3 +1,25 @@
+@define-color silver_selected #FF4545;
+
+/*
+ **************************
+ * Selected button color  *
+ **************************
+ */
+.button:focus,
+.button:hover:focus,
+.button:active:focus,
+.button:active:hover:focus,
+.button:checked:focus,
+.button:checked:hover:focus {
+    border-color: shade(@silver_selected, 0.8);
+}
+
+/***********************************************************
+ *** Typical fixes for outdated GTK3 themes		 ***
+ *** Uncomment or (better) place this in gtk-widgets.css ***
+ *** file if everything looks like shit for you		 ***
+ ***********************************************************/
+
 /*
  **************************
  * no borders for toolbar *
@@ -34,4 +56,17 @@
 .undershoot {
     background: none;
 }
+
+ ***********
+ * spinner *
+ ***********
+@keyframes spinner {
+    to { -gtk-icon-transform: rotate(1turn); }
+}
+
+.spinner:active {
+    animation: spinner 1s infinite linear;
+    opacity: 1;
+}
+
 */

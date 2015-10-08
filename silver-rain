@@ -13,6 +13,7 @@ import requests
 import signal
 import subprocess
 import threading
+import urllib.request
 
 from collections import deque
 from datetime import date
@@ -46,14 +47,14 @@ SCHED_URL = "http://silver.ru/programms/"
 
 # Own style
 CSS_PATH = 'silver-rain.css'
-#style_provider = Gtk.CssProvider()
-#css = open(CSS_PATH, 'rb')
-#css_data = css.read()
-#css.close()
-#style_provider.load_from_data(css_data)
-#Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(),
-#                                       style_provider,
-#                                       Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+style_provider = Gtk.CssProvider()
+css = open(CSS_PATH, 'rb')
+css_data = css.read()
+css.close()
+style_provider.load_from_data(css_data)
+Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(),
+                                       style_provider,
+                                       Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
 # Colors
 # * Silver red - #FF4545
@@ -313,7 +314,6 @@ class SilverSchedule():
         __sched_week__      - full schedule
         __sched_day__       - daily agenda
         __event__           - currently playing
-        __event_pos__       - event position
 
         Schedule list[weekday(0-6)]:
             0   Weekday             str
@@ -330,40 +330,55 @@ class SilverSchedule():
     def __init__(self):
         self.__sched_week__ = [ [] for x in range(7) ]
         self.__sched_day__ = deque()
-        self.__event_pos__ = -1
-        # Retrieve schedule
-        if os.path.exists(SCHED_FILE):
+        self.__event__ = {}
+
+    # Get current event values
+    def get_event_title(self): return self.__event__["title"]
+    def get_event_url(self): return self.__event__["url"]
+    def get_event_end(self): return self.__event__["end"]
+    def get_event_position(self): return self.__event__["position"]
+    def get_event_icon(self):
+        """ Return pixbuf """
+        # Download icon if it doesn't exist
+        if not os.path.exists(self.__event__["icon"]):
+            urllib.request.urlretrieve(self.__event__["icon_url"], self.__event__["icon"])
+        return GdkPixbuf.Pixbuf.new_from_file(self.__event__["icon"])
+
+    def update_current_event(self):
+        """ Update current event """
+        newday = False
+        if not len(self.__sched_day__):
+            # It's a new day.
+            # It's so mundane. What exciting things will happen today?
+            print("NEW DAY")
+            self._sched_gen_daily_agenda()
+            newday = True
+        self.__event__ = self.__sched_day__.popleft()
+        return newday
+
+    def update_schedule(self, force_refresh=False):
+        """ Retrieve schedule """
+        if not force_refresh and os.path.exists(SCHED_FILE):
             # Read from file
-            self.sched_get_from_file()
+            self._sched_get_from_file()
         else:
+            # Backup
+            sched_week_bak = self.__sched_week__
+            sched_day_bak = self.__sched_day__
+            # Clear
+            self.__sched_week__ = [ [] for x in range(7) ]
+            self.__sched_day__ = deque()
             # Load from website
-            self.sched_get_from_html()
+            if not self._sched_get_from_html():
+                logging.error("Couldn't update")
+                self.__sched_week__ = sched_week_bak
+                self.__sched_day__ = sched_day_bak
+                return False
         # Generate schedule for today
-        self.sched_gen_daily_agenda()
+        self._sched_gen_daily_agenda()
         # Update current event
-        self.sched_update_current()
-
-    def set_timer(self, timer):
-#TODO:  Need something better
-        self.__timer__ = timer
-
-    def update_schedule(self):
-        """ Force downloading sched from internet """
-        # Backup
-        sched_week_bak = self.__sched_week__
-        sched_day_bak = self.__sched_day__
-        # Clear
-        self.__sched_week__ = [ [] for x in range(7) ]
-        self.__sched_day__ = deque()
-        if not self.sched_get_from_html():
-#TODO:      Raise alert
-            logging.warning("Couldn't update")
-            self.__sched_week__ = sched_week_bak
-            self.__sched_day__ = sched_day_bak
-        else:
-            self.sched_gen_daily_agenda()
-            self.sched_update_current()
-            self.__timer__.reset()
+        self.update_current_event()
+        return True
 
     def fill_tree_strore(self, store):
         """ Fill TreeStore object """
@@ -408,66 +423,38 @@ class SilverSchedule():
                     # Alternate row color
                     ch_dark = not ch_dark
 
-    def get_event_title(self):
-        """ Return title of current event """
-        return self.__event__["title"]
-
-    def get_event_url(self):
-        """ Return title of current event """
-        return self.__event__["url"]
-
-    def get_event_icon(self):
-        """ Return pixbuf """
-        # Download icon if it doesn't exist
-        if not os.path.exists(self.__event__["icon"]):
-            urllib.request.urlretrieve(self.__event__["icon_url"], self.__event__["icon"])
-        return GdkPixbuf.Pixbuf.new_from_file(self.__event__["icon"])
-
-    def get_event(self):
-        """ Return current event """
-        return self.__event__
-
-    def get_event_position(self):
-        """ Return current event """
-        return self.__event_pos__
-
-    def sched_gen_daily_agenda(self):
+    def _sched_gen_daily_agenda(self):
         """ Create a list of main events for today """
-        self.__event_pos__ = -1
         today = datetime.now()
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
+        position = 0
         for item in self.__sched_week__[today.weekday()]:
             if not item["is_main"]:
                 continue
-            elif item["end"] < now:
+            else:
+                item["position"] = position
+                position = position + 1
+            if item["end"] < now:
                 # Child or already ended. Skip
-                self.__event_pos__ = self.__event_pos__ + 1
                 continue
             self.__sched_day__.append(item)
 
-    def sched_update_current(self):
-        """ Update current event """
-        if not len(self.__sched_day__):
-            # It's a new day.
-            # It's so mundane. What exciting things will happen today?
-            self.sched_gen_daily_agenda()
-
-        item = self.__sched_day__.popleft()
-        self.__event__ = item
-        self.__event_pos__ = self.__event_pos__ + 1
-
-    def sched_get_from_file(self):
+    def _sched_get_from_file(self):
+        """ Load schedule from file """
         f = open(SCHED_FILE, "r")
         self.__sched_week__ = json.load(f)
         f.close()
 
-    def sched_write_to_file(self):
+    def _sched_write_to_file(self):
+        """ Save schedule on disk """
         f = open(SCHED_FILE, 'w')
         json.dump(self.__sched_week__, f)
         f.close()
 
-    def sched_get_from_html(self):
+    def _sched_get_from_html(self):
+        """ Load schedule from site """
+        # Create session with fake user-agent
         session = requests.Session()
         session.headers['User-Agent'] = \
                 'Mozilla/5.0 (X11; Linux x86_64) ' + \
@@ -481,37 +468,24 @@ class SilverSchedule():
                         'По будням' : list(range(0,5)),
                         'По выходным' : [5, 6]}
         # Download sched
-        #try:
-            #xhtml = urllib.request.urlopen(SCHED_URL).read().decode("utf-8")
-        #except urllib.error.URLError as e:
-            #logging.error("Connection error:", e)
-##TODO       handle error
-            #return False
         resp = session.get(SCHED_URL)
+#TODO:  handle connection error
+#           return False
+        # Follow redirects
         resp = session.get(resp.url)
         xhtml = resp.text
-
-        #TODO: come up with something better
+#TODO:  come up with something better
         xhtml = re.sub(
                 r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$',
                 r'\1', xhtml)
-        # Close unclosed img tags /* make it xhtml style */
+        # Handle unclosed img tags /* xhtml style */
         xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
-
-        root = etree.fromstring(xhtml)
         # Parse xhtml text
+        root = etree.fromstring(xhtml)
         for obj in root:
+            # If time not presented
             if not len(obj[3]):
                 # Event happens randomly or never
-                continue
-            if obj[1][0][0].text == "Музыка":
-                # Don't parse music. Just fill spaces with it
-                if obj[0][0][0].attrib['src'][0] == '/':
-                    music_icon_src = SILVER_URL + \
-                                     obj[0][0][0].attrib['src'].split("?")[0]
-                else:
-                    music_icon_src = "http://" + \
-                                     obj[0][0][0].attrib['src'].split("?")[0]
                 continue
             # Get icon
             if obj[0][0][0].attrib['src'][0] == '/':
@@ -523,19 +497,23 @@ class SilverSchedule():
             icon_name = icon_src.split("/")[-1]
             # Get title
             title = obj[1][0][0].text
+            # Don't parse music. Just save icon location
+            if title == "Музыка":
+                music_icon_src = icon_src
+                continue
             # Get program url
             url = SILVER_URL + obj[1][0][0].attrib['href']
             # Get hosts
             host = []
             if len(obj[2]):
-                # If hosts exist
+                # If hosts presented
                 for it in obj[2][0]:
                     host.append(it[0][0].text)
             # Get schedule
             sched = []
-            for t in obj[3][0]:
+            for it in obj[3][0]:
                 # Expecting "WD, WD, WD : HH:MM" format
-                weekday, time = t.text.split(' : ')
+                weekday, time = it.text.split(' : ')
                 wd_list = weekday.split(', ')
                 start, end = time.split('-')
                 for wd in wd_list:
@@ -567,16 +545,14 @@ class SilverSchedule():
                     program["icon_url"] = icon_src
                     self.__sched_week__[weekday].append(program)
 
-        # Sort schedule by start/parent
-        for wd in range(7):
-            self.__sched_week__[wd].sort(key = lambda x : (x["start"], -x["is_main"]))
-
-        # Fill spaces with music
         for wd in range(7):
             time = 0.0
             pos = 0
             last = []
-
+            # Sort schedule by start/parent
+            self.__sched_week__[wd].sort(key = lambda x : \
+                                         (x["start"], -x["is_main"]))
+            # Fill spaces with music
             for item in self.__sched_week__[wd]:
                 if not item["is_main"]:
                     continue
@@ -612,12 +588,11 @@ class SilverSchedule():
                 program["start"] = last["end"]
                 program["end"] = 86400.0
                 self.__sched_week__[wd].insert(pos, program)
-            # Sort by start/parent
-            self.__sched_week__[wd].sort(key = lambda x : (x["start"], -x["is_main"]))
-
+            # Sort again
+            self.__sched_week__[wd].sort(key = lambda x : \
+                                         (x["start"], -x["is_main"]))
         # Save sched to file
-        self.sched_write_to_file()
-
+        self._sched_write_to_file()
         return True
 
 ########################################################################
@@ -625,100 +600,78 @@ class SilverSchedule():
 class SilverGUI(Gtk.Window):
     """ GUI """
     def __init__(self, player, recorder, sched):
+        ## GStreamer
+        # Player
+        self._player = player
         self.__playing__ = False
-        self.__player__ = player
-        self.__recording__ = False
-        self.__recorder__ = recorder
         self.__volume__ = 100
         self.__muted__ = 0
-        self.cell_bg_old = ''
-        self.cell_fg_old = ''
-
+        # Recorder
+        self._recorder = recorder
+        self.__recording__ = False
+        ## Schedule
+        self._schedule = sched
+        self.__SCHEDULE_ERROR__ = False
+        ## Timers
+        # On event timer
+        self._t_event = threading.Timer(0, None)
+        ## Interface
+        # Main window
         self.__main_window__ = True
-        self.__about_window__ = False
-        self.__prefs_window__ = False
-        self.__schedule__ = sched
-        self.week_filter = date.today().strftime("%A")
-
-        self.create_main_window()
-        self.create_status_icon()
+        # Notifications
         self.notification = Notify.Notification.new("Header", "Body", "image")
+        # TreeView
+        self.__weekday_filter__ = date.today().strftime("%A")
+        self.__cell_bg_old__ = ''
+        self.__cell_fg_old__ = ''
+        # Create main window
+        self.main_window_create()
+        # Create status icon
+        self.status_icon_create()
+        # Create treeview
+        self.schedule_update()
 
-### Updater
-    def update_status(self):
-        """ Update label, bg of current event, show notifications """
-        self.tree_mark_current_row()
-        self.cp_update_label()
-        self.show_notification_event()
-
-    def tree_mark_current_row(self):
-        pos = self.__schedule__.get_event_position()
-
-        if self.cell_bg_old:
-            # Reset previous row
-            path = Gtk.TreePath(pos - 1)
-            iter = self.sched_model.get_iter(path)
-            self.sched_model[iter][7] = self.cell_bg_old
-            self.sched_model[iter][8] = self.cell_fg_old
-            self.sched_model[iter][9] = SCHED_FONT
-            self.cell_bg_old = ''
-            self.cell_fg_old = ''
-
-        path = Gtk.TreePath(pos)
-        iter = self.sched_model.get_iter(path)
-        self.cell_bg_old = self.sched_model[iter][7]
-        self.cell_fg_old = self.sched_model[iter][8]
-        self.sched_model[iter][7] = SCHED_CURRENT_BG_COLOR
-        self.sched_model[iter][8] = SCHED_CURRENT_FG_COLOR
-        self.sched_model[iter][9] = SCHED_CURRENT_FONT
-
-        path = Gtk.TreePath(pos)
-        # Scroll to current cell
-        self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
+### Cleanup
+    def clean(self):
+        self.timers_clean()
 
 ### Main Window
-    def create_main_window(self):
-        """ Init top window """
+    def main_window_create(self):
+        """ Init parent window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(0)
         self.set_default_size(650, 450)
-        self.connect("delete-event", self.mw_on_delete_event)
-
-        # Main box
+        self.connect("delete-event", self.main_window_on_delete_event)
+        # Container
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         ## Menubar
-        menubar = self.create_menubar()
+        menubar = self.menubar_create()
         vbox.pack_start(menubar, False, False, 0)
         sep = Gtk.Separator()
         vbox.pack_start(sep, False, False, 0)
-        ## Schedule tree
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.NEVER,
+        ## Scrolled window
+        self.scrolled_window = Gtk.ScrolledWindow()
+        self.scrolled_window.set_policy(Gtk.PolicyType.NEVER,
                                    Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_min_content_height(100)
-        self.sched_tree = self.create_tree()
-        scrolled_window.add(self.sched_tree)
-        vbox.pack_start(scrolled_window, True, True, 0)
-        ## Mark current
-        self.tree_mark_current_row()
+        self.scrolled_window.set_min_content_height(100)
+        vbox.pack_start(self.scrolled_window, True, True, 0)
         ## Selection
-        selection = self.create_selection()
+        selection = self.selection_create()
         vbox.pack_start(selection, False, False, 0)
         # Controls
-        control_panel = self.create_control_panel()
+        control_panel = self.control_panel_create()
         vbox.pack_end(control_panel, False, False, 0)
-
         self.add(vbox)
         self.show_all()
 
-    def mw_on_delete_event(self, window, event):
-        """ Hide top window instead of destroying it """
+    def main_window_on_delete_event(self, window, event):
+        """ Hide parent window instead of destroying it """
         self.__main_window__ = False
         window.hide()
         return True
 
 ### Menubar
-    def create_menubar(self):
+    def menubar_create(self):
         """ Menu bar """
         agr = Gtk.AccelGroup()
         self.add_accel_group(agr)
@@ -729,7 +682,7 @@ class SilverGUI(Gtk.Window):
         music.set_submenu(music_menu)
         ## Play
         self.menubar_play = self.create_menuitem("Play",
-                                                 "media-playback-start")
+                                          "media-playback-start")
         self.menubar_play.set_size_request(90, -1)
         self.menubar_play.connect("activate", self.playback_toggle)
         key, mod = Gtk.accelerator_parse("F6")
@@ -762,9 +715,15 @@ class SilverGUI(Gtk.Window):
         key, mod = Gtk.accelerator_parse("<Control>M")
         self.menubar_mute.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
+        ## Refresh
+        refresh = self.create_menuitem("Update shcedule", "gtk-refresh")
+        refresh.connect("activate", self.schedule_refresh)
+        key, mod = Gtk.accelerator_parse("F5")
+        refresh.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Preferences
         prefs = self.create_menuitem("Preferences", "gtk-preferences")
-        prefs.connect("activate", self.create_prefs_window)
+        prefs.connect("activate", self.prefs_window_create)
         key, mod = Gtk.accelerator_parse("<Control>P")
         prefs.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
@@ -776,14 +735,22 @@ class SilverGUI(Gtk.Window):
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Separator
         sep = []
-        for i in range(3):
+        for i in range(4):
             sep.append(Gtk.SeparatorMenuItem())
-
-        for item in [self.menubar_play, self.menubar_stop,
-                     self.menubar_record, self.menubar_stop_recording,
-                     sep[0], self.menubar_mute, sep[1], prefs, sep[2], quit]:
+        ## Pack
+        for item in [ self.menubar_play,
+                      self.menubar_stop,
+                      self.menubar_record,
+                      self.menubar_stop_recording,
+                      sep[0],
+                      self.menubar_mute,
+                      sep[1],
+                      refresh,
+                      sep[2],
+                      prefs,
+                      sep[3],
+                      quit ]:
             music_menu.append(item)
-
         # Help
         help_menu = Gtk.Menu()
         help = Gtk.MenuItem("Help")
@@ -791,7 +758,7 @@ class SilverGUI(Gtk.Window):
         ## About
         about = self.create_menuitem("About", "gtk-about")
         about.set_size_request(90, -1)
-        about.connect("activate", self.create_about_window)
+        about.connect("activate", self.about_window_create)
         key, mod = Gtk.accelerator_parse("F1")
         about.add_accelerator("activate", agr, key,
                               mod, Gtk.AccelFlags.VISIBLE)
@@ -802,13 +769,175 @@ class SilverGUI(Gtk.Window):
         return menubar
 
     def menubar_mute_toggle(self):
+        """ Set mute button active flag """
         if self.__muted__:
             self.menubar_mute.set_active(False)
         else:
             self.menubar_mute.set_active(True)
 
+### Selection
+    def selection_create(self):
+        """ Create selection buttons """
+        self.selection_buttons = []
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        for day in WEEKDAY_LIST:
+            button = Gtk.Button(day)
+            button.set_focus_on_click(True)
+            button.set_size_request(80, 0)
+            button.connect("clicked", self.selection_on_clicked)
+            hbox.pack_start(button, True, True, 0)
+            self.selection_buttons.append(button)
+        return hbox
+
+    def selection_on_clicked(self, button):
+        """ Refilter treeview by selected weekday """
+        self.__weekday_filter__ = button.get_label()
+        self.sched_tree_model.refilter()
+
+### Control panel
+    def control_panel_create(self):
+        """ Playback control panel """
+        toolbar = Gtk.Toolbar()
+        toolbar.set_orientation(Gtk.Orientation.HORIZONTAL)
+        toolbar.set_style(Gtk.ToolbarStyle.ICONS)
+
+        control_panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        control_panel.set_spacing(6)
+        control_panel.set_border_width(6)
+        ## Playback Button
+        icon = self.get_playback_label()[1]
+        self.playback_button = self.create_toolbutton(icon)
+        self.playback_button.connect("clicked", self.playback_toggle)
+        self.playback_button.set_tooltip_text("Play")
+        ## Record Button
+        icon = self.get_record_label()[1]
+        self.record_button = self.create_toolbutton(icon)
+        self.record_button.connect("clicked", self.record_toggle)
+        self.record_button.set_tooltip_text("Record")
+        ## Separator
+        sep = Gtk.SeparatorToolItem()
+        ## Update schedule Button
+        self.sched_refresh_button = self.create_toolbutton("gtk-refresh")
+        self.sched_refresh_button.connect("clicked", self.schedule_refresh)
+        self.sched_refresh_button.set_tooltip_text("Update schedule")
+        ## Spinner
+        self.spinner = Gtk.Spinner()
+        ## Label
+        self.status = Gtk.Label()
+        self.status.set_selectable(True)
+        self.status.set_yalign(0.45)
+        ## Mute Button
+        icon = self.get_volume_icon()
+        self.mute_button = self.create_toolbutton(icon)
+        self.mute_button.connect("clicked", self.cp_on_mute)
+        ## Volume scale
+        ad = Gtk.Adjustment(value=self.__volume__, lower=0,
+                            upper=100, step_increment=5,
+                            page_increment=10, page_size=0)
+        self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL,
+                                adjustment=ad)
+        self.volume.set_property('draw-value', False)
+        self.volume.connect("value-changed", self.cp_on_volume_changed)
+        self.volume.set_size_request(80, 0)
+        # Pack toolbar
+        for x, el in enumerate ([ self.playback_button,
+                                  self.record_button,
+                                  sep,
+                                  self.sched_refresh_button ]):
+            toolbar.insert(el, x)
+        # Pack panel
+        control_panel.pack_start(toolbar, False, False, 0)
+        control_panel.pack_start(self.spinner, False, False, 0)
+        control_panel.pack_start(self.status, True, False, 0)
+        control_panel.pack_end(self.volume, False, False, 0)
+        control_panel.pack_end(self.mute_button, False, False, 0)
+        return control_panel
+
+    def cp_on_volume_changed(self, scale):
+        self.__volume__ = scale.get_value()
+        if not self.__muted__ and self.__volume__ == 0:
+            self.menubar_mute_toggle()
+        elif self.__muted__ and self.__volume__ > 0:
+            self.__muted__ = self.__volume__
+            self.menubar_mute_toggle()
+        self._player.volume_set(self.__volume__)
+
+    def cp_on_mute(self, arg):
+        self.menubar_mute_toggle()
+
+### Status Icon
+    def status_icon_create(self):
+        self.status_icon = Gtk.StatusIcon()
+        self.status_icon.set_from_icon_name("media-tape")
+        self.status_icon.connect("activate", self.status_icon_on_activate)
+        self.status_icon.connect("popup-menu", self.status_icon_popup)
+        self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
+        self.status_icon.set_tooltip_text("Silver Rain")
+
+    def status_icon_on_activate(self, icon):
+        """ Show/hide main window on left click """
+        self.__main_window__ = not self.__main_window__
+        if self.__main_window__:
+            self.show()
+        else:
+            self.hide()
+
+    def status_icon_on_scroll(self, icon, data):
+        """ Change volume by scrolling on status icon """
+        direction = data.direction
+        if direction == Gdk.ScrollDirection.UP:
+            self.__volume__ = self._player.volume_step(True)
+            if self.__muted__:
+                self.menubar_mute_toggle()
+        elif direction == Gdk.ScrollDirection.DOWN:
+            self.__volume__ = self._player.volume_step(False)
+            if self.__volume__ == 0:
+                self.menubar_mute_toggle()
+        self.volume.set_value(self.__volume__)
+
+    def status_icon_popup(self, icon, button, time):
+        """ Show menu on right click """
+        self.popup_menu = Gtk.Menu()
+        # Playback
+        text, icon = self.get_playback_label()
+        play = self.create_menuitem(text, icon)
+        play.connect("activate", self.playback_toggle)
+        play.set_size_request(100, -1)
+        # Record
+        text, icon = self.get_record_label()
+        record = self.create_menuitem(text, icon)
+        record.connect("activate", self.record_toggle)
+        # Mute
+        mute = Gtk.CheckMenuItem("Mute")
+        if self.__muted__:
+            mute.set_active(True)
+        mute.connect("toggled", self.popup_on_mute)
+        # Preferences
+        preferences = self.create_menuitem("Preferences", "gtk-preferences")
+        preferences.connect("activate", self.prefs_window_create)
+        # Quit
+        quit = self.create_menuitem("Quit", "gtk-quit")
+        quit.connect("activate", Gtk.main_quit)
+        # Separator
+        sep = []
+        for i in range(3):
+            sep.append(Gtk.SeparatorMenuItem())
+
+        for item in [play, record, sep[0], mute,
+                     sep[1], preferences, sep[2], quit]:
+            self.popup_menu.append(item)
+        self.popup_menu.show_all()
+
+        def pos_func(menu, x, y, icon):
+            return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
+        self.popup_menu.popup(None, None, pos_func,
+                              self.status_icon, button, time)
+
+    def popup_on_mute(self, arg):
+        self.menubar_mute_toggle()
+
 ### TreeView
-    def create_sched_list_model(self):
+    def sched_tree_model_create(self):
         """ Create schedule tree """
         store = Gtk.TreeStore(str,              # Weekday
                               bool,             # IsParent
@@ -820,17 +949,59 @@ class SilverGUI(Gtk.Window):
                               str,              # BackgroundColor
                               str,              # FontColor
                               str)              # Font
-        self.sched_model = store.filter_new()
-        self.sched_model.set_visible_func(self.sched_model_func)
-        self.__schedule__.fill_tree_strore(store)
-        self.cell_bg_old = ''
-        self.cell_fg_old = ''
+        self.sched_tree_model = store.filter_new()
+        self.sched_tree_model.set_visible_func(self.sched_tree_model_func)
+        self._schedule.fill_tree_strore(store)
+        self.__cell_bg_old__ = ''
+        self.__cell_fg_old__ = ''
 
-    def sched_model_func(self, model, iter, data):
+    def sched_tree_model_func(self, model, iter, data):
         """ Filter by weekday """
-        return model[iter][0] == self.week_filter
+        return model[iter][0] == self.__weekday_filter__
 
-    def sched_on_button_release_event(self, widget, event):
+    def sched_tree_create(self):
+        """ Create schedule tree """
+        self.sched_tree_model_create()
+
+        self.sched_tree = Gtk.TreeView.new_with_model(self.sched_tree_model)
+        self.sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
+        self.sched_tree.connect('button-release-event',
+                           self.sched_tree_on_button_release_event)
+        # Icon
+        renderer = Gtk.CellRendererPixbuf()
+        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=6)
+        renderer.set_alignment(1, 0.5)
+        self.sched_tree.append_column(column)
+
+        renderer = Gtk.CellRendererText()
+        renderer.set_padding(10, 0)
+        renderer.set_alignment(0.5, 0.5)
+        # Time
+        column = Gtk.TreeViewColumn("Time", renderer,
+                                    text=2, background=7, foreground=8, font=9)
+        column.set_alignment(0.5)
+        column.set_min_width(10)
+        self.sched_tree.append_column(column)
+        # Title
+        renderer.set_alignment(0, 0.5)
+        column = Gtk.TreeViewColumn("Title", renderer,
+                                    text=3, background=7, foreground=8, font=9)
+        column.set_alignment(0.5)
+        column.set_min_width(50)
+        column.set_resizable(True)
+        self.sched_tree.append_column(column)
+        # Host
+        column = Gtk.TreeViewColumn("Host", renderer,
+                                    text=5, background=7, foreground=8, font=9)
+        column.set_alignment(0.5)
+        column.set_min_width(50)
+        column.set_resizable(True)
+        self.sched_tree.append_column(column)
+
+        self.scrolled_window.add(self.sched_tree)
+        self.scrolled_window.show_all()
+
+    def sched_tree_on_button_release_event(self, widget, event):
         if not event.button == 3:
             return
         selection = self.sched_tree.get_selection()
@@ -861,228 +1032,164 @@ class SilverGUI(Gtk.Window):
         print(time)
         pass
 
-    def create_tree(self):
-        """ Create schedule tree """
-        self.create_sched_list_model()
+### Timers
+    def timers_clean(self):
+        """ Cancel timer """
+        self._t_event.cancel()
 
-        sched_tree = Gtk.TreeView.new_with_model(self.sched_model)
-        sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
-        sched_tree.connect('button-release-event',
-                           self.sched_on_button_release_event)
-        # Icon
-        renderer = Gtk.CellRendererPixbuf()
-        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=6)
-        renderer.set_alignment(1, 0.5)
-        sched_tree.append_column(column)
+    def timers_reset(self):
+        """ Reset timer """
+        self.timers_clean()
+        self.timers_init_event_timer()
 
-        renderer = Gtk.CellRendererText()
-        renderer.set_padding(10, 0)
-        renderer.set_alignment(0.5, 0.5)
-        # Time
-        column = Gtk.TreeViewColumn("Time", renderer,
-                                    text=2, background=7, foreground=8, font=9)
-        column.set_alignment(0.5)
-        column.set_min_width(10)
-        sched_tree.append_column(column)
-        # Title
-        renderer.set_alignment(0, 0.5)
-        column = Gtk.TreeViewColumn("Title", renderer,
-                                    text=3, background=7, foreground=8, font=9)
-        column.set_alignment(0.5)
-        column.set_min_width(50)
-        column.set_resizable(True)
-        sched_tree.append_column(column)
-        # Host
-        column = Gtk.TreeViewColumn("Host", renderer,
-                                    text=5, background=7, foreground=8, font=9)
-        column.set_alignment(0.5)
-        column.set_min_width(50)
-        column.set_resizable(True)
-        sched_tree.append_column(column)
-        return sched_tree
+    def timers_init_event_timer(self):
+        """ Raise handler when event ends """
+        today = datetime.now()
+        now = timedelta(hours=today.hour,
+                minutes=today.minute, seconds=today.second).total_seconds()
+        timeout = int(self._schedule.get_event_end() - now)
+        print("NEW TIMER WITH TIMEOUT:", timeout)
+        self._t_event = threading.Timer(timeout, self.timers_callback_event)
+        self._t_event.start()
 
-### Selection
-    def create_selection(self):
-        """ Create selection buttons """
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        for day in WEEKDAY_LIST:
-            button = Gtk.ToggleButton(day)
-            button.set_size_request(80, 0)
-            button.connect("toggled", self.selection_on_clicked)
-            hbox.pack_start(button, True, True, 0)
-        return hbox
+    def timers_callback_event(self):
+        """ Update schedule """
+        print("TIMER CALLBACK")
+        self.update_now_playing()
+        # Init new timer
+        self.timers_init_event_timer()
 
-    def selection_on_clicked(self, button):
-        """ Filter Treeview by selected weekday """
-        self.week_filter = button.get_label()
-        self.sched_model.refilter()
+### Updater
+    def schedule_refresh(self, button): self.schedule_update(refresh=True)
 
-### Control panel
-    def create_control_panel(self):
-        """ Playback control buttons """
-        toolbar = Gtk.Toolbar()
-        toolbar.set_orientation(Gtk.Orientation.HORIZONTAL)
-        toolbar.set_style(Gtk.ToolbarStyle.ICONS)
+    def schedule_update(self, refresh=False):
+        """ Initialize schedule, create treeview and start timers
+            This might take a while, so run in thread """
+        def init_sched():
+            # Initialize schedule
+            ret = self._schedule.update_schedule(refresh)
+            if not ret:
+                self.__SCHEDULE_ERROR__ = True
+                if refresh:
+                    self.timers_clean()
+                GObject.idle_add(error)
+            if not refresh:
+                # Initialization
+                # Create treeview
+                self.sched_tree_create()
+                # Initialize timers
+                self.timers_init_event_timer()
+            else:
+                # Refresh treeview
+                self.sched_tree_model_create()
+                self.sched_tree.set_model(self.sched_tree_model)
+                self.timers_reset()
+            GObject.idle_add(cleanup)
 
-        control_panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        control_panel.set_spacing(6)
-        control_panel.set_border_width(6)
-        ## Playback Button
-        icon = self.get_playback_label()[1]
-        self.playback_button = self.create_toolbutton(icon)
-        self.playback_button.connect("clicked", self.playback_toggle)
-        self.playback_button.set_tooltip_text("Play")
-        ## Record Button
-        icon = self.get_record_label()[1]
-        self.record_button = self.create_toolbutton(icon)
-        self.record_button.connect("clicked", self.record_toggle)
-        self.record_button.set_tooltip_text("Record")
-        ## Separator
-        sep = Gtk.SeparatorToolItem()
-        ## Update schedule Button
-        self.sched_refresh = self.create_toolbutton("gtk-refresh")
-        self.sched_refresh.connect("clicked", self.cp_sched_update)
-        self.sched_refresh.set_tooltip_text("Update schedule")
-        ## Label
-        self.text = Gtk.Label()
-        self.text.set_selectable(True)
-        self.text.set_yalign(0.45)
-        self.cp_update_label()
-        ## Mute Button
-        icon = self.get_volume_icon()
-        self.mute_button = self.create_toolbutton(icon)
-        self.mute_button.connect("clicked", self.cp_on_mute)
-        ## Pack toolbar
-        for x, el in enumerate ([
-                                 self.playback_button,
-                                 self.record_button,
-                                 sep,
-                                 self.sched_refresh,
-                                 ]):
-            toolbar.insert(el, x)
-        ## Volume scale
-        ad = Gtk.Adjustment(value=self.__volume__, lower=0,
-                            upper=100, step_increment=5,
-                            page_increment=10, page_size=0)
-        self.volume = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL,
-                                adjustment=ad)
-        self.volume.set_property('draw-value', False)
-        self.volume.connect("value-changed", self.cp_on_volume_changed)
-        self.volume.set_size_request(80, 0)
-        ## Pack panel
-        control_panel.pack_start(toolbar, False, False, 0)
-        control_panel.pack_start(self.text, True, False, 0)
-        control_panel.pack_end(self.volume, False, False, 0)
-        control_panel.pack_end(self.mute_button, False, False, 0)
-        return control_panel
+        def cleanup():
+            t.join()
+            # Show playing status
+            self.status_set_playing()
+            # Update selection
+            self.selection_update()
+            # Mark current row
+            self.sched_tree_mark_current()
 
-    def cp_update_label(self):
-        self.text.set_text("<span size='12000'><b>" +
-                           self.__schedule__.get_event_title() + "</b></span>")
-        self.text.set_use_markup(True)
+        def error():
+            t.join()
+            # Show error status
+            self.status_set_error()
 
-    def cp_on_volume_changed(self, scale):
-        self.__volume__ = scale.get_value()
-        if not self.__muted__ and self.__volume__ == 0:
-            self.menubar_mute_toggle()
-        if self.__muted__ and self.__volume__ > 0:
-            self.__muted__ = self.__volume__
-            self.menubar_mute_toggle()
-        self.__player__.volume_set(self.__volume__)
+        # Show updating status
+        self.status_set_schedule_updating()
+        # Reset error flag
+        self.__SCHEDULE_ERROR__ = False
+        # Show updating message
+        t = threading.Thread(target=init_sched)
+        t.start()
 
-    def cp_on_mute(self, arg):
-        self.menubar_mute_toggle()
+    def selection_update(self):
+        """ Update selection """
+        today = date.today().weekday()
+        self.selection_buttons[today].clicked()
+        Gtk.Widget.grab_focus(self.selection_buttons[today])
 
-    def create_toolbutton(self, icon):
-        ## Playback Button
-        button = Gtk.ToolButton()
-        button.set_icon_name(icon)
-        return button
+    def status_set_schedule_updating(self):
+        """ Show spinner and "Updating" message """
+        self.sched_refresh_button.hide()
+        self.spinner.show()
+        self.spinner.start()
+        self.status.set_text("<span size='12000'><b>" +
+                             "Updating schedule..." + "</b></span>")
+        self.status.set_use_markup(True)
 
-    def cp_sched_update(self, button):
-        self.__schedule__.update_schedule()
-        self.create_sched_list_model()
-        self.sched_tree.set_model(self.sched_model)
-        self.update_status()
+    def status_set_playing(self):
+        """ Hide spinner and show currently playing """
+        self.spinner.stop()
+        self.spinner.hide()
+        self.sched_refresh_button.show()
+        self.status_update()
 
-### Popup menu
-    def create_popup_menu(self, icon, button, time):
-        """ Show menu on right click """
-        self.popup_menu = Gtk.Menu()
-        # Playback
-        text, icon = self.get_playback_label()
-        play = self.create_menuitem(text, icon)
-        play.connect("activate", self.playback_toggle)
-        play.set_size_request(100, -1)
-        # Record
-        text, icon = self.get_record_label()
-        record = self.create_menuitem(text, icon)
-        record.connect("activate", self.record_toggle)
-        # Mute
-        mute = Gtk.CheckMenuItem("Mute")
-        if self.__muted__:
-            mute.set_active(True)
-        mute.connect("toggled", self.popup_mute)
-        # Preferences
-        preferences = self.create_menuitem("Preferences", "gtk-preferences")
-        preferences.connect("activate", self.create_prefs_window)
-        # Quit
-        quit = self.create_menuitem("Quit", "gtk-quit")
-        quit.connect("activate", Gtk.main_quit)
-        # Separator
-        sep = []
-        for i in range(3):
-            sep.append(Gtk.SeparatorMenuItem())
+    def status_set_error(self):
+        """ Hide spinner and show error """
+        self.spinner.stop()
+        self.spinner.hide()
+        self.sched_refresh_button.show()
+        self.status.set_text("<span size='12000'><b>" +
+                             "Couldn't update schedule" + "</b></span>")
+        self.status.set_use_markup(True)
 
-        for item in [play, record, sep[0], mute,
-                     sep[1], preferences, sep[2], quit]:
-            self.popup_menu.append(item)
-        self.popup_menu.show_all()
+    def status_update(self):
+        """ Show program name in status """
+        if not self.__SCHEDULE_ERROR__:
+            self.status.set_text("<span size='12000'><b>" +
+                                 self._schedule.get_event_title() +
+                                 "</b></span>")
+            self.status.set_use_markup(True)
 
-        def pos_func(menu, x, y, icon):
-            return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
-        self.popup_menu.popup(None, None, pos_func,
-                              self.status_icon, button, time)
+    def sched_tree_mark_current(self):
+        """ Set current event colors """
+        if self.__SCHEDULE_ERROR__:
+            return
+        # Get current position
+        pos = self._schedule.get_event_position()
+        if self.__cell_bg_old__:
+            # Reset previous row
+            print("RESET PREV ITER COLORS")
+            self.sched_tree_model[self.__iter_old__][7] = self.__cell_bg_old__
+            self.sched_tree_model[self.__iter_old__][8] = self.__cell_fg_old__
+            self.sched_tree_model[self.__iter_old__][9] = SCHED_FONT
+            self.cell_bg_old = ''
+            self.cell_fg_old = ''
+        # Set current row color
+        path = Gtk.TreePath(pos)
+        iter = self.sched_tree_model.get_iter(path)
+        self.__cell_bg_old__ = self.sched_tree_model[iter][7]
+        self.__cell_fg_old__ = self.sched_tree_model[iter][8]
+        self.__iter_old__ = iter
+        self.sched_tree_model[iter][7] = SCHED_CURRENT_BG_COLOR
+        self.sched_tree_model[iter][8] = SCHED_CURRENT_FG_COLOR
+        self.sched_tree_model[iter][9] = SCHED_CURRENT_FONT
+        # Scroll to current cell
+        path = Gtk.TreePath(pos)
+        self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
 
-    def popup_mute(self, arg):
-        self.menubar_mute_toggle()
+    def update_now_playing(self):
+        """ Update label, bg of current event, show notifications """
+        if self._schedule.update_current_event():
+            # Update selection
+            GObject.idle_add(self.selection_update)
 
-### Status Icon
-    def create_status_icon(self):
-        self.status_icon = Gtk.StatusIcon()
-        self.status_icon.set_from_icon_name("media-tape")
-        self.status_icon.connect("activate", self.status_icon_on_activate)
-        self.status_icon.connect("popup-menu", self.create_popup_menu)
-        self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
-        self.status_icon.set_tooltip_text("Silver Rain")
-
-    def status_icon_on_activate(self, icon):
-        """ Show/hide main window on left click """
-        self.__main_window__ = not self.__main_window__
-        if self.__main_window__:
-            self.show()
-        else:
-            self.hide()
-
-    def status_icon_on_scroll(self, icon, data):
-        """ Change volume by scrolling on status icon """
-        direction = data.direction
-        if direction == Gdk.ScrollDirection.UP:
-            self.__volume__ = self.__player__.volume_step(True)
-            if self.__muted__:
-                self.menubar_mute_toggle()
-        elif direction == Gdk.ScrollDirection.DOWN:
-            self.__volume__ = self.__player__.volume_step(False)
-            if self.__volume__ == 0:
-                self.menubar_mute_toggle()
-        self.volume.set_value(self.__volume__)
+        self.sched_tree_mark_current()
+        self.status_update()
+        self.show_notification_on_event()
 
 ### Preferences window
-    def create_prefs_window(self, something):
+    def prefs_window_create(self, something):
         pass
 
 ### About window
-    def create_about_window(self, icon):
+    def about_window_create(self, icon):
         def uri_open(uri):
             Popen(['xdg-open', uri], stdout=PIPE)
         about = Gtk.AboutDialog()
@@ -1102,10 +1209,17 @@ class SilverGUI(Gtk.Window):
         img = Gtk.Image()
         img.set_from_pixbuf(icon)
 
+        # Depricated, but Gtk.Box looks like shit
         menuitem = Gtk.ImageMenuItem()
         menuitem.set_image(img)
         menuitem.set_label(text)
         return menuitem
+
+    def create_toolbutton(self, icon):
+        """ Toolbar button """
+        button = Gtk.ToolButton()
+        button.set_icon_name(icon)
+        return button
 
     def playback_toggle(self, button):
         self.__playing__ = not self.__playing__
@@ -1120,8 +1234,8 @@ class SilverGUI(Gtk.Window):
             self.menubar_stop.set_sensitive(False)
             self.playback_button.set_tooltip_text("Play")
 
-        self.__player__.playback_toggle()
-        self.show_notification_playback()
+        self._player.playback_toggle()
+        self.show_notification_on_playback()
 
     def record_toggle(self, button):
         self.__recording__ = not self.__recording__
@@ -1135,8 +1249,11 @@ class SilverGUI(Gtk.Window):
             self.menubar_stop_recording.set_sensitive(False)
             self.record_button.set_tooltip_text("Record")
 
-        name = self.__schedule__.get_event_title()
-        self.__recorder__.record_toggle(name)
+        if not __SCHEDULE_ERROR__:
+            name = self._schedule.get_event_title()
+        else:
+            name = "SilverRain"
+        self._recorder.record_toggle(name)
 
     def mute_toggle(self, button, val=0):
         if self.__muted__:
@@ -1146,7 +1263,7 @@ class SilverGUI(Gtk.Window):
             self.__muted__ = self.__volume__ or 5
             self.__volume__ = 0
 
-        self.__player__.volume_set(self.__volume__)
+        self._player.volume_set(self.__volume__)
         self.mute_button.set_icon_name(self.get_volume_icon())
         self.volume.set_value(self.__volume__)
 
@@ -1178,17 +1295,23 @@ class SilverGUI(Gtk.Window):
             icon = "audio-volume-high"
         return icon
 
-    def show_notification_event(self):
+    def show_notification_on_event(self):
+        """ Show currently playing """
         text = "Silver Rain"
-        body = self.__schedule__.get_event_title()
-        self.notification.set_icon_from_pixbuf(
-                self.__schedule__.get_event_icon())
-        self.notification.update(text, body)
+        if not self.__SCHEDULE_ERROR__:
+            body = self._schedule.get_event_title()
+            self.notification.set_icon_from_pixbuf(
+                    self._schedule.get_event_icon())
+            self.notification.update(text, body)
+        else:
+            body = "Playing"
+            img = "notification-audio-stop"
+            self.notification.update(text, body, img)
         self.notification.show()
 
-    def show_notification_playback(self):
+    def show_notification_on_playback(self):
         if self.__playing__:
-            self.show_notification_event()
+            self.show_notification_on_event()
         else:
             text = "Silver Rain"
             body = "Stopped"
@@ -1196,44 +1319,6 @@ class SilverGUI(Gtk.Window):
             self.notification.update(text, body, img)
             self.notification.show()
 
-########################################################################
-# Threading
-class SilverTimer():
-    def __init__(self, sched, window):
-        self.__sched__ = sched
-        self.__window__ = window
-        # On event timer
-        self.__t_event__ = threading.Timer(0, None)
-        self.init_event_timer()
-        self.__sched__.set_timer(self)
-
-    def clean(self):
-        """ Cancel timer """
-        self.__t_event__.cancel()
-
-    def reset(self):
-        """ Reset timer """
-        self.clean()
-        self.init_event_timer()
-
-    def init_event_timer(self):
-        """ Raise handler when event ends """
-        today = datetime.now()
-        now = timedelta(hours=today.hour,
-                minutes=today.minute, seconds=today.second).total_seconds()
-        event = self.__sched__.get_event()
-        timeout = int(event["end"] - now)
-        self.__t_event__ = threading.Timer(timeout, self.t_callback_event)
-        self.__t_event__.start()
-
-    def t_callback_event(self):
-        """ Update schedule """
-        self.__sched__.sched_update_current()
-        self.__window__.update_status()
-        # Init new timer
-        self.init_event_timer()
-
-########################################################################
 # Common
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
@@ -1268,11 +1353,10 @@ silver_player = SilverPlayer()
 silver_recorder = SilverRecorder()
 silver_schedule = SilverSchedule()
 silver_window = SilverGUI(silver_player, silver_recorder, silver_schedule)
-silver_timer = SilverTimer(silver_schedule, silver_window)
-# Main loop
+# Run loop
 Gtk.main()
 # Cleanup
 Notify.uninit()
+silver_window.clean()
 silver_player.clean()
 silver_recorder.clean()
-silver_timer.clean()
