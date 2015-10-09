@@ -1,5 +1,28 @@
 @define-color silver_selected #FF4545;
 
+/*************************
+ * 	   Scale	 *
+ *************************/
+GtkScale.slider:hover {
+    background-image: -gtk-gradient(linear, left top, left bottom,
+                                     from (shade(mix(@theme_bg_color, shade(@silver_selected, 0.9), 0.4), 1.2)),
+                                     to (shade(mix(@theme_bg_color, shade(@silver_selected, 0.9), 0.4),0.97)));
+}
+.menubar .menuitem .scale.highlight.left,
+.scale.highlight.left {
+    background-image: -gtk-gradient(linear, left top, left bottom,
+                                    from (shade(shade(@silver_selected, 0.9), 1.1)),
+                                    to (shade(shade(@silver_selected, 0.9), 0.9)));
+    border-color: transparent;
+}
+
+.scale.highlight.bottom {
+    background-image: -gtk-gradient(linear, left top, right top,
+                                    from (shade(shade(@silver_selected, 0.9), 1.1)),
+                                    to (shade(shade(@silver_selected, 0.9), 0.9)));
+    border-color: transparent;
+}
+
 /*
  **************************
  * Selected button color  *
