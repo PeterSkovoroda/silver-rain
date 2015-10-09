@@ -3,6 +3,7 @@
 import gi
 gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
+gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Gdk, GdkPixbuf, Notify
 
 import json
@@ -46,7 +47,7 @@ SCHED_FILE = APP_DIR + "sched.dump"
 SCHED_URL = "http://silver.ru/programms/"
 
 # Own style
-CSS_PATH = APP_DIR + 'silver-rain.css'
+CSS_PATH = 'silver-rain.css'
 style_provider = Gtk.CssProvider()
 css = open(CSS_PATH, 'rb')
 css_data = css.read()
@@ -351,7 +352,7 @@ class SilverSchedule():
         if not len(self.__sched_day__):
             # It's a new day.
             # It's so mundane. What exciting things will happen today?
-            print("NEW DAY")
+            logging.warning("new day")
             self._sched_gen_daily_agenda()
             newday = True
         self.__event__ = self.__sched_day__.popleft()
@@ -1000,7 +1001,6 @@ class SilverGUI(Gtk.Window):
         self.sched_tree.append_column(column)
 
         self.scrolled_window.add(self.sched_tree)
-        self.scrolled_window.show_all()
 
     def sched_tree_on_button_release_event(self, widget, event):
         if not event.button == 3:
@@ -1049,13 +1049,11 @@ class SilverGUI(Gtk.Window):
         now = timedelta(hours=today.hour,
                 minutes=today.minute, seconds=today.second).total_seconds()
         timeout = int(self._schedule.get_event_end() - now)
-        print("NEW TIMER WITH TIMEOUT:", timeout)
         self._t_event = threading.Timer(timeout, self.timers_callback_event)
         self._t_event.start()
 
     def timers_callback_event(self):
         """ Update schedule """
-        print("TIMER CALLBACK")
         self.update_now_playing()
         # Init new timer
         self.timers_init_event_timer()
@@ -1089,6 +1087,9 @@ class SilverGUI(Gtk.Window):
 
         def cleanup():
             t.join()
+            # Draw sched tree if just created
+            if not refresh:
+                self.sched_tree.show()
             # Show playing status
             self.status_set_playing()
             # Update selection
@@ -1152,27 +1153,26 @@ class SilverGUI(Gtk.Window):
         """ Set current event colors """
         if self.__SCHEDULE_ERROR__:
             return
-        # Get current position
-        pos = self._schedule.get_event_position()
         if self.__cell_bg_old__:
             # Reset previous row
-            print("RESET PREV ITER COLORS")
             self.sched_tree_model[self.__iter_old__][7] = self.__cell_bg_old__
             self.sched_tree_model[self.__iter_old__][8] = self.__cell_fg_old__
             self.sched_tree_model[self.__iter_old__][9] = SCHED_FONT
             self.cell_bg_old = ''
             self.cell_fg_old = ''
-        # Set current row color
+        # Get current position
+        pos = self._schedule.get_event_position()
         path = Gtk.TreePath(pos)
         iter = self.sched_tree_model.get_iter(path)
+        # Backup original style
         self.__cell_bg_old__ = self.sched_tree_model[iter][7]
         self.__cell_fg_old__ = self.sched_tree_model[iter][8]
         self.__iter_old__ = iter
+        # Set current row color
         self.sched_tree_model[iter][7] = SCHED_CURRENT_BG_COLOR
         self.sched_tree_model[iter][8] = SCHED_CURRENT_FG_COLOR
         self.sched_tree_model[iter][9] = SCHED_CURRENT_FONT
         # Scroll to current cell
-        path = Gtk.TreePath(pos)
         self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
 
     def update_now_playing(self):
