@@ -13,6 +13,7 @@ import re
 import requests
 import signal
 import subprocess
+import textwrap
 import threading
 import urllib.request
 
@@ -1180,27 +1181,71 @@ class SilverGUI(Gtk.Window):
         if self._schedule.update_current_event():
             # Update selection
             GObject.idle_add(self.selection_update)
-
         self.sched_tree_mark_current()
         self.status_update()
         self.show_notification_on_event()
 
 ### Preferences window
     def prefs_window_create(self, something):
+        self.error_show("Not implemented yet")
         pass
 
-### About window
+### About dialog
     def about_window_create(self, icon):
-        def uri_open(uri):
-            Popen(['xdg-open', uri], stdout=PIPE)
-        about = Gtk.AboutDialog()
-        about.set_name("Silver Rain")
-        about.set_version("0.1")
-        about.set_copyright('Copyright \xa9 2015 Petr Skovoroda')
-        about.set_comments('Silver Rain radio player')
-        about.set_website('http://silver.ru')
+        about = Gtk.Dialog.new()
+        about.set_title("Silver Rain: About")
+        about.set_resizable(False)
+        about.set_transient_for(self)
+
+        comment = Gtk.Label('Silver Rain application for Linux')
+        copyright = Gtk.Label('Copyright \xa9 2015 Petr Skovoroda')
+        website = Gtk.Label('http://silver.ru')
+
+        box = about.get_content_area()
+        box.pack_start(comment, False, False, 0)
+        box.pack_start(copyright, False, False, 0)
+        box.pack_start(website, False, False, 0)
+
+        about.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        about.show_all()
         about.run()
         about.destroy()
+
+### Message dialog
+    def dialog_create(self, title, icon_name, message):
+        dialog = Gtk.Dialog.new()
+        dialog.set_title("Silver Rain: " + title)
+        dialog.set_resizable(False)
+        dialog.set_transient_for(self)
+        # Image
+        icontheme = Gtk.IconTheme.get_default()
+        icon = icontheme.load_icon(icon_name, 48, 0)
+        img = Gtk.Image()
+        img.set_from_pixbuf(icon)
+        # Message
+        text = Gtk.Label("<span size='12000'><b>" + title + ": </b></span>" +
+                "\n".join(textwrap.wrap(message, 50)))
+        text.set_use_markup(True)
+        # Pack
+        grid = Gtk.Grid()
+        grid.set_column_spacing(10)
+        grid.set_border_width(10)
+        grid.attach(img, 0, 0, 1, 1)
+        grid.attach(text, 1, 0, 1, 1)
+        # Content
+        box = dialog.get_content_area()
+        box.set_spacing(10)
+        box.pack_start(grid, True, True, 0)
+        # Button
+        dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()
+
+    def warning_show(self, msg):
+        self.dialog_create("Warning", "dialog-warning", msg)
+    def error_show(self, msg):
+        self.dialog_create("Error", "dialog-error", msg)
 
 ### Common
     def create_menuitem(self, text, icon):
@@ -1209,8 +1254,6 @@ class SilverGUI(Gtk.Window):
         icon = icontheme.load_icon(icon, 16, 0)
         img = Gtk.Image()
         img.set_from_pixbuf(icon)
-
-        # Depricated, but Gtk.Box looks like shit
         menuitem = Gtk.ImageMenuItem()
         menuitem.set_image(img)
         menuitem.set_label(text)
