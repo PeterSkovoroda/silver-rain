@@ -88,42 +88,36 @@ class SilverPlayer():
         sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
     def __init__(self):
         self.__playing__ = False
-        self.create_pipeline()
+        self._create_pipeline()
 
     def clean(self):
         """ Unref pipeline """
         self.__playing__ = False
-        self.pipeline.set_state(Gst.State.NULL)
+        self.__pipeline__.set_state(Gst.State.NULL)
 
     def playback_toggle(self):
         """ Playback trigger """
         self.__playing__ = not self.__playing__
         if self.__playing__:
-            ret = self.pipeline.set_state(Gst.State.PLAYING)
+            ret = self.__pipeline__.set_state(Gst.State.PLAYING)
         else:
             # Switch state to READY instead of STOP to prevent EOS
-            ret = self.pipeline.set_state(Gst.State.READY)
+            ret = self.__pipeline__.set_state(Gst.State.READY)
 
         if ret == Gst.StateChangeReturn.FAILURE:
             logging.error("Couldn't change state")
             self.clean()
             exit(-1)
 
-    def volume_get(self):
-        """ Return volume status """
-        value = int(
-            self.pipeline.get_by_name('volume').get_property('volume') * 100.)
-        return value
-
     def volume_set(self, value):
         """ Set player volume [0-100] """
-        self.pipeline.get_by_name('volume').set_property('volume',
+        self.__pipeline__.get_by_name('volume').set_property('volume',
                                                          value / 100.)
 
     def volume_step(self, increase):
         """ Increase/decrease volume by 5
             Return new value """
-        value = self.pipeline.get_by_name('volume').get_property('volume')
+        value = self.__pipeline__.get_by_name('volume').get_property('volume')
         if increase:
             if value >= 0.95:
                 value = 1.
@@ -134,13 +128,13 @@ class SilverPlayer():
                 value = 0.
             else:
                 value = value - 0.05
-        self.pipeline.get_by_name('volume').set_property('volume', value)
+        self.__pipeline__.get_by_name('volume').set_property('volume', value)
         return int(value * 100.)
 
-    def create_pipeline(self):
+    def _create_pipeline(self):
         self.elements = dict()
-        self.pipeline = Gst.Pipeline.new("SilverPlayer")
-        if not self.pipeline:
+        self.__pipeline__ = Gst.Pipeline.new("SilverPlayer")
+        if not self.__pipeline__:
             logging.error("Couldn't create pipeline")
             exit(-1)
         # Create GStream elements
@@ -167,10 +161,11 @@ class SilverPlayer():
                 logging.error("Couldn't create element:", key)
                 exit(-1)
             else:
-                self.pipeline.add(self.elements[key])
+                self.__pipeline__.add(self.elements[key])
 
         self.elements["source"].set_property('location', SILVER_STREAM_URL)
         self.elements["source"].set_property('is-live', True)
+        self.elements["source"].set_property('compress', True)
         self.elements["volume"].set_property('volume', 1.)
 
         # Link elements
@@ -192,11 +187,11 @@ class SilverPlayer():
             exit(-1)
 
         # Create message bus
-        msg_bus = self.pipeline.get_bus()
+        msg_bus = self.__pipeline__.get_bus()
         msg_bus.add_signal_watch()
-        msg_bus.connect('message', self.message_handler)
+        msg_bus.connect('message', self._message_handler)
 
-    def message_handler(self, bus, msg):
+    def _message_handler(self, bus, msg):
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
@@ -205,9 +200,8 @@ class SilverPlayer():
         elif msg.type == Gst.MessageType.EOS:
             logging.warning("End of stream")
 #TODO: What should I do?..
+            self.playback_toggle()
             # Try again
-            self.__playing__ = False
-            self.pipeline.set_state(Gst.State.READY)
             self.playback_toggle()
         else:
             pass
@@ -306,8 +300,6 @@ class SilverRecorder():
             logging.error("Error from element %s: %s" % (msg.src.get_name(),
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
-#TODO:
-            logging.warning("End of stream")
             self.clean()
         else:
             pass
