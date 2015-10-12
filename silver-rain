@@ -46,6 +46,9 @@ RECS_DIR = os.getenv("HOME") + "/SilverRain/"
 SILVER_URL = "http://silver.ru"
 SCHED_FILE = APP_DIR + "sched.dump"
 SCHED_URL = "http://silver.ru/programms/"
+ICON_DIR = "icon/"
+SILVER_ICON = ICON_DIR + "silver-rain_256.png"
+SILVER_ICON_SMALL = ICON_DIR + "silver-rain_128.png"
 
 # Own style
 CSS_PATH = 'silver-rain.css'
@@ -871,7 +874,7 @@ class SilverGUI(Gtk.Window):
 ### Status Icon
     def status_icon_create(self):
         self.status_icon = Gtk.StatusIcon()
-        self.status_icon.set_from_icon_name("media-tape")
+        self.status_icon.set_from_file(SILVER_ICON_SMALL)
         self.status_icon.connect("activate", self.status_icon_on_activate)
         self.status_icon.connect("popup-menu", self.status_icon_popup)
         self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
@@ -1197,11 +1200,14 @@ class SilverGUI(Gtk.Window):
         about.set_resizable(False)
         about.set_transient_for(self)
 
+        img = Gtk.Image()
+        img.set_from_file(SILVER_ICON)
         comment = Gtk.Label('Silver Rain application for Linux')
         copyright = Gtk.Label('Copyright \xa9 2015 Petr Skovoroda')
         website = Gtk.Label('http://silver.ru')
 
         box = about.get_content_area()
+        box.pack_start(img, False, False, 0)
         box.pack_start(comment, False, False, 0)
         box.pack_start(copyright, False, False, 0)
         box.pack_start(website, False, False, 0)
