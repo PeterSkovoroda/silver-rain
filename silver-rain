@@ -38,6 +38,7 @@ STREAM_URL_LIST = [
         'http://radiosilver.corbina.net:8000/silver48.mp3'
         ]
 SILVER_STREAM_URL = STREAM_URL_LIST[0]
+#SILVER_STREAM_URL = "http://icy1.abacast.com:80/kplu-jazz24aac-64"
 
 # System files
 APP_DIR = ".silver/"
@@ -81,19 +82,23 @@ WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday',
                 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 ########################################################################
-# GStreamer classes
-## Player
+# GStreamer
 class SilverPlayer():
-    """ Gstreamer container for playing network audio stream
-        sophttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink"""
+    """ Gstreamer container for playing and recording network audio stream
+        Player:
+            souphttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink
+        Recorder:
+            souphttpsrc -> icydemux -> filesink """
     def __init__(self):
         self.__playing__ = False
-        self._create_pipeline()
+        self.__recording__ = False
 
     def clean(self):
         """ Unref pipeline """
         self.__playing__ = False
+        self.__recording__ = False
         self.__pipeline__.set_state(Gst.State.NULL)
+        self.__recorder__.set_state(Gst.State.NULL)
 
     def playback_toggle(self):
         """ Playback trigger """
@@ -105,14 +110,36 @@ class SilverPlayer():
             ret = self.__pipeline__.set_state(Gst.State.READY)
 
         if ret == Gst.StateChangeReturn.FAILURE:
-            logging.error("Couldn't change state")
+            self.error_func("Couldn't change state")
             self.clean()
             exit(-1)
+
+    def record_toggle(self, name):
+        """ Record trigger """
+        self.__recording__ = not self.__recording__
+        if self.__recording__:
+            file = RECS_DIR + datetime.now().strftime("%m-%d-%y-%H:%M") + \
+                                                      "-" + name + ".mp3"
+            self.__recorder__.get_by_name('filesink').set_property('location',
+                                                                   file)
+            ret = self.__recorder__.set_state(Gst.State.PLAYING)
+        else:
+            ret = self.__recorder__.set_state(Gst.State.READY)
+
+        if ret == Gst.StateChangeReturn.FAILURE:
+            self.error_func("Couldn't change state")
+            self.clean()
+            exit(-1)
+
+    def set_error_function(self, er_func, warn_func):
+        """ Set callback to show error messages """
+        self.error_func = er_func
+        self.warning_func = warn_func
 
     def volume_set(self, value):
         """ Set player volume [0-100] """
         self.__pipeline__.get_by_name('volume').set_property('volume',
-                                                         value / 100.)
+                                                             value / 100.)
 
     def volume_step(self, increase):
         """ Increase/decrease volume by 5
@@ -131,11 +158,11 @@ class SilverPlayer():
         self.__pipeline__.get_by_name('volume').set_property('volume', value)
         return int(value * 100.)
 
-    def _create_pipeline(self):
+    def create_pipeline(self):
         self.elements = dict()
         self.__pipeline__ = Gst.Pipeline.new("SilverPlayer")
         if not self.__pipeline__:
-            logging.error("Couldn't create pipeline")
+            self.error_func("Couldn't create pipeline")
             exit(-1)
         # Create GStream elements
         try:
@@ -150,15 +177,17 @@ class SilverPlayer():
             self.elements["sink"] = Gst.ElementFactory.make('autoaudiosink',
                                                             'sink')
         except Gst.ElementNotFoundError:
-            logging.error("Couldn't find elements", "Check if packages ",
-                          "'GStreamer Good Plugins 1.0' ",
-                          "'GStreamer Base Plugins 1.0' ",
-                          "are installed")
+            str = "Couldn't find GStreamer element" + \
+                  "Check if packages" + \
+                  "'GStreamer Good Plugins 1.0'" + \
+                  "'GStreamer Base Plugins 1.0'" + \
+                  "are installed"
+            self.error_func(str)
             exit(-1)
 
         for key in self.elements:
             if not self.elements[key]:
-                logging.error("Couldn't create element:", key)
+                self.error_func("Couldn't create element: " + key)
                 exit(-1)
             else:
                 self.__pipeline__.add(self.elements[key])
@@ -183,7 +212,7 @@ class SilverPlayer():
                                  self.elements["volume"]) or
             not Gst.Element.link(self.elements["volume"],
                                  self.elements["sink"])):
-            logging.error("Elements could not be linked")
+            self.error_func("Elements could not be linked")
             exit(-1)
 
         # Create message bus
@@ -191,14 +220,68 @@ class SilverPlayer():
         msg_bus.add_signal_watch()
         msg_bus.connect('message', self._message_handler)
 
+    def create_recorder(self):
+        self.relements = dict()
+        self.__recorder__ = Gst.Pipeline.new("SilverRecorder")
+        if not self.__recorder__:
+            self.error_func("Couldn't create pipeline")
+            exit(-1)
+
+        # Create GStreamer elements
+        try:
+            self.relements["source"] = Gst.ElementFactory.make('souphttpsrc',
+                                                               'source')
+            self.relements["demux"] = Gst.ElementFactory.make('icydemux',
+                                                              'demux')
+            self.relements["filesink"] = Gst.ElementFactory.make('filesink',
+                                                                 'filesink')
+        except Gst.ElementNotFoundError:
+            str = "Couldn't find GStreamer element " + \
+                  "Check if packages " + \
+                  "'GStreamer Good Plugins 1.0' " + \
+                  "'GStreamer Base Plugins 1.0' " + \
+                  "are installed"
+            self.error_func(str)
+            exit(-1)
+
+        for key in self.relements:
+            if not self.relements[key]:
+                self.error_func("Couldn't create element: " + key)
+                exit(-1)
+            else:
+                self.__recorder__.add(self.relements[key])
+
+        self.relements["source"].set_property('location', SILVER_STREAM_URL)
+        self.relements["source"].set_property('is-live', True)
+        self.relements["source"].set_property('compress', True)
+        self.relements["filesink"].set_property('location', "file.mp3")
+
+        # Link relements
+        def pad_added_callback(demux, pad):
+            if pad.is_linked():
+                # Already linked. Skip
+                return
+            return pad.link(self.relements["filesink"].get_static_pad('sink'))
+
+        self.relements["demux"].connect('pad-added', pad_added_callback)
+
+        if not Gst.Element.link(self.relements["source"],
+                                self.relements["demux"]):
+            self.error_func("Elements could not be linked")
+            exit(-1)
+        # Create message bus
+        msg_bus = self.__recorder__.get_bus()
+        msg_bus.add_signal_watch()
+        msg_bus.connect('message', self._rec_message_handler)
+
     def _message_handler(self, bus, msg):
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
-            logging.error("Error from element %s: %s" % (msg.src.get_name(),
+            self.error_func("Error from element %s: %s" % (msg.src.get_name(),
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
-            logging.warning("End of stream")
+            warn_func("End of stream")
 #TODO: What should I do?..
             self.playback_toggle()
             # Try again
@@ -206,101 +289,14 @@ class SilverPlayer():
         else:
             pass
 
-## Recorder
-class SilverRecorder():
-#TODO: Merge souphttpsrc container with player
-    """ Gstreamer container for audio recording
-        souphttpsrc -> icydemux -> filesink """
-    def __init__(self):
-        self.__recording__ = False
-        self.create_pipeline()
-
-    def clean(self):
-        """ Free pipeline """
-        self.__recording__ = False
-        self.pipeline.set_state(Gst.State.NULL)
-
-    def record_get(self):
-        """ Return recorder status """
-        return self.__recording__
-
-    def record_toggle(self, name):
-        """ Record trigger """
-        self.__recording__ = not self.__recording__
-        if self.__recording__:
-            file = RECS_DIR + datetime.now().strftime("%m-%d-%y-%H:%M") + \
-                   "-" + name + ".mp3"
-            self.pipeline.get_by_name('sink').set_property('location', file)
-            ret = self.pipeline.set_state(Gst.State.PLAYING)
-        else:
-            # Switch state to READY to prevent EOS
-            ret = self.pipeline.set_state(Gst.State.READY)
-
-        if ret == Gst.StateChangeReturn.FAILURE:
-            logging.error("Couldn't change state")
-            self.clean()
-            exit(-1)
-
-    def create_pipeline(self):
-        self.elements = dict()
-        self.pipeline = Gst.Pipeline.new("SilverRecorder")
-        if not self.pipeline:
-            logging.error("Couldn't create pipeline")
-            exit(-1)
-
-        # Create GStream elements
-        try:
-            self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
-                                                              'source')
-            self.elements["demux"] = Gst.ElementFactory.make('icydemux',
-                                                             'demux')
-            self.elements["sink"] = Gst.ElementFactory.make('filesink',
-                                                            'sink')
-        except Gst.ElementNotFoundError:
-            logging.error("Couldn't find elements", "Check if packages ",
-                          "'GStreamer Good Plugins 1.0' ",
-                          "'GStreamer Base Plugins 1.0' ",
-                          "are installed")
-            exit(-1)
-
-        for key in self.elements:
-            if not self.elements[key]:
-                logging.error("Couldn't create element", key)
-                exit(-1)
-            else:
-                self.pipeline.add(self.elements[key])
-
-        self.elements["source"].set_property('location', SILVER_STREAM_URL)
-        self.elements["source"].set_property('is-live', True)
-        self.elements["sink"].set_property('location', "file.mp3")
-
-        # Link elements
-        def pad_added_callback(demux, pad):
-            if pad.is_linked():
-                # Already linked. Skip
-                return
-            return pad.link(self.elements["sink"].get_static_pad('sink'))
-
-        self.elements["demux"].connect('pad-added', pad_added_callback)
-
-        if not Gst.Element.link(self.elements["source"],
-                                self.elements["demux"]):
-            logging.error("Elements could not be linked")
-            exit(-1)
-
-        # Create message bus
-        msg_bus = self.pipeline.get_bus()
-        msg_bus.add_signal_watch()
-        msg_bus.connect('message', self.message_handler)
-
-    def message_handler(self, bus, msg):
+    def _rec_message_handler(self, bus, msg):
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
-            logging.error("Error from element %s: %s" % (msg.src.get_name(),
+            self.error_func("Error from element %s: %s" % (msg.src.get_name(),
                                                          err))
         elif msg.type == Gst.MessageType.EOS:
-            self.clean()
+            pass
         else:
             pass
 
@@ -597,16 +593,13 @@ class SilverSchedule():
 # GUI
 class SilverGUI(Gtk.Window):
     """ GUI """
-    def __init__(self, player, recorder, sched):
+    def __init__(self, player, sched):
         ## GStreamer
-        # Player
         self._player = player
-        self.__playing__ = False
-        self.__volume__ = 100
         self.__muted__ = 0
-        # Recorder
-        self._recorder = recorder
+        self.__playing__ = False
         self.__recording__ = False
+        self.__volume__ = 100
         ## Schedule
         self._schedule = sched
         self.__SCHEDULE_ERROR__ = False
@@ -622,8 +615,13 @@ class SilverGUI(Gtk.Window):
         self.__weekday_filter__ = date.today().strftime("%A")
         self.__cell_bg_old__ = ''
         self.__cell_fg_old__ = ''
+
         # Create main window
         self.main_window_create()
+        # Initialize GStreamer
+        self._player.set_error_function(self.error_show, self.warning_show)
+        self._player.create_pipeline()
+        self._player.create_recorder()
         # Create status icon
         self.status_icon_create()
         # Create treeview
@@ -1291,11 +1289,11 @@ class SilverGUI(Gtk.Window):
             self.menubar_stop_recording.set_sensitive(False)
             self.record_button.set_tooltip_text("Record")
 
-        if not __SCHEDULE_ERROR__:
+        if not self.__SCHEDULE_ERROR__:
             name = self._schedule.get_event_title()
         else:
             name = "SilverRain"
-        self._recorder.record_toggle(name)
+        self._player.record_toggle(name)
 
     def mute_toggle(self, button, val=0):
         if self.__muted__:
@@ -1392,13 +1390,11 @@ for dir in [APP_DIR, IMG_DIR, RECS_DIR]:
         os.makedirs(dir)
 # Init
 silver_player = SilverPlayer()
-silver_recorder = SilverRecorder()
 silver_schedule = SilverSchedule()
-silver_window = SilverGUI(silver_player, silver_recorder, silver_schedule)
+silver_window = SilverGUI(silver_player, silver_schedule)
 # Run loop
 Gtk.main()
 # Cleanup
 Notify.uninit()
 silver_window.clean()
 silver_player.clean()
-silver_recorder.clean()
