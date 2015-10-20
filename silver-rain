@@ -49,48 +49,90 @@ SCHED_URL       = "http://silver.ru/programms/"
 # Translations
 LANGUAGES_LIST  = ["English", "Русский"]
 TRANSLATIONS    = [
-                    {'WeekdayList'  : ['Monday', 'Tuesday', 'Wednesday',
-                                       'Thursday', 'Friday', 'Saturday',
-                                       'Sunday'],
-                     'MenuMusic'    : 'Music',
-                     'MenuHelp'     : 'Help',
-                     'Play'         : 'Play',
-                     'Stop'         : 'Stop',
-                     'Record'       : 'Record',
-                     'StopRecording' : 'Stop recording',
-                     'Mute'         : 'Mute',
-                     'Quit'         : 'Quit',
-                     'Preferences'  : 'Preferences',
-                     'UpdateSchedule' : 'Update schedule',
-                     'SendMessage'  : 'Send message',
-                     'Time'         : 'Time',
-                     'Title'        : 'Title',
-                     'Host'         : 'Host',
-                     'Updating'     : 'Updating schedule...',
-                     'UpdateFailed' : "Couldn't update schedule",
-                     'SilverRain'   : "Silver Rain",
+                    {'WeekdayList'      : ['Monday', 'Tuesday', 'Wednesday',
+                                           'Thursday', 'Friday', 'Saturday',
+                                           'Sunday'],
+                     'MenuMusic'        : 'Music',
+                     'MenuHelp'         : 'Help',
+                     'Play'             : 'Play',
+                     'Stop'             : 'Stop',
+                     'Record'           : 'Record',
+                     'StopRecording'    : 'Stop recording',
+                     'Mute'             : 'Mute',
+                     'Quit'             : 'Quit',
+                     'Preferences'      : 'Preferences',
+                     'UpdateSchedule'   : 'Update schedule',
+                     'SendMessage'      : 'Send message',
+                     'Time'             : 'Time',
+                     'Title'            : 'Title',
+                     'Host'             : 'Host',
+                     'Updating'         : 'Updating schedule...',
+                     'UpdateFailed'     : 'Couldn\'t update schedule',
+                     'SilverRain'       : 'Silver Rain',
+                     'General'          : 'General',
+                     'Appearance'       : 'Appearance',
+                     'Network'          : 'Network',
+                     'Autoplay'         : 'Autoplay when starts',
+                     'StartHidden'      : 'Start hidden',
+                     'Language'         : 'Language:',
+                     'NeedRestart'      : 'Requires restart',
+                     'Recordings'       : 'Recordings',
+                     'Recsdirpath'      : 'Recordings directory path:',
+                     'Recsprefix'       : 'Recordings prefix:',
+                     'IM'               : 'Sending message',
+                     'IMHeader'         : 'Default message header:',
+                     'Colors'           : 'Colors',
+                     'BgColor'          : 'Background color:',
+                     'AltBgColor'       : 'Alternate background color:',
+                     'SelBgColor'       : 'Selection color:',
+                     'Fonts'            : 'Fonts',
+                     'Font'             : 'Font:',
+                     'SelFont'          : 'Selection font:',
+                     'ResetDefault'     : 'Reset default settings',
+                     'StreamUrl'        : 'Stream url',
                     },
 
-                    {'WeekdayList'  : ['Понедельник', 'Вторник', 'Среда',
-                                       'Четверг', 'Пятница', 'Суббота',
-                                       'Воскресенье'],
-                     'MenuMusic'    : 'Музыка',
-                     'MenuHelp'     : 'Помощь',
-                     'Play'         : 'Играть',
-                     'Stop'         : 'Стоп',
-                     'Record'       : 'Запись',
-                     'Mute'         : 'Выключить звук',
-                     'StopRecording' : 'Остановить запись',
-                     'Quit'         : 'Выход',
-                     'Preferences'  : 'Настройки',
-                     'UpdateSchedule' : 'Обновить расписание',
-                     'SendMessage'  : 'Отправить сообщение',
-                     'Time'         : 'Время',
-                     'Title'        : 'Название',
-                     'Host'         : 'Ведущие',
-                     'Updating'     : 'Обновление расписания...',
-                     'UpdateFailed' : "Не удалось выполнить обновление",
-                     'SilverRain'   : "Серебряный Дождь",
+                    {'WeekdayList'      : ['Понедельник', 'Вторник', 'Среда',
+                                           'Четверг', 'Пятница', 'Суббота',
+                                           'Воскресенье'],
+                     'MenuMusic'        : 'Музыка',
+                     'MenuHelp'         : 'Помощь',
+                     'Play'             : 'Играть',
+                     'Stop'             : 'Стоп',
+                     'Record'           : 'Запись',
+                     'Mute'             : 'Выключить звук',
+                     'StopRecording'    : 'Остановить запись',
+                     'Quit'             : 'Выход',
+                     'Preferences'      : 'Настройки',
+                     'UpdateSchedule'   : 'Обновить расписание',
+                     'SendMessage'      : 'Отправить сообщение',
+                     'Time'             : 'Время',
+                     'Title'            : 'Название',
+                     'Host'             : 'Ведущие',
+                     'Updating'         : 'Обновление расписания...',
+                     'UpdateFailed'     : 'Не удалось выполнить обновление',
+                     'SilverRain'       : 'Серебряный Дождь',
+                     'General'          : 'Основные',
+                     'Appearance'       : 'Appearance',
+                     'Network'          : 'Соединение',
+                     'Autoplay'         : 'Начинать воспроизведение при старте',
+                     'StartHidden'      : 'Сворачивать в трей при запуске',
+                     'Language'         : 'Язык:',
+                     'NeedRestart'      : 'Требуется перезапуск приложения',
+                     'Recordings'       : 'Записи',
+                     'Recsdirpath'      : 'Recordings directory path:',
+                     'Recsprefix'       : 'Recordings prefix:',
+                     'IM'               : 'SMS-портал',
+                     'IMHeader'         : 'Заголовок сообщения:',
+                     'Colors'           : 'Цвета',
+                     'BgColor'          : 'Цвет фона:',
+                     'AltBgColor'       : 'Альтернативный цвет фона:',
+                     'SelBgColor'       : 'Цвет выделенной области:',
+                     'Fonts'            : 'Шрифты',
+                     'Font'             : 'Основной шрифт:',
+                     'SelFont'          : 'Шрифт выделенной области:',
+                     'ResetDefault'     : 'Восстановить стандартные настройки',
+                     'StreamUrl'        : 'Адрес стрима',
                     }
                   ]
 WEEKDAY_LIST = TRANSLATIONS[0]['WeekdayList']
@@ -131,7 +173,7 @@ DEFAULT_FONT_FAMILY         = font_probe()
 DEFAULT_FONT_SIZE           = "11"
 DEFAULT_FONT                = DEFAULT_FONT_FAMILY + " " + DEFAULT_FONT_SIZE
 DEFAULT_SELECTED_FONT       = DEFAULT_FONT_FAMILY + " Bold " + \
-                                DEFAULT_FONT_SIZE
+                              DEFAULT_FONT_SIZE
 DEFAULT_LANGUAGE            = 0
 DEFAULT_MESSAGE_HEADER      = ""
 
@@ -1462,7 +1504,9 @@ class SilverGUI(Gtk.Window):
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
                          TRANSLATIONS[LANGUAGE]["SilverRain"] +
-                         "</b></span>\n<span size='11000'>Properties</span>")
+                         "</b></span>\n<span size='11000'>" +
+                         TRANSLATIONS[LANGUAGE]["Preferences"] +
+                         "</span>")
         title.set_alignment(0, 0)
         # Pack
         eventbox = Gtk.EventBox()
@@ -1501,21 +1545,21 @@ class SilverGUI(Gtk.Window):
         general = create_prefs_grid()
         # Autoplay
         self.prefs_autoplay = Gtk.CheckButton()
-        self.prefs_autoplay.set_label("Autoplay when starts")
+        self.prefs_autoplay.set_label(TRANSLATIONS[LANGUAGE]["Autoplay"])
         self.prefs_autoplay.set_active(AUTOPLAY)
         general.attach(self.prefs_autoplay, 0, 0, 2, 1)
         # Start Hidden
         self.prefs_start_hidden = Gtk.CheckButton()
-        self.prefs_start_hidden.set_label("Start hidden")
+        self.prefs_start_hidden.set_label(TRANSLATIONS[LANGUAGE]["StartHidden"])
         self.prefs_start_hidden.set_active(START_HIDDEN)
         general.attach_next_to(self.prefs_start_hidden, self.prefs_autoplay,
                                Gtk.PositionType.BOTTOM, 2, 1)
         # Languages
-        text = Gtk.Label("Language:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["Language"])
         text.set_size_request(180, -1)
         text.set_alignment(0, 0.5)
         general.attach_next_to(text, self.prefs_start_hidden,
-                               Gtk.PositionType.BOTTOM, 2, 1)
+                               Gtk.PositionType.BOTTOM, 1, 1)
         lang_store = Gtk.ListStore(str)
         for lang in LANGUAGES_LIST:
             lang_store.append([lang])
@@ -1524,9 +1568,18 @@ class SilverGUI(Gtk.Window):
         self.prefs_language.pack_start(renderer_text, True)
         self.prefs_language.add_attribute(renderer_text, "text", 0)
         self.prefs_language.set_active(LANGUAGE)
+        self.prefs_language.connect("changed", self.prefs_on_language_changed)
         general.attach_next_to(self.prefs_language, text,
                                Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_general, "General", general)
+        self.prefs_need_restart = Gtk.Label()
+        self.prefs_need_restart.set_alignment(0, 0)
+        self.prefs_need_restart.set_markup("<i>" +
+                                           TRANSLATIONS[LANGUAGE]["NeedRestart"] +
+                                           "</i>")
+        general.attach_next_to(self.prefs_need_restart, text,
+                               Gtk.PositionType.BOTTOM, 2, 1)
+        pack_prefs_box(page_general,
+                       TRANSLATIONS[LANGUAGE]["General"], general)
         ## Recordings
         recordings = create_prefs_grid()
         text = Gtk.Label("Recordings directory path:")
@@ -1547,10 +1600,11 @@ class SilverGUI(Gtk.Window):
         self.prefs_recs_prefix.set_editable(True)
         recordings.attach_next_to(self.prefs_recs_prefix, text,
                                   Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_general, "Recordings", recordings)
+        pack_prefs_box(page_general,
+                       TRANSLATIONS[LANGUAGE]["Recordings"], recordings)
         ## Messages
         im = create_prefs_grid()
-        text = Gtk.Label("Default message header:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["IMHeader"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         im.attach(text, 0, 0, 1, 1)
@@ -1559,7 +1613,7 @@ class SilverGUI(Gtk.Window):
         self.prefs_message_header.set_text(MESSAGE_HEADER)
         im.attach_next_to(self.prefs_message_header, text,
                           Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_general, "Sending message", im)
+        pack_prefs_box(page_general, TRANSLATIONS[LANGUAGE]["IM"], im)
         ################
         ## Appearance ##
         ################
@@ -1567,7 +1621,7 @@ class SilverGUI(Gtk.Window):
         ## Sched bg colors
         # Background
         colors = create_prefs_grid()
-        text = Gtk.Label("Background color:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["BgColor"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         colors.attach(text, 0, 0, 1, 1)
@@ -1577,7 +1631,7 @@ class SilverGUI(Gtk.Window):
         colors.attach_next_to(self.prefs_bg_color_light, text,
                               Gtk.PositionType.RIGHT, 1, 1)
         # Alternate background
-        text = Gtk.Label("Alternate background color:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["AltBgColor"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         colors.attach(text, 0, 1, 1, 1)
@@ -1586,7 +1640,7 @@ class SilverGUI(Gtk.Window):
         colors.attach_next_to(self.prefs_bg_color_dark, text,
                               Gtk.PositionType.RIGHT, 1, 1)
         # Selection
-        text = Gtk.Label("Selection color:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["SelBgColor"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         colors.attach(text, 0, 2, 1, 1)
@@ -1594,11 +1648,12 @@ class SilverGUI(Gtk.Window):
         self.prefs_selection_color = Gtk.ColorButton.new_with_rgba(color)
         colors.attach_next_to(self.prefs_selection_color, text,
                               Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_appearance, "Colors", colors)
+        pack_prefs_box(page_appearance,
+                       TRANSLATIONS[LANGUAGE]["Colors"], colors)
         ## Fonts
         # Default font
         fonts = create_prefs_grid()
-        text = Gtk.Label("Font:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["Font"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         fonts.attach(text, 0, 0, 1, 1)
@@ -1611,7 +1666,7 @@ class SilverGUI(Gtk.Window):
         fonts.attach_next_to(self.prefs_font_color, self.prefs_font,
                              Gtk.PositionType.RIGHT, 1, 1)
         # Selected font
-        text = Gtk.Label("Selection font:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["SelFont"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         fonts.attach(text, 0, 1, 1, 1)
@@ -1624,9 +1679,10 @@ class SilverGUI(Gtk.Window):
         fonts.attach_next_to(self.prefs_selection_font_color,
                              self.prefs_selection_font,
                              Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_appearance, "Fonts", fonts)
+        pack_prefs_box(page_appearance,
+                       TRANSLATIONS[LANGUAGE]["Fonts"], fonts)
         ## Reset button
-        reset = Gtk.Button("Reset default settings")
+        reset = Gtk.Button(TRANSLATIONS[LANGUAGE]["ResetDefault"])
         reset.connect("clicked", self.prefs_reset_appearance)
         page_appearance.pack_end(reset, False, False, 0)
         ###############
@@ -1634,7 +1690,7 @@ class SilverGUI(Gtk.Window):
         ###############
         page_network = create_page()
         network = create_prefs_grid()
-        text = Gtk.Label("Stream url:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["StreamUrl"])
         text.set_size_request(180, -1)
         text.set_alignment(0, 0.5)
         network.attach(text, 0, 0, 1, 1)
@@ -1645,17 +1701,19 @@ class SilverGUI(Gtk.Window):
                                                               stream_url_store)
         self.prefs_stream_url.set_entry_text_column(0)
         self.prefs_stream_url.set_active(STREAM_URL_LIST.index(STREAM_URL))
-        network.attach_next_to(self.prefs_stream_url, text,
-                               Gtk.PositionType.RIGHT, 1, 1)
+        network.attach_next_to(self.prefs_stream_url, text, Gtk.PositionType.RIGHT, 1, 1)
         pack_prefs_box(page_network, "Network", network)
 
         ## Notebook
         notebook = Gtk.Notebook()
         notebook.set_show_border(True)
         notebook.set_border_width(10)
-        notebook.append_page(page_general, Gtk.Label("General"))
-        notebook.append_page(page_appearance, Gtk.Label("Appearance"))
-        notebook.append_page(page_network, Gtk.Label("Network"))
+        notebook.append_page(page_general,
+                             Gtk.Label(TRANSLATIONS[LANGUAGE]["General"]))
+        notebook.append_page(page_appearance,
+                             Gtk.Label(TRANSLATIONS[LANGUAGE]["Appearance"]))
+        notebook.append_page(page_network,
+                             Gtk.Label(TRANSLATIONS[LANGUAGE]["Network"]))
         ## Pack
         area = prefs.get_content_area()
         area.set_border_width(0)
@@ -1667,6 +1725,7 @@ class SilverGUI(Gtk.Window):
         prefs.add_button(Gtk.STOCK_APPLY, Gtk.ResponseType.APPLY)
         prefs.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
         ## Show
+        self.prefs_need_restart.hide()
         # Apply settings
         while prefs.run() == Gtk.ResponseType.APPLY:
             new_path = self.prefs_recs_dir.get_filename()
@@ -1681,6 +1740,9 @@ class SilverGUI(Gtk.Window):
 
         prefs.destroy()
 
+    def prefs_on_language_changed(self, combo):
+        self.prefs_need_restart.show()
+
     def prefs_apply_settings(self):
         """ Apply settings and save config file """
         # General
@@ -1689,6 +1751,7 @@ class SilverGUI(Gtk.Window):
         global START_HIDDEN
         START_HIDDEN = self.prefs_start_hidden.get_active()
         global LANGUAGE
+        LANG_OLD = LANGUAGE
         iter = self.prefs_language.get_active_iter()
         if iter:
             model = self.prefs_language.get_model()
@@ -1723,13 +1786,15 @@ class SilverGUI(Gtk.Window):
             STREAM_URL = model[iter][0]
         else:
             STREAM_URL = self.prefs_stream_url.get_child().get_text()
+        # Save config file
+        config_save()
+        # Restore language
+        LANGUAGE = LANG_OLD
         # Update schedule
         self.selection_update()
         self.sched_tree_model_create()
         self.sched_tree.set_model(self.sched_tree_model)
         self.sched_tree_mark_current()
-        # Save config file
-        config_save()
 
     def prefs_reset_appearance(self, widget):
         """ Reset default settings """
@@ -1756,20 +1821,27 @@ class SilverGUI(Gtk.Window):
         about = Gtk.Dialog.new()
         about.set_title("Silver Rain: About")
         about.set_transient_for(self)
-        about.set_size_request(500, 500)
+        about.set_size_request(300, 300)
         about.set_resizable(False)
 
         img = Gtk.Image()
-        img.set_from_file(SILVER_ICON)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON,
+                                                         150, 150, True)
+        img.set_from_pixbuf(pixbuf)
         comment = Gtk.Label('Silver Rain application for Linux')
         copyright = Gtk.Label('Copyright \xa9 2015 Petr Skovoroda')
-        website = Gtk.LinkButton("http://silver.ru", "http://silver.ru")
+        website = Gtk.Label()
+        website.set_markup("<a href='http://silver.ru'>http://silver.ru</a>")
+        website.set_selectable(True)
+        text = Gtk.Label()
+        text.set_text("This pruduct is not approved in any way\nby Silver Rain Radio")
 
         box = about.get_content_area()
         box.pack_start(img, False, False, 0)
         box.pack_start(comment, False, False, 0)
         box.pack_start(copyright, False, False, 0)
         box.pack_start(website, False, False, 0)
+        box.pack_start(text, False, False, 0)
 
         about.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
         about.show_all()
@@ -1819,6 +1891,7 @@ class SilverGUI(Gtk.Window):
         self.__playing__ = False
         self.menubar_play.set_sensitive(True)
         self.menubar_stop.set_sensitive(False)
+        self.playback_button.set_icon_name(self.get_playback_label()[1])
         self.playback_button.set_tooltip_text(TRANSLATIONS[LANGUAGE]["Play"])
 
     def recorder_emergency_stop(self):
