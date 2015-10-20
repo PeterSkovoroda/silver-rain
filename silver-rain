@@ -6,8 +6,8 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Gdk, GdkPixbuf, Notify
 
+import configparser
 import json
-import logging
 import os
 import re
 import requests
@@ -28,58 +28,185 @@ except ImportError as err:
     import xml.etree.ElementTree as etree
 
 ########################################################################
-# Default values
-#TODO: should be configured in settings
-
-# Stream
-STREAM_URL_LIST = [
-        'http://icecast.silver.cdnvideo.ru/silver',
-        'http://radiosilver.corbina.net:8000/silver128.mp3',
-        'http://radiosilver.corbina.net:8000/silver48.mp3'
-        ]
-SILVER_STREAM_URL = STREAM_URL_LIST[0]
-#SILVER_STREAM_URL = "http://icy1.abacast.com:80/kplu-jazz24aac-64"
-
-# System files
+# System files and variables
 APP_DIR = ".silver/"
 IMG_DIR = APP_DIR + "imgs/"
-RECS_DIR = os.getenv("HOME") + "/SilverRain/"
-SILVER_URL = "http://silver.ru"
 SCHED_FILE = APP_DIR + "sched.dump"
-SCHED_URL = "http://silver.ru/programms/"
+CONFIG_FILE = APP_DIR + "config.ini"
+CSS_PATH = "silver-rain.css"
+#TODO:
 ICON_DIR = "icon/"
 SILVER_ICON = ICON_DIR + "silver-rain_256.png"
 SILVER_ICON_SMALL = ICON_DIR + "silver-rain_128.png"
+# Network
+STREAM_URL_LIST = [ 'http://icecast.silver.cdnvideo.ru/silver',
+                    'http://radiosilver.corbina.net:8000/silver128.mp3',
+                    'http://radiosilver.corbina.net:8000/silver48.mp3' ]
+SILVER_RAIN_URL = "http://silver.ru"
+SCHED_URL       = "http://silver.ru/programms/"
 
-# Own style
-CSS_PATH = 'silver-rain.css'
-style_provider = Gtk.CssProvider()
-css = open(CSS_PATH, 'rb')
-css_data = css.read()
-css.close()
-style_provider.load_from_data(css_data)
-Gtk.StyleContext.add_provider_for_screen (Gdk.Screen.get_default(),
-                                       style_provider,
-                                       Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+########################################################################
+# Translations
+LANGUAGES_LIST  = ["English", "Русский"]
+TRANSLATIONS    = [
+                    {'WeekdayList'  : ['Monday', 'Tuesday', 'Wednesday',
+                                       'Thursday', 'Friday', 'Saturday',
+                                       'Sunday'],
+                     'MenuMusic'    : 'Music',
+                     'MenuHelp'     : 'Help',
+                     'Play'         : 'Play',
+                     'Stop'         : 'Stop',
+                     'Record'       : 'Record',
+                     'StopRecording' : 'Stop recording',
+                     'Mute'         : 'Mute',
+                     'Quit'         : 'Quit',
+                     'Preferences'  : 'Preferences',
+                     'UpdateSchedule' : 'Update schedule',
+                     'SendMessage'  : 'Send message',
+                     'Time'         : 'Time',
+                     'Title'        : 'Title',
+                     'Host'         : 'Host',
+                     'Updating'     : 'Updating schedule...',
+                     'UpdateFailed' : "Couldn't update schedule",
+                     'SilverRain'   : "Silver Rain",
+                    },
 
-# Colors
-# * Silver red - #FF4545
-# * Reddit red - #FF4C4C
-# * Silver light red - #FFD9D9
-# * Kinda yellow - beige
-SCHED_BG_COLORS         = ["white", "gray95"]
-SCHED_FG_COLORS         = ["black", "black"]
-SCHED_CHILD_BG_COLORS   = ["gray90", "#FFEBEB"]
-SCHED_CHILD_FG_COLORS   = ["black", "black"]
-SCHED_CURRENT_BG_COLOR  = "#FF4545"
-SCHED_CURRENT_FG_COLOR  = "white"
-# Fonts
-SCHED_FONT              = "Ubuntu 11"
-SCHED_CURRENT_FONT      = "Ubuntu bold 11"
+                    {'WeekdayList'  : ['Понедельник', 'Вторник', 'Среда',
+                                       'Четверг', 'Пятница', 'Суббота',
+                                       'Воскресенье'],
+                     'MenuMusic'    : 'Музыка',
+                     'MenuHelp'     : 'Помощь',
+                     'Play'         : 'Играть',
+                     'Stop'         : 'Стоп',
+                     'Record'       : 'Запись',
+                     'Mute'         : 'Выключить звук',
+                     'StopRecording' : 'Остановить запись',
+                     'Quit'         : 'Выход',
+                     'Preferences'  : 'Настройки',
+                     'UpdateSchedule' : 'Обновить расписание',
+                     'SendMessage'  : 'Отправить сообщение',
+                     'Time'         : 'Время',
+                     'Title'        : 'Название',
+                     'Host'         : 'Ведущие',
+                     'Updating'     : 'Обновление расписания...',
+                     'UpdateFailed' : "Не удалось выполнить обновление",
+                     'SilverRain'   : "Серебряный Дождь",
+                    }
+                  ]
+WEEKDAY_LIST = TRANSLATIONS[0]['WeekdayList']
 
-# If one day I'll have to translate this shit
-WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday',
-                'Thursday', 'Friday', 'Saturday', 'Sunday']
+########################################################################
+# Style sheet
+def css_load():
+    style_provider = Gtk.CssProvider()
+    css = open(CSS_PATH, 'rb')
+    css_data = css.read()
+    css.close()
+    style_provider.load_from_data(css_data)
+    Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            style_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+########################################################################
+# Default settings
+def font_probe():
+    """ Get system default font family """
+    t = Gtk.Label("")
+    s = t.get_style()
+    font = s.font_desc.get_family()
+    return font
+
+DEFAULT_AUTOPLAY            = False
+DEFAULT_START_HIDDEN        = False
+DEFAULT_RECS_DIR            = os.getenv("HOME") + "/SilverRain/"
+DEFAULT_RECS_PREFIX         = "%m-%d-%y-%H:%M-"
+DEFAULT_USE_CSS             = True
+DEFAULT_STREAM_URL          = STREAM_URL_LIST[0]
+DEFAULT_BG_COLORS           = ["white", "gray95"]
+DEFAULT_FONT_COLOR          = "black"
+DEFAULT_SELECTED_BG_COLOR   = "#FF4545"
+DEFAULT_SELECTED_FONT_COLOR = "white"
+DEFAULT_FONT_FAMILY         = font_probe()
+DEFAULT_FONT_SIZE           = "11"
+DEFAULT_FONT                = DEFAULT_FONT_FAMILY + " " + DEFAULT_FONT_SIZE
+DEFAULT_SELECTED_FONT       = DEFAULT_FONT_FAMILY + " Bold " + \
+                                DEFAULT_FONT_SIZE
+DEFAULT_LANGUAGE            = 0
+DEFAULT_MESSAGE_HEADER      = ""
+
+########################################################################
+# Settings
+def config_save():
+    """ Create configuration file with default values """
+    config = configparser.ConfigParser()
+    config['GENERAL'] = {
+            'Autoplay'          : AUTOPLAY,
+            'StartHidden'       : START_HIDDEN,
+            'RecordsDirectory'  : RECS_DIR,
+            'RecordsPrefix'     : re.sub('%', '%%', RECS_PREFIX),
+            'UseCSS'            : USE_CSS,
+            'StreamURL'         : STREAM_URL,
+            'BgColor0'          : BG_COLORS[0],
+            'BgColor1'          : BG_COLORS[1],
+            'FontColor'         : FONT_COLOR,
+            'SelectedBgColor'   : SELECTED_BG_COLOR,
+            'SelectedFontColor' : SELECTED_FONT_COLOR,
+            'Font'              : FONT,
+            'SelectedFont'      : SELECTED_FONT,
+            'Language'          : LANGUAGE,
+            'MessageHeader'     : MESSAGE_HEADER
+            }
+    with open(CONFIG_FILE, 'w') as configfile:
+        config.write(configfile)
+
+def config_load():
+    config = configparser.ConfigParser()
+    config.read(CONFIG_FILE)
+    global AUTOPLAY
+    AUTOPLAY = config.getboolean('GENERAL', 'Autoplay',
+                                fallback=DEFAULT_AUTOPLAY)
+    global START_HIDDEN
+    START_HIDDEN = config.getboolean('GENERAL', 'StartHidden',
+                                fallback=DEFAULT_START_HIDDEN)
+    global RECS_DIR
+    RECS_DIR = config.get('GENERAL', 'RecordsDirectory',
+                                fallback=DEFAULT_RECS_DIR)
+    global RECS_PREFIX
+    RECS_PREFIX = config.get('GENERAL', 'RecordsPrefix',
+                                fallback=DEFAULT_RECS_PREFIX)
+    global USE_CSS
+    USE_CSS = config.getboolean('GENERAL', 'UseCSS',
+                                fallback=DEFAULT_USE_CSS)
+    global STREAM_URL
+    STREAM_URL = config.get('GENERAL', 'StreamURL',
+                                fallback=DEFAULT_STREAM_URL)
+    global BG_COLORS
+    BG_COLORS = []
+    BG_COLORS.append(config.get('GENERAL', 'BgColor0',
+                                fallback=DEFAULT_BG_COLORS[0]))
+    BG_COLORS.append(config.get('GENERAL', 'BgColor1',
+                                fallback=DEFAULT_BG_COLORS[1]))
+    global FONT_COLOR
+    FONT_COLOR = config.get('GENERAL', 'FontColor',
+                                fallback=DEFAULT_FONT_COLOR)
+    global SELECTED_BG_COLOR
+    SELECTED_BG_COLOR = config.get('GENERAL', 'SelectedBgColor',
+                                fallback=DEFAULT_SELECTED_BG_COLOR)
+    global SELECTED_FONT_COLOR
+    SELECTED_FONT_COLOR = config.get('GENERAL', 'SelectedFontColor',
+                                fallback=DEFAULT_SELECTED_FONT_COLOR)
+    global FONT
+    FONT = config.get('GENERAL', 'Font', fallback=DEFAULT_FONT)
+    global SELECTED_FONT
+    SELECTED_FONT = config.get('GENERAL', 'SelectedFont',
+                                fallback=DEFAULT_SELECTED_FONT)
+    global LANGUAGE
+    LANGUAGE = int(config.get('GENERAL', 'Language',
+                                fallback=DEFAULT_LANGUAGE))
+    global MESSAGE_HEADER
+    MESSAGE_HEADER = config.get('GENERAL', 'MessageHeader',
+                                fallback=DEFAULT_MESSAGE_HEADER)
 
 ########################################################################
 # GStreamer
@@ -104,6 +231,8 @@ class SilverPlayer():
         """ Playback trigger """
         self.__playing__ = not self.__playing__
         if self.__playing__:
+            self.__pipeline__.get_by_name('source').set_property('location',
+                                                                 STREAM_URL)
             ret = self.__pipeline__.set_state(Gst.State.PLAYING)
         else:
             # Switch state to READY instead of STOP to prevent EOS
@@ -114,12 +243,12 @@ class SilverPlayer():
             self.clean()
             exit(-1)
 
-    def record_toggle(self, name):
+    def recorder_toggle(self, name):
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
-            file = RECS_DIR + datetime.now().strftime("%m-%d-%y-%H:%M") + \
-                                                      "-" + name + ".mp3"
+            file = RECS_DIR + datetime.now().strftime(RECS_PREFIX) + \
+                                                      name + ".mp3"
             self.__recorder__.get_by_name('filesink').set_property('location',
                                                                    file)
             ret = self.__recorder__.set_state(Gst.State.PLAYING)
@@ -131,10 +260,13 @@ class SilverPlayer():
             self.clean()
             exit(-1)
 
-    def set_error_function(self, er_func, warn_func):
+    def set_error_function(self, er_func, warn_func,
+                           playback_stop_func, rec_stop_func):
         """ Set callback to show error messages """
         self.error_func = er_func
         self.warning_func = warn_func
+        self.playback_stop_callback = playback_stop_func
+        self.recorder_stop_callback = rec_stop_func
 
     def volume_set(self, value):
         """ Set player volume [0-100] """
@@ -192,7 +324,7 @@ class SilverPlayer():
             else:
                 self.__pipeline__.add(self.elements[key])
 
-        self.elements["source"].set_property('location', SILVER_STREAM_URL)
+        self.elements["source"].set_property('location', STREAM_URL)
         self.elements["source"].set_property('is-live', True)
         self.elements["source"].set_property('compress', True)
         self.elements["volume"].set_property('volume', 1.)
@@ -251,7 +383,7 @@ class SilverPlayer():
             else:
                 self.__recorder__.add(self.relements[key])
 
-        self.relements["source"].set_property('location', SILVER_STREAM_URL)
+        self.relements["source"].set_property('location', STREAM_URL)
         self.relements["source"].set_property('is-live', True)
         self.relements["source"].set_property('compress', True)
         self.relements["filesink"].set_property('location', "file.mp3")
@@ -275,30 +407,29 @@ class SilverPlayer():
         msg_bus.connect('message', self._rec_message_handler)
 
     def _message_handler(self, bus, msg):
+        """ Player message bus """
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
             self.error_func("Error from element %s: %s" % (msg.src.get_name(),
                                                          err))
+            self.playback_stop_callback()
         elif msg.type == Gst.MessageType.EOS:
-            warn_func("End of stream")
-#TODO: What should I do?..
-            self.playback_toggle()
-            # Try again
-            self.playback_toggle()
-        else:
-            pass
+            self.warning_func("End of stream")
+            self.playback_stop_callback()
 
     def _rec_message_handler(self, bus, msg):
+        """ Recorder message bus """
         struct = msg.get_structure()
         if msg.type == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
             self.error_func("Error from element %s: %s" % (msg.src.get_name(),
                                                          err))
+            self.recorder_stop_callback()
         elif msg.type == Gst.MessageType.EOS:
-            pass
-        else:
-            pass
+            # Stop recorder timers
+            self.warning_func("End of stream")
+            self.recorder_stop_callback()
 
 ########################################################################
 # Schedule
@@ -327,6 +458,7 @@ class SilverSchedule():
 
     # Get current event values
     def get_event_title(self): return self.__event__["title"]
+    def get_event_time(self): return self.__event__["time"]
     def get_event_url(self): return self.__event__["url"]
     def get_event_end(self): return self.__event__["end"]
     def get_event_position(self): return self.__event__["position"]
@@ -337,6 +469,9 @@ class SilverSchedule():
             urllib.request.urlretrieve(self.__event__["icon_url"],
                                        self.__event__["icon"])
         return GdkPixbuf.Pixbuf.new_from_file(self.__event__["icon"])
+    def get_event_host(self):
+        str = ' и '.join(self.__event__["host"])
+        return str
 
     def update_current_event(self):
         """ Update current event """
@@ -344,7 +479,6 @@ class SilverSchedule():
         if not len(self.__sched_day__):
             # It's a new day.
             # It's so mundane. What exciting things will happen today?
-            logging.warning("new day")
             self._sched_gen_daily_agenda()
             newday = True
         self.__event__ = self.__sched_day__.popleft()
@@ -364,7 +498,6 @@ class SilverSchedule():
             self.__sched_day__ = deque()
             # Load from website
             if not self._sched_get_from_html():
-                logging.error("Couldn't update")
                 self.__sched_week__ = sched_week_bak
                 self.__sched_day__ = sched_day_bak
                 return False
@@ -383,29 +516,30 @@ class SilverSchedule():
             ch_dark = bg_dark
 
             for item in self.__sched_week__[x]:
-                host = '\n'.join(item["host"])
-                font = SCHED_FONT
+                host = ' и '.join(item["host"])
+                font = FONT
                 # Download icon if it doesn't exist
                 if not os.path.exists(item["icon"]):
                     urllib.request.urlretrieve(item["icon_url"], item["icon"])
                 if item["is_main"]:
                     # Main event
-                    bg_color = SCHED_BG_COLORS[bg_dark]
-                    fg_color = SCHED_FG_COLORS[bg_dark]
+                    bg_color = BG_COLORS[bg_dark]
+                    fg_color = FONT_COLOR
                     # Get pixbuf
                     icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
                     # Insert item
                     it = store.append(None, [item["weekday"], item["is_main"],
                                              item["time"], item["title"],
                                              item["url"], host, icon,
-                                             bg_color, fg_color, font])
+                                             bg_color, fg_color, font,
+                                             False])
                     # Alternate row color
-                    ch_dark = bg_dark
                     bg_dark = not bg_dark
+                    ch_dark = bg_dark
                 else:
                     # Child event
-                    bg_color = SCHED_CHILD_BG_COLORS[ch_dark]
-                    fg_color = SCHED_CHILD_FG_COLORS[ch_dark]
+                    bg_color = BG_COLORS[ch_dark]
+                    fg_color = FONT_COLOR
                     # Get pixbuf
                     icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                                                             item["icon"],
@@ -413,7 +547,8 @@ class SilverSchedule():
                     # Insert item
                     store.append(it, [item["weekday"], item["is_main"],
                                  item["time"], item["title"], item["url"],
-                                 host, icon, bg_color, fg_color, font])
+                                 host, icon, bg_color, fg_color, font,
+                                 False])
                     # Alternate row color
                     ch_dark = not ch_dark
 
@@ -429,7 +564,7 @@ class SilverSchedule():
             else:
                 item["position"] = position
                 position = position + 1
-            if item["end"] < now:
+            if item["end"] <= now:
                 # Child or already ended. Skip
                 continue
             self.__sched_day__.append(item)
@@ -483,7 +618,7 @@ class SilverSchedule():
                 continue
             # Get icon
             if obj[0][0][0].attrib['src'][0] == '/':
-                icon_src = SILVER_URL + \
+                icon_src = SILVER_RAIN_URL + \
                            obj[0][0][0].attrib['src'].split("?")[0]
             else:
                 icon_src = "http://" + \
@@ -496,13 +631,13 @@ class SilverSchedule():
                 music_icon_src = icon_src
                 continue
             # Get program url
-            url = SILVER_URL + obj[1][0][0].attrib['href']
+            url = SILVER_RAIN_URL + obj[1][0][0].attrib['href']
             # Get hosts
             host = []
             if len(obj[2]):
                 # If hosts presented
                 for it in obj[2][0]:
-                    host.append(it[0][0].text)
+                    host.append(it[0][0].text[1:-1])
             # Get schedule
             sched = []
             for it in obj[3][0]:
@@ -540,16 +675,33 @@ class SilverSchedule():
                     self.__sched_week__[weekday].append(program)
 
         for wd in range(7):
-            time = 0.0
-            pos = 0
-            last = []
             # Sort schedule by start/parent
             self.__sched_week__[wd].sort(key = lambda x : \
                                          (x["start"], -x["is_main"]))
+            # Remove duplicates
+            prev = []
+            for item in self.__sched_week__[wd]:
+                if prev and prev["title"] == item["title"] and \
+                        prev["end"] > item["start"]:
+                    # If there are two identical programms in a row
+                    # I can't resolve more complicated errors
+                    # I just hope they'll never happen
+                    if prev["end"] > item["end"]:
+                        item["end"] = prev["end"]
+                    if prev["start"] < item["start"]:
+                        item["start"] = prev["start"]
+                    item["time"] = str_time(item["start"], item["end"])
+                    self.__sched_week__[wd].remove(prev)
+                prev = item
+
             # Fill spaces with music
+            time = 0.0
+            pos = 0
+            last = []
             for item in self.__sched_week__[wd]:
                 if not item["is_main"]:
                     continue
+
                 if item["start"] > time:
                     # If doesn't start right after the last one
                     program = {}
@@ -606,6 +758,8 @@ class SilverGUI(Gtk.Window):
         ## Timers
         # On event timer
         self._t_event = threading.Timer(0, None)
+        # Record timer
+        self._t_recorder = threading.Timer(0, None)
         ## Interface
         # Main window
         self.__main_window__ = True
@@ -613,19 +767,24 @@ class SilverGUI(Gtk.Window):
         self.notification = Notify.Notification.new("Header", "Body", "image")
         # TreeView
         self.__weekday_filter__ = date.today().strftime("%A")
+        self.__today__ = date.today()
         self.__cell_bg_old__ = ''
         self.__cell_fg_old__ = ''
 
         # Create main window
         self.main_window_create()
         # Initialize GStreamer
-        self._player.set_error_function(self.error_show, self.warning_show)
+        self._player.set_error_function(self.error_show, self.warning_show,
+                                        self.playback_emergency_stop,
+                                        self.recorder_emergency_stop)
         self._player.create_pipeline()
         self._player.create_recorder()
         # Create status icon
         self.status_icon_create()
         # Create treeview
         self.schedule_update()
+        if AUTOPLAY:
+            self.playback_toggle(None)
 
 ### Cleanup
     def clean(self):
@@ -657,8 +816,11 @@ class SilverGUI(Gtk.Window):
         # Controls
         control_panel = self.control_panel_create()
         vbox.pack_end(control_panel, False, False, 0)
+        vbox.show_all()
         self.add(vbox)
-        self.show_all()
+
+        if not START_HIDDEN:
+            self.show()
 
     def main_window_on_delete_event(self, window, event):
         """ Hide parent window instead of destroying it """
@@ -674,10 +836,11 @@ class SilverGUI(Gtk.Window):
         menubar = Gtk.MenuBar()
         # Music
         music_menu = Gtk.Menu()
-        music = Gtk.MenuItem("Music")
+        music = Gtk.MenuItem(TRANSLATIONS[LANGUAGE]["MenuMusic"])
         music.set_submenu(music_menu)
         ## Play
-        self.menubar_play = self.create_menuitem("Play",
+        self.menubar_play = self.create_menuitem(
+                                          TRANSLATIONS[LANGUAGE]["Play"],
                                           "media-playback-start")
         self.menubar_play.set_size_request(90, -1)
         self.menubar_play.connect("activate", self.playback_toggle)
@@ -685,46 +848,54 @@ class SilverGUI(Gtk.Window):
         self.menubar_play.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Stop
-        self.menubar_stop = self.create_menuitem("Stop", "media-playback-stop")
+        self.menubar_stop = self.create_menuitem(
+                                          TRANSLATIONS[LANGUAGE]["Stop"],
+                                          "media-playback-stop")
         self.menubar_stop.set_sensitive(False)
         self.menubar_stop.connect("activate", self.playback_toggle)
         key, mod = Gtk.accelerator_parse("F7")
         self.menubar_stop.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Record
-        self.menubar_record = self.create_menuitem("Record", "media-record")
-        self.menubar_record.connect("activate", self.record_toggle)
+        self.menubar_record = self.create_menuitem(
+                                          TRANSLATIONS[LANGUAGE]["Record"],
+                                          "media-record")
+        self.menubar_record.connect("activate", self.recorder_toggle)
         key, mod = Gtk.accelerator_parse("F8")
         self.menubar_record.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Stop recording
-        self.menubar_stop_recording = self.create_menuitem("Stop recording",
+        self.menubar_stop_recording = self.create_menuitem(
+                                      TRANSLATIONS[LANGUAGE]["StopRecording"],
                                           "media-playback-stop")
         self.menubar_stop_recording.set_sensitive(False)
-        self.menubar_stop_recording.connect("activate", self.record_toggle)
+        self.menubar_stop_recording.connect("activate", self.recorder_stop)
         key, mod = Gtk.accelerator_parse("F9")
         self.menubar_stop_recording.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Mute
-        self.menubar_mute = Gtk.CheckMenuItem("Mute")
+        self.menubar_mute = Gtk.CheckMenuItem(TRANSLATIONS[LANGUAGE]["Mute"])
         self.menubar_mute.connect("toggled", self.mute_toggle)
         key, mod = Gtk.accelerator_parse("<Control>M")
         self.menubar_mute.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Refresh
-        refresh = self.create_menuitem("Update shcedule", "gtk-refresh")
+        refresh = self.create_menuitem(
+                TRANSLATIONS[LANGUAGE]["UpdateSchedule"],
+                "gtk-refresh")
         refresh.connect("activate", self.schedule_refresh)
         key, mod = Gtk.accelerator_parse("F5")
         refresh.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Preferences
-        prefs = self.create_menuitem("Preferences", "gtk-preferences")
+        prefs = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Preferences"],
+                                          "gtk-preferences")
         prefs.connect("activate", self.prefs_window_create)
         key, mod = Gtk.accelerator_parse("<Control>P")
         prefs.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Quit
-        quit = self.create_menuitem("Quit", "gtk-quit")
+        quit = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Quit"], "gtk-quit")
         quit.connect("activate", Gtk.main_quit)
         key, mod = Gtk.accelerator_parse("<Control>Q")
         quit.add_accelerator("activate", agr,
@@ -749,7 +920,7 @@ class SilverGUI(Gtk.Window):
             music_menu.append(item)
         # Help
         help_menu = Gtk.Menu()
-        help = Gtk.MenuItem("Help")
+        help = Gtk.MenuItem(TRANSLATIONS[LANGUAGE]['MenuHelp'])
         help.set_submenu(help_menu)
         ## About
         about = self.create_menuitem("About", "gtk-about")
@@ -776,7 +947,7 @@ class SilverGUI(Gtk.Window):
         """ Create selection buttons """
         self.selection_buttons = []
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        for day in WEEKDAY_LIST:
+        for day in TRANSLATIONS[LANGUAGE]['WeekdayList']:
             button = Gtk.Button(day)
             button.set_focus_on_click(True)
             button.set_size_request(80, 0)
@@ -787,7 +958,9 @@ class SilverGUI(Gtk.Window):
 
     def selection_on_clicked(self, button):
         """ Refilter treeview by selected weekday """
-        self.__weekday_filter__ = button.get_label()
+        weekday_n = TRANSLATIONS[LANGUAGE]['WeekdayList'].index(
+                                                            button.get_label())
+        self.__weekday_filter__ = WEEKDAY_LIST[weekday_n]
         self.sched_tree_model.refilter()
 
 ### Control panel
@@ -804,18 +977,18 @@ class SilverGUI(Gtk.Window):
         icon = self.get_playback_label()[1]
         self.playback_button = self.create_toolbutton(icon)
         self.playback_button.connect("clicked", self.playback_toggle)
-        self.playback_button.set_tooltip_text("Play")
-        ## Record Button
-        icon = self.get_record_label()[1]
-        self.record_button = self.create_toolbutton(icon)
-        self.record_button.connect("clicked", self.record_toggle)
-        self.record_button.set_tooltip_text("Record")
+        self.playback_button.set_tooltip_text(TRANSLATIONS[LANGUAGE]["Play"])
+        ## Send message Button
+        send_msg = self.create_toolbutton("mail_new")
+        send_msg.connect("clicked", self.send_message)
+        send_msg.set_tooltip_text(TRANSLATIONS[LANGUAGE]["SendMessage"])
         ## Separator
         sep = Gtk.SeparatorToolItem()
         ## Update schedule Button
         self.sched_refresh_button = self.create_toolbutton("gtk-refresh")
         self.sched_refresh_button.connect("clicked", self.schedule_refresh)
-        self.sched_refresh_button.set_tooltip_text("Update schedule")
+        self.sched_refresh_button.set_tooltip_text(
+                                      TRANSLATIONS[LANGUAGE]["UpdateSchedule"])
         ## Spinner
         self.spinner = Gtk.Spinner()
         ## Label
@@ -837,7 +1010,7 @@ class SilverGUI(Gtk.Window):
         self.volume.set_size_request(80, 0)
         # Pack toolbar
         for x, el in enumerate ([ self.playback_button,
-                                  self.record_button,
+                                  send_msg,
                                   sep,
                                   self.sched_refresh_button ]):
             toolbar.insert(el, x)
@@ -868,7 +1041,43 @@ class SilverGUI(Gtk.Window):
         self.status_icon.connect("activate", self.status_icon_on_activate)
         self.status_icon.connect("popup-menu", self.status_icon_popup)
         self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
-        self.status_icon.set_tooltip_text("Silver Rain")
+        self.status_icon.set_property("has-tooltip", True)
+        self.status_icon.connect("query-tooltip", self.status_icon_tooltip)
+
+    def status_icon_tooltip(self, widget, x, y, keyboard_mode, tooltip):
+        # Silver Rain
+        silver = Gtk.Label()
+        silver.set_markup("<b>" + TRANSLATIONS[LANGUAGE]["SilverRain"] +
+                          "</b>")
+        # Icon
+        img = Gtk.Image.new_from_pixbuf(self._schedule.get_event_icon())
+        # Program
+        title = Gtk.Label()
+        str = '\n'.join(textwrap.wrap(self._schedule.get_event_title(), 21))
+        title.set_markup("<b>" + str + "</b>")
+        title.set_alignment(0, 0.5)
+        host = Gtk.Label()
+        str = '\n'.join(textwrap.wrap(self._schedule.get_event_host(), 21))
+        host.set_text(str)
+        host.set_alignment(0, 0.5)
+        time = Gtk.Label()
+        time.set_text(self._schedule.get_event_time())
+        time.set_alignment(0, 0.5)
+        # Pack
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        box.set_border_width(10)
+        grid = Gtk.Grid()
+        grid.set_column_spacing(20)
+        grid.attach(img,    0, 0, 1, 3)
+        grid.attach(title,  1, 0, 1, 1)
+        grid.attach(host,   1, 1, 1, 1)
+        grid.attach(time,   1, 2, 1, 1)
+        box.pack_start(silver, False, False, 0)
+        box.pack_start(grid, False, False, 0)
+        # Show
+        box.show_all()
+        tooltip.set_custom(box)
+        return True
 
     def status_icon_on_activate(self, icon):
         """ Show/hide main window on left click """
@@ -902,17 +1111,22 @@ class SilverGUI(Gtk.Window):
         # Record
         text, icon = self.get_record_label()
         record = self.create_menuitem(text, icon)
-        record.connect("activate", self.record_toggle)
+        if text == TRANSLATIONS[LANGUAGE]["Record"]:
+            record.connect("activate", self.recorder_toggle)
+        else:
+            record.connect("activate", self.recorder_stop)
         # Mute
-        mute = Gtk.CheckMenuItem("Mute")
+        mute = Gtk.CheckMenuItem(TRANSLATIONS[LANGUAGE]["Mute"])
         if self.__muted__:
             mute.set_active(True)
         mute.connect("toggled", self.popup_on_mute)
         # Preferences
-        preferences = self.create_menuitem("Preferences", "gtk-preferences")
+        preferences = self.create_menuitem(
+                                 TRANSLATIONS[LANGUAGE]["Preferences"],
+                                 "gtk-preferences")
         preferences.connect("activate", self.prefs_window_create)
         # Quit
-        quit = self.create_menuitem("Quit", "gtk-quit")
+        quit = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Quit"], "gtk-quit")
         quit.connect("activate", Gtk.main_quit)
         # Separator
         sep = []
@@ -935,16 +1149,17 @@ class SilverGUI(Gtk.Window):
 ### TreeView
     def sched_tree_model_create(self):
         """ Create schedule tree """
-        store = Gtk.TreeStore(str,              # Weekday
-                              bool,             # IsParent
-                              str,              # Time
-                              str,              # Title
-                              str,              # URL
-                              str,              # Host
-                              GdkPixbuf.Pixbuf, # Icon
-                              str,              # BackgroundColor
-                              str,              # FontColor
-                              str)              # Font
+        store = Gtk.TreeStore(str,              #  0 Weekday
+                              bool,             #  1 IsParent
+                              str,              #  2 Time
+                              str,              #  3 Title
+                              str,              #  4 URL
+                              str,              #  5 Host
+                              GdkPixbuf.Pixbuf, #  6 Icon
+                              str,              #  7 BackgroundColor
+                              str,              #  8 FontColor
+                              str,              #  9 Font
+                              bool)             # 10 Recorder set
         self.sched_tree_model = store.filter_new()
         self.sched_tree_model.set_visible_func(self.sched_tree_model_func)
         self._schedule.fill_tree_strore(store)
@@ -973,27 +1188,29 @@ class SilverGUI(Gtk.Window):
         renderer.set_padding(10, 0)
         renderer.set_alignment(0.5, 0.5)
         # Time
-        column = Gtk.TreeViewColumn("Time", renderer,
+        column = Gtk.TreeViewColumn(TRANSLATIONS[LANGUAGE]["Time"], renderer,
                                     text=2, background=7, foreground=8, font=9)
         column.set_alignment(0.5)
         column.set_min_width(10)
         self.sched_tree.append_column(column)
         # Title
         renderer.set_alignment(0, 0.5)
-        column = Gtk.TreeViewColumn("Title", renderer,
+        renderer.set_property("wrap_mode", Gtk.WrapMode.WORD)
+        renderer.set_property("wrap_width", 200)
+        column = Gtk.TreeViewColumn(TRANSLATIONS[LANGUAGE]["Title"], renderer,
                                     text=3, background=7, foreground=8, font=9)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
         self.sched_tree.append_column(column)
         # Host
-        column = Gtk.TreeViewColumn("Host", renderer,
+        column = Gtk.TreeViewColumn(TRANSLATIONS[LANGUAGE]["Host"], renderer,
                                     text=5, background=7, foreground=8, font=9)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
         self.sched_tree.append_column(column)
-
+        # Add to scrolled window
         self.scrolled_window.add(self.sched_tree)
 
     def sched_tree_on_button_release_event(self, widget, event):
@@ -1010,11 +1227,15 @@ class SilverGUI(Gtk.Window):
         url.connect("activate", self.url_open, event_url)
         self.sched_popup.append(url)
         # Record program
-        icon = self.get_record_label()[1]
-        rec = self.create_menuitem("Set recording", icon)
-        event_time = model.get_value(iter, 2)
-        rec.connect("activate", self.sched_record, event_time)
-        self.sched_popup.append(rec)
+        if model.get_value(iter, 1):
+            if not model.get_value(iter, 10):
+                rec = self.create_menuitem("Record program", "media-record")
+                rec.connect("activate", self.sched_record_set, model, iter)
+            else:
+                rec = self.create_menuitem("Don't record", "gtk-cancel")
+                rec.connect("activate", self.sched_record_cancel, model, iter)
+            self.sched_popup.append(rec)
+
         self.sched_popup.show_all()
         self.sched_popup.popup(None, None,
                                None, None,
@@ -1023,14 +1244,19 @@ class SilverGUI(Gtk.Window):
     def url_open(self, button, url):
         subprocess.Popen(['xdg-open', url], stdout=subprocess.PIPE)
 
-    def sched_record(self, button, time):
-        print(time)
-        pass
+    def sched_record_set(self, button, model, iter):
+        """ Record program """
+        model.set_value(iter, 10, True)
+
+    def sched_record_cancel(self, button, model, iter):
+        """ Cancel recording """
+        model.set_value(iter, 10, False)
 
 ### Timers
     def timers_clean(self):
         """ Cancel timer """
         self._t_event.cancel()
+        self._t_recorder.cancel()
 
     def timers_reset(self):
         """ Reset timer """
@@ -1048,9 +1274,16 @@ class SilverGUI(Gtk.Window):
 
     def timers_callback_event(self):
         """ Update schedule """
-        self.update_now_playing()
         # Init new timer
-        self.timers_init_event_timer()
+        def func():
+            self.update_now_playing()
+            self.timers_init_event_timer()
+        GObject.idle_add(func)
+
+    def timers_callback_recorder_stop(self):
+        """ Update schedule """
+        # Init new timer
+        GObject.idle_add(self.recorder_toggle, None)
 
 ### Updater
     def schedule_refresh(self, button): self.schedule_update(refresh=True)
@@ -1106,9 +1339,8 @@ class SilverGUI(Gtk.Window):
 
     def selection_update(self):
         """ Update selection """
-        today = date.today().weekday()
-        self.selection_buttons[today].clicked()
-        Gtk.Widget.grab_focus(self.selection_buttons[today])
+        self.selection_buttons[self.__today__.weekday()].clicked()
+        Gtk.Widget.grab_focus(self.selection_buttons[self.__today__.weekday()])
 
     def status_set_schedule_updating(self):
         """ Show spinner and "Updating" message """
@@ -1116,7 +1348,8 @@ class SilverGUI(Gtk.Window):
         self.spinner.show()
         self.spinner.start()
         self.status.set_text("<span size='12000'><b>" +
-                             "Updating schedule..." + "</b></span>")
+                             TRANSLATIONS[LANGUAGE]["Updating"] +
+                             "</b></span>")
         self.status.set_use_markup(True)
 
     def status_set_playing(self):
@@ -1132,7 +1365,8 @@ class SilverGUI(Gtk.Window):
         self.spinner.hide()
         self.sched_refresh_button.show()
         self.status.set_text("<span size='12000'><b>" +
-                             "Couldn't update schedule" + "</b></span>")
+                             TRANSLATIONS[LANGUAGE]["UpdateFailed"] +
+                             "</b></span>")
         self.status.set_use_markup(True)
 
     def status_update(self):
@@ -1143,58 +1377,393 @@ class SilverGUI(Gtk.Window):
                                  "</b></span>")
             self.status.set_use_markup(True)
 
+    def sched_tree_reset_current(self):
+        """ Reset previously marked row """
+        if self.__SCHEDULE_ERROR__ or not self.__cell_bg_old__:
+            return
+        pos = self._schedule.get_event_position()
+        path = Gtk.TreePath(pos)
+        iter = self.sched_tree_model.get_iter(path)
+        self.sched_tree_model[iter][7] = self.__cell_bg_old__
+        self.sched_tree_model[iter][8] = self.__cell_fg_old__
+        self.sched_tree_model[iter][9] = FONT
+        self.cell_bg_old = ''
+        self.cell_fg_old = ''
+
     def sched_tree_mark_current(self):
         """ Set current event colors """
         if self.__SCHEDULE_ERROR__:
             return
-        if self.__cell_bg_old__:
-            # Reset previous row
-            self.sched_tree_model[self.__iter_old__][7] = self.__cell_bg_old__
-            self.sched_tree_model[self.__iter_old__][8] = self.__cell_fg_old__
-            self.sched_tree_model[self.__iter_old__][9] = SCHED_FONT
-            self.cell_bg_old = ''
-            self.cell_fg_old = ''
         # Get current position
         pos = self._schedule.get_event_position()
         path = Gtk.TreePath(pos)
+        self.__ref__ = Gtk.TreeRowReference.new(self.sched_tree_model,  path)
         iter = self.sched_tree_model.get_iter(path)
         # Backup original style
         self.__cell_bg_old__ = self.sched_tree_model[iter][7]
         self.__cell_fg_old__ = self.sched_tree_model[iter][8]
-        self.__iter_old__ = iter
         # Set current row color
-        self.sched_tree_model[iter][7] = SCHED_CURRENT_BG_COLOR
-        self.sched_tree_model[iter][8] = SCHED_CURRENT_FG_COLOR
-        self.sched_tree_model[iter][9] = SCHED_CURRENT_FONT
+        self.sched_tree_model[iter][7] = SELECTED_BG_COLOR
+        self.sched_tree_model[iter][8] = SELECTED_FONT_COLOR
+        self.sched_tree_model[iter][9] = SELECTED_FONT
         # Scroll to current cell
         self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
 
     def update_now_playing(self):
         """ Update label, bg of current event, show notifications """
+        # Show agenda for today if not shown
+        if not (self.__weekday_filter__ == self.__today__.strftime("%A")):
+            self.selection_update()
+        # Reset previous line
+        self.sched_tree_reset_current()
         if self._schedule.update_current_event():
             # Update selection
-            GObject.idle_add(self.selection_update)
+            self.__today__ = date.today()
+            self.selection_update()
+        self.sched_tree_check_recorder()
         self.sched_tree_mark_current()
         self.status_update()
         self.show_notification_on_event()
 
-### Preferences window
-    def prefs_window_create(self, something):
+    def sched_tree_check_recorder(self):
+        """ Start recording if set """
+        pos = self._schedule.get_event_position()
+        path = Gtk.TreePath(pos)
+        iter = self.sched_tree_model.get_iter(path)
+        if self.sched_tree_model[iter][10]:
+            self.sched_tree_model[iter][10] = False
+            if self.__recording__:
+                # Recorder was started manually
+                return
+            # Toggle recorder
+            self.recorder_toggle(None)
+
+### Messenger
+    def send_message(self, something_somethin):
         self.error_show("Not implemented yet")
         pass
+
+### Preferences window
+    def prefs_window_create(self, widget):
+        ## Dialog
+        prefs = Gtk.Dialog.new()
+        prefs.set_title("Silver Rain: Preferences")
+        prefs.set_resizable(True)
+        prefs.set_size_request(400, 300)
+        prefs.set_transient_for(self)
+        prefs.set_resizable(False)
+        ## Header
+        # Image
+        img = Gtk.Image()
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON_SMALL,
+                                                         50, 50, True)
+        img.set_from_pixbuf(pixbuf)
+        # Title
+        title = Gtk.Label()
+        title.set_markup("<span size='18000'><b>" +
+                         TRANSLATIONS[LANGUAGE]["SilverRain"] +
+                         "</b></span>\n<span size='11000'>Properties</span>")
+        title.set_alignment(0, 0)
+        # Pack
+        eventbox = Gtk.EventBox()
+        eventbox.override_background_color(Gtk.StateType.NORMAL,
+                                           Gdk.RGBA(1.0,1.0,1.0,1.0))
+        hbox = Gtk.HBox(spacing=5)
+        hbox.set_border_width(10)
+        hbox.pack_start(img, False, False, 0)
+        hbox.pack_start(title, False, False, 0)
+        eventbox.add(hbox)
+
+        def create_page():
+            page = Gtk.VBox()
+            page.set_border_width(15)
+            return page
+
+        def create_prefs_grid():
+            grid = Gtk.Grid()
+            grid.set_border_width(10)
+            grid.set_column_spacing(10)
+            grid.set_row_spacing(5)
+            return grid
+
+        def pack_prefs_box(page, text, grid):
+            title = Gtk.Label()
+            title.set_alignment(0, 0.5)
+            title.set_markup("<span size='11000'><b>" + text + "</b></span>")
+            page.pack_start(title, False, False, 0)
+            page.pack_start(grid, False, False, 0)
+
+        ###############
+        ### General ###
+        ###############
+        page_general = create_page()
+        ## General
+        general = create_prefs_grid()
+        # Autoplay
+        self.prefs_autoplay = Gtk.CheckButton()
+        self.prefs_autoplay.set_label("Autoplay when starts")
+        self.prefs_autoplay.set_active(AUTOPLAY)
+        general.attach(self.prefs_autoplay, 0, 0, 2, 1)
+        # Start Hidden
+        self.prefs_start_hidden = Gtk.CheckButton()
+        self.prefs_start_hidden.set_label("Start hidden")
+        self.prefs_start_hidden.set_active(START_HIDDEN)
+        general.attach_next_to(self.prefs_start_hidden, self.prefs_autoplay,
+                               Gtk.PositionType.BOTTOM, 2, 1)
+        # Languages
+        text = Gtk.Label("Language:")
+        text.set_size_request(180, -1)
+        text.set_alignment(0, 0.5)
+        general.attach_next_to(text, self.prefs_start_hidden,
+                               Gtk.PositionType.BOTTOM, 2, 1)
+        lang_store = Gtk.ListStore(str)
+        for lang in LANGUAGES_LIST:
+            lang_store.append([lang])
+        self.prefs_language = Gtk.ComboBox.new_with_model(lang_store)
+        renderer_text = Gtk.CellRendererText()
+        self.prefs_language.pack_start(renderer_text, True)
+        self.prefs_language.add_attribute(renderer_text, "text", 0)
+        self.prefs_language.set_active(LANGUAGE)
+        general.attach_next_to(self.prefs_language, text,
+                               Gtk.PositionType.RIGHT, 1, 1)
+        pack_prefs_box(page_general, "General", general)
+        ## Recordings
+        recordings = create_prefs_grid()
+        text = Gtk.Label("Recordings directory path:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        recordings.attach(text, 0, 0, 1, 1)
+        self.prefs_recs_dir = Gtk.FileChooserButton()
+        self.prefs_recs_dir.set_filename(RECS_DIR)
+        self.prefs_recs_dir.set_action(Gtk.FileChooserAction.SELECT_FOLDER)
+        recordings.attach_next_to(self.prefs_recs_dir, text,
+                                  Gtk.PositionType.RIGHT, 1, 1)
+        text = Gtk.Label("Recordings prefix:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        recordings.attach(text, 0, 1, 1, 1)
+        self.prefs_recs_prefix = Gtk.Entry()
+        self.prefs_recs_prefix.set_text(RECS_PREFIX)
+        self.prefs_recs_prefix.set_editable(True)
+        recordings.attach_next_to(self.prefs_recs_prefix, text,
+                                  Gtk.PositionType.RIGHT, 1, 1)
+        pack_prefs_box(page_general, "Recordings", recordings)
+        ## Messages
+        im = create_prefs_grid()
+        text = Gtk.Label("Default message header:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        im.attach(text, 0, 0, 1, 1)
+        self.prefs_message_header = Gtk.Entry()
+        self.prefs_message_header.set_editable(True)
+        self.prefs_message_header.set_text(MESSAGE_HEADER)
+        im.attach_next_to(self.prefs_message_header, text,
+                          Gtk.PositionType.RIGHT, 1, 1)
+        pack_prefs_box(page_general, "Sending message", im)
+        ################
+        ## Appearance ##
+        ################
+        page_appearance = create_page()
+        ## Sched bg colors
+        # Background
+        colors = create_prefs_grid()
+        text = Gtk.Label("Background color:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        colors.attach(text, 0, 0, 1, 1)
+        color = Gdk.RGBA()
+        color.parse(BG_COLORS[0])
+        self.prefs_bg_color_light = Gtk.ColorButton.new_with_rgba(color)
+        colors.attach_next_to(self.prefs_bg_color_light, text,
+                              Gtk.PositionType.RIGHT, 1, 1)
+        # Alternate background
+        text = Gtk.Label("Alternate background color:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        colors.attach(text, 0, 1, 1, 1)
+        color.parse(BG_COLORS[1])
+        self.prefs_bg_color_dark = Gtk.ColorButton.new_with_rgba(color)
+        colors.attach_next_to(self.prefs_bg_color_dark, text,
+                              Gtk.PositionType.RIGHT, 1, 1)
+        # Selection
+        text = Gtk.Label("Selection color:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        colors.attach(text, 0, 2, 1, 1)
+        color.parse(SELECTED_BG_COLOR)
+        self.prefs_selection_color = Gtk.ColorButton.new_with_rgba(color)
+        colors.attach_next_to(self.prefs_selection_color, text,
+                              Gtk.PositionType.RIGHT, 1, 1)
+        pack_prefs_box(page_appearance, "Colors", colors)
+        ## Fonts
+        # Default font
+        fonts = create_prefs_grid()
+        text = Gtk.Label("Font:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        fonts.attach(text, 0, 0, 1, 1)
+        self.prefs_font = Gtk.FontButton()
+        self.prefs_font.set_font_name(FONT)
+        fonts.attach_next_to(self.prefs_font, text,
+                             Gtk.PositionType.RIGHT, 1, 1)
+        color.parse(FONT_COLOR)
+        self.prefs_font_color = Gtk.ColorButton.new_with_rgba(color)
+        fonts.attach_next_to(self.prefs_font_color, self.prefs_font,
+                             Gtk.PositionType.RIGHT, 1, 1)
+        # Selected font
+        text = Gtk.Label("Selection font:")
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        fonts.attach(text, 0, 1, 1, 1)
+        self.prefs_selection_font = Gtk.FontButton()
+        self.prefs_selection_font.set_font_name(SELECTED_FONT)
+        fonts.attach_next_to(self.prefs_selection_font, text,
+                             Gtk.PositionType.RIGHT, 1, 1)
+        color.parse(SELECTED_FONT_COLOR)
+        self.prefs_selection_font_color = Gtk.ColorButton.new_with_rgba(color)
+        fonts.attach_next_to(self.prefs_selection_font_color,
+                             self.prefs_selection_font,
+                             Gtk.PositionType.RIGHT, 1, 1)
+        pack_prefs_box(page_appearance, "Fonts", fonts)
+        ## Reset button
+        reset = Gtk.Button("Reset default settings")
+        reset.connect("clicked", self.prefs_reset_appearance)
+        page_appearance.pack_end(reset, False, False, 0)
+        ###############
+        ### Network ###
+        ###############
+        page_network = create_page()
+        network = create_prefs_grid()
+        text = Gtk.Label("Stream url:")
+        text.set_size_request(180, -1)
+        text.set_alignment(0, 0.5)
+        network.attach(text, 0, 0, 1, 1)
+        stream_url_store = Gtk.ListStore(str)
+        for url in STREAM_URL_LIST:
+            stream_url_store.append([url])
+        self.prefs_stream_url = Gtk.ComboBox.new_with_model_and_entry(
+                                                              stream_url_store)
+        self.prefs_stream_url.set_entry_text_column(0)
+        self.prefs_stream_url.set_active(STREAM_URL_LIST.index(STREAM_URL))
+        network.attach_next_to(self.prefs_stream_url, text,
+                               Gtk.PositionType.RIGHT, 1, 1)
+        pack_prefs_box(page_network, "Network", network)
+
+        ## Notebook
+        notebook = Gtk.Notebook()
+        notebook.set_show_border(True)
+        notebook.set_border_width(10)
+        notebook.append_page(page_general, Gtk.Label("General"))
+        notebook.append_page(page_appearance, Gtk.Label("Appearance"))
+        notebook.append_page(page_network, Gtk.Label("Network"))
+        ## Pack
+        area = prefs.get_content_area()
+        area.set_border_width(0)
+        area.set_spacing(5)
+        area.pack_start(eventbox, False, False, 0)
+        area.pack_start(notebook, True, True, 0)
+        area.show_all()
+        ## Buttons
+        prefs.add_button(Gtk.STOCK_APPLY, Gtk.ResponseType.APPLY)
+        prefs.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        ## Show
+        # Apply settings
+        while prefs.run() == Gtk.ResponseType.APPLY:
+            new_path = self.prefs_recs_dir.get_filename()
+            if os.access(new_path, os.W_OK):
+                Gtk.Widget.grab_focus(self.prefs_recs_dir)
+                self.prefs_apply_settings()
+                break
+            else:
+                self.error_show("Invalid recordings storage location")
+                self.prefs_recs_dir.set_filename(RECS_DIR)
+                Gtk.Widget.grab_focus(self.prefs_recs_dir)
+
+        prefs.destroy()
+
+    def prefs_apply_settings(self):
+        """ Apply settings and save config file """
+        # General
+        global AUTOPLAY
+        AUTOPLAY = self.prefs_autoplay.get_active()
+        global START_HIDDEN
+        START_HIDDEN = self.prefs_start_hidden.get_active()
+        global LANGUAGE
+        iter = self.prefs_language.get_active_iter()
+        if iter:
+            model = self.prefs_language.get_model()
+            lang = model[iter][0]
+            LANGUAGE = LANGUAGES_LIST.index(lang)
+        global RECS_DIR
+        RECS_DIR = self.prefs_recs_dir.get_filename()
+        global RECS_PREFIX
+        RECS_PREFIX = self.prefs_recs_prefix.get_text()
+        global MESSAGE_HEADER
+        MESSAGE_HEADER = self.prefs_message_header.get_text()
+        # Appearance
+        global SELECTED_BG_COLOR
+        SELECTED_BG_COLOR = rgba_to_hex(self.prefs_selection_color.get_rgba())
+        global BG_COLORS
+        BG_COLORS[0] = rgba_to_hex(self.prefs_bg_color_light.get_rgba())
+        BG_COLORS[1] = rgba_to_hex(self.prefs_bg_color_dark.get_rgba())
+        global FONT
+        FONT = self.prefs_font.get_font_name()
+        global FONT_COLOR
+        FONT_COLOR = rgba_to_hex(self.prefs_font_color.get_rgba())
+        global SELECTED_FONT
+        SELECTED_FONT = self.prefs_selection_font.get_font_name()
+        global SELECTED_FONT_COLOR
+        SELECTED_FONT_COLOR = rgba_to_hex(
+                                   self.prefs_selection_font_color.get_rgba())
+        # Network
+        global STREAM_URL
+        iter = self.prefs_stream_url.get_active_iter()
+        if iter:
+            model = self.prefs_stream_url.get_model()
+            STREAM_URL = model[iter][0]
+        else:
+            STREAM_URL = self.prefs_stream_url.get_child().get_text()
+        # Update schedule
+        self.selection_update()
+        self.sched_tree_model_create()
+        self.sched_tree.set_model(self.sched_tree_model)
+        self.sched_tree_mark_current()
+        # Save config file
+        config_save()
+
+    def prefs_reset_appearance(self, widget):
+        """ Reset default settings """
+        color = Gdk.RGBA()
+        # BG colors
+        color.parse(DEFAULT_BG_COLORS[0])
+        self.prefs_bg_color_light.set_rgba(color)
+        color.parse(DEFAULT_BG_COLORS[1])
+        self.prefs_bg_color_dark.set_rgba(color)
+        # Selection color
+        color.parse(DEFAULT_SELECTED_BG_COLOR)
+        self.prefs_selection_color.set_rgba(color)
+        # Font
+        self.prefs_font.set_font_name(DEFAULT_FONT)
+        color.parse(DEFAULT_FONT_COLOR)
+        self.prefs_font_color.set_rgba(color)
+        # Selection font
+        self.prefs_selection_font.set_font_name(DEFAULT_SELECTED_FONT)
+        color.parse(DEFAULT_SELECTED_FONT_COLOR)
+        self.prefs_selection_font_color.set_rgba(color)
 
 ### About dialog
     def about_window_create(self, icon):
         about = Gtk.Dialog.new()
         about.set_title("Silver Rain: About")
-        about.set_resizable(False)
         about.set_transient_for(self)
+        about.set_size_request(500, 500)
+        about.set_resizable(False)
 
         img = Gtk.Image()
         img.set_from_file(SILVER_ICON)
         comment = Gtk.Label('Silver Rain application for Linux')
         copyright = Gtk.Label('Copyright \xa9 2015 Petr Skovoroda')
-        website = Gtk.Label('http://silver.ru')
+        website = Gtk.LinkButton("http://silver.ru", "http://silver.ru")
 
         box = about.get_content_area()
         box.pack_start(img, False, False, 0)
@@ -1207,7 +1776,7 @@ class SilverGUI(Gtk.Window):
         about.run()
         about.destroy()
 
-### Message dialog
+### Dialog
     def dialog_create(self, title, icon_name, message):
         dialog = Gtk.Dialog.new()
         dialog.set_title("Silver Rain: " + title)
@@ -1235,13 +1804,29 @@ class SilverGUI(Gtk.Window):
         # Button
         dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
         dialog.show_all()
-        dialog.run()
+        response = dialog.run()
         dialog.destroy()
 
     def warning_show(self, msg):
         self.dialog_create("Warning", "dialog-warning", msg)
+
     def error_show(self, msg):
         self.dialog_create("Error", "dialog-error", msg)
+
+### GStreamer callbacks
+    def playback_emergency_stop(self):
+        """ Change buttons """
+        self.__playing__ = False
+        self.menubar_play.set_sensitive(True)
+        self.menubar_stop.set_sensitive(False)
+        self.playback_button.set_tooltip_text(TRANSLATIONS[LANGUAGE]["Play"])
+
+    def recorder_emergency_stop(self):
+        """ Change buttons, cancel timer """
+        self.__recording__ = False
+        self.menubar_record.set_sensitive(True)
+        self.menubar_stop_recording.set_sensitive(False)
+        self._t_recorder.cancel()
 
 ### Common
     def create_menuitem(self, text, icon):
@@ -1262,38 +1847,48 @@ class SilverGUI(Gtk.Window):
         return button
 
     def playback_toggle(self, button):
+        """ Change buttons, toggle player """
         self.__playing__ = not self.__playing__
         self.playback_button.set_icon_name(self.get_playback_label()[1])
+        self.menubar_play.set_sensitive(not self.__playing__)
+        self.menubar_stop.set_sensitive(self.__playing__)
 
         if self.__playing__:
-            self.menubar_play.set_sensitive(False)
-            self.menubar_stop.set_sensitive(True)
-            self.playback_button.set_tooltip_text("Stop")
+            self.playback_button.set_tooltip_text(
+                                                TRANSLATIONS[LANGUAGE]["Stop"])
         else:
-            self.menubar_play.set_sensitive(True)
-            self.menubar_stop.set_sensitive(False)
-            self.playback_button.set_tooltip_text("Play")
+            self.playback_button.set_tooltip_text(
+                                                TRANSLATIONS[LANGUAGE]["Play"])
 
         self._player.playback_toggle()
         self.show_notification_on_playback()
 
-    def record_toggle(self, button):
+    def recorder_toggle(self, button):
+        """ Change status, toggle recorder, set timer """
         self.__recording__ = not self.__recording__
-        self.record_button.set_icon_name(self.get_record_label()[1])
+        # Change menubar
+        self.menubar_record.set_sensitive(not self.__recording__)
+        self.menubar_stop_recording.set_sensitive(self.__recording__)
         if self.__recording__:
-            self.menubar_record.set_sensitive(False)
-            self.menubar_stop_recording.set_sensitive(True)
-            self.record_button.set_tooltip_text("Stop recording")
-        else:
-            self.menubar_record.set_sensitive(True)
-            self.menubar_stop_recording.set_sensitive(False)
-            self.record_button.set_tooltip_text("Record")
+            # Set timer
+            today = datetime.now()
+            now = timedelta(hours=today.hour,
+                            minutes=today.minute,
+                            seconds=today.second).total_seconds()
+            timeout = int(self._schedule.get_event_end() - now)
+            self._t_recorder = threading.Timer(timeout,
+                            self.timers_callback_recorder_stop)
+            self._t_recorder.start()
 
         if not self.__SCHEDULE_ERROR__:
             name = self._schedule.get_event_title()
         else:
             name = "SilverRain"
-        self._player.record_toggle(name)
+        self._player.recorder_toggle(name)
+
+    def recorder_stop(self, button):
+        self._t_recorder.cancel()
+        self.recorder_toggle(None)
 
     def mute_toggle(self, button, val=0):
         if self.__muted__:
@@ -1310,20 +1905,20 @@ class SilverGUI(Gtk.Window):
     def get_playback_label(self):
         """ Return label and icon for Playback menu/button """
         if not self.__playing__:
-            label = "Play"
+            label = TRANSLATIONS[LANGUAGE]["Play"]
             icon = "media-playback-start"
         else:
-            label = "Stop"
+            label = TRANSLATIONS[LANGUAGE]["Stop"]
             icon = "media-playback-stop"
         return label, icon
 
     def get_record_label(self):
         """ Return label and icon for Playback menu/button """
         if not self.__recording__:
-            label = "Record"
+            label = TRANSLATIONS[LANGUAGE]["Record"]
             icon = "media-record"
         else:
-            label = "Stop recording"
+            label = TRANSLATIONS[LANGUAGE]["StopRecording"]
             icon = "media-playback-stop"
         return label, icon
 
@@ -1339,7 +1934,8 @@ class SilverGUI(Gtk.Window):
         """ Show currently playing """
         text = "Silver Rain"
         if not self.__SCHEDULE_ERROR__:
-            body = self._schedule.get_event_title()
+            body = "<b>" + self._schedule.get_event_title() + "</b>" + \
+                   "\n" + self._schedule.get_event_host()
             self.notification.set_icon_from_pixbuf(
                     self._schedule.get_event_icon())
             self.notification.update(text, body)
@@ -1360,6 +1956,12 @@ class SilverGUI(Gtk.Window):
             self.notification.show()
 
 # Common
+def rgba_to_hex(rgba):
+    r = int(rgba.red * 255)
+    g = int(rgba.green * 255)
+    b = int(rgba.blue * 255)
+    return "#{0:02x}{1:02x}{2:02x}".format(r, g, b)
+
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
     s_h, s_m = divmod(int(start), 3600)
@@ -1384,10 +1986,41 @@ GObject.threads_init()
 Gst.init(None)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 Notify.init("Silver Rain")
+
 # Create directories if they don't exist
-for dir in [APP_DIR, IMG_DIR, RECS_DIR]:
+for dir in [APP_DIR, IMG_DIR]:
     if not os.path.exists(dir):
         os.makedirs(dir)
+
+# Read config
+if not os.path.exists(CONFIG_FILE):
+    # Initialize default settings
+    AUTOPLAY = DEFAULT_AUTOPLAY
+    START_HIDDEN = DEFAULT_START_HIDDEN
+    RECS_DIR = DEFAULT_RECS_DIR
+    RECS_PREFIX = DEFAULT_RECS_PREFIX
+    USE_CSS = DEFAULT_USE_CSS
+    STREAM_URL = DEFAULT_STREAM_URL
+    BG_COLORS = DEFAULT_BG_COLORS
+    FONT_COLOR = DEFAULT_FONT_COLOR
+    SELECTED_BG_COLOR = DEFAULT_SELECTED_BG_COLOR
+    SELECTED_FONT_COLOR = DEFAULT_SELECTED_FONT_COLOR
+    FONT = DEFAULT_FONT
+    SELECTED_FONT = DEFAULT_SELECTED_FONT
+    LANGUAGE = DEFAULT_LANGUAGE
+    MESSAGE_HEADER = DEFAULT_MESSAGE_HEADER
+    # Create configuration file
+    config_save()
+else:
+    config_load()
+
+if not os.path.exists(RECS_DIR):
+    os.makedirs(RECS_DIR)
+
+# Load css
+if USE_CSS:
+    css_load()
+
 # Init
 silver_player = SilverPlayer()
 silver_schedule = SilverSchedule()
