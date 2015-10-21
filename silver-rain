@@ -44,6 +44,7 @@ STREAM_URL_LIST = [ 'http://icecast.silver.cdnvideo.ru/silver',
                     'http://radiosilver.corbina.net:8000/silver48.mp3' ]
 SILVER_RAIN_URL = "http://silver.ru"
 SCHED_URL       = "http://silver.ru/programms/"
+COLOR_INVALID   = "#FF4545"
 
 ########################################################################
 # Translations
@@ -79,7 +80,8 @@ TRANSLATIONS    = [
                      'Recordings'       : 'Recordings',
                      'Recsdirpath'      : 'Recordings directory path:',
                      'Recsprefix'       : 'Recordings prefix:',
-                     'IM'               : 'Sending message',
+                     'Messenger'        : 'Send message',
+                     'IMTitle'          : 'Send a message to the studio',
                      'IMHeader'         : 'Default message header:',
                      'Colors'           : 'Colors',
                      'BgColor'          : 'Background color:',
@@ -90,6 +92,9 @@ TRANSLATIONS    = [
                      'SelFont'          : 'Selection font:',
                      'ResetDefault'     : 'Reset default settings',
                      'StreamUrl'        : 'Stream url',
+                     'IMHeaderPlaceholder' : 'Name e-mail/phone number',
+                     'IMTextPlaceholder' : 'Text',
+                     'Send'             : 'Send',
                     },
 
                     {'WeekdayList'      : ['Понедельник', 'Вторник', 'Среда',
@@ -122,7 +127,8 @@ TRANSLATIONS    = [
                      'Recordings'       : 'Записи',
                      'Recsdirpath'      : 'Recordings directory path:',
                      'Recsprefix'       : 'Recordings prefix:',
-                     'IM'               : 'SMS-портал',
+                     'Messenger'        : 'SMS-портал',
+                     'IMTitle'          : 'Отправить сообщение в студию',
                      'IMHeader'         : 'Заголовок сообщения:',
                      'Colors'           : 'Цвета',
                      'BgColor'          : 'Цвет фона:',
@@ -133,6 +139,9 @@ TRANSLATIONS    = [
                      'SelFont'          : 'Шрифт выделенной области:',
                      'ResetDefault'     : 'Восстановить стандартные настройки',
                      'StreamUrl'        : 'Адрес стрима',
+                     'IMHeaderPlaceholder' : 'Имя, e-mail/номер телефона',
+                     'IMTextPlaceholder' : 'Текст сообщения',
+                     'Send'             : 'Отправить',
                     }
                   ]
 WEEKDAY_LIST = TRANSLATIONS[0]['WeekdayList']
@@ -805,6 +814,8 @@ class SilverGUI(Gtk.Window):
         ## Interface
         # Main window
         self.__main_window__ = True
+        # Messenger
+        self.__im_window__ = False
         # Notifications
         self.notification = Notify.Notification.new("Header", "Body", "image")
         # TreeView
@@ -812,9 +823,10 @@ class SilverGUI(Gtk.Window):
         self.__today__ = date.today()
         self.__cell_bg_old__ = ''
         self.__cell_fg_old__ = ''
-
         # Create main window
         self.main_window_create()
+        # Create messenger
+        self.im_create()
         # Initialize GStreamer
         self._player.set_error_function(self.error_show, self.warning_show,
                                         self.playback_emergency_stop,
@@ -860,7 +872,7 @@ class SilverGUI(Gtk.Window):
         vbox.pack_end(control_panel, False, False, 0)
         vbox.show_all()
         self.add(vbox)
-
+        # Don't show if should stay hidden
         if not START_HIDDEN:
             self.show()
 
@@ -929,6 +941,13 @@ class SilverGUI(Gtk.Window):
         key, mod = Gtk.accelerator_parse("F5")
         refresh.add_accelerator("activate", agr,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
+        ## Messenger
+        msg = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Messenger"],
+                                          "gtk-edit")
+        msg.connect("activate", self.im_show)
+        key, mod = Gtk.accelerator_parse("<Control>S")
+        msg.add_accelerator("activate", agr,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         ## Preferences
         prefs = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Preferences"],
                                           "gtk-preferences")
@@ -944,7 +963,7 @@ class SilverGUI(Gtk.Window):
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Separator
         sep = []
-        for i in range(4):
+        for i in range(5):
             sep.append(Gtk.SeparatorMenuItem())
         ## Pack
         for item in [ self.menubar_play,
@@ -956,8 +975,10 @@ class SilverGUI(Gtk.Window):
                       sep[1],
                       refresh,
                       sep[2],
-                      prefs,
+                      msg,
                       sep[3],
+                      prefs,
+                      sep[4],
                       quit ]:
             music_menu.append(item)
         # Help
@@ -1021,8 +1042,8 @@ class SilverGUI(Gtk.Window):
         self.playback_button.connect("clicked", self.playback_toggle)
         self.playback_button.set_tooltip_text(TRANSLATIONS[LANGUAGE]["Play"])
         ## Send message Button
-        send_msg = self.create_toolbutton("mail_new")
-        send_msg.connect("clicked", self.send_message)
+        send_msg = self.create_toolbutton("gtk-edit")
+        send_msg.connect("clicked", self.im_show)
         send_msg.set_tooltip_text(TRANSLATIONS[LANGUAGE]["SendMessage"])
         ## Separator
         sep = Gtk.SeparatorToolItem()
@@ -1162,6 +1183,10 @@ class SilverGUI(Gtk.Window):
         if self.__muted__:
             mute.set_active(True)
         mute.connect("toggled", self.popup_on_mute)
+        # IM
+        im = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Messenger"],
+                                 "gtk-edit")
+        im.connect("activate", self.im_show)
         # Preferences
         preferences = self.create_menuitem(
                                  TRANSLATIONS[LANGUAGE]["Preferences"],
@@ -1172,11 +1197,11 @@ class SilverGUI(Gtk.Window):
         quit.connect("activate", Gtk.main_quit)
         # Separator
         sep = []
-        for i in range(3):
+        for i in range(4):
             sep.append(Gtk.SeparatorMenuItem())
 
         for item in [play, record, sep[0], mute,
-                     sep[1], preferences, sep[2], quit]:
+                     sep[1], im, sep[2], preferences, sep[3], quit]:
             self.popup_menu.append(item)
         self.popup_menu.show_all()
 
@@ -1481,16 +1506,156 @@ class SilverGUI(Gtk.Window):
             self.recorder_toggle(None)
 
 ### Messenger
-    def send_message(self, something_somethin):
-        self.error_show("Not implemented yet")
-        pass
+    def im_create(self):
+        """ Create messenger dialog """
+        self.im = Gtk.Dialog.new()
+        self.im.connect("delete-event", self.im_on_delete_event)
+        self.im.set_title("Silver Rain: Messenger")
+        self.im.set_resizable(True)
+        self.im.set_default_size(300, 200)
+        self.im.set_transient_for(self)
+        self.im.set_modal(False)
+        ## Header
+        # Image
+        img = Gtk.Image()
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON_SMALL,
+                                                         50, 50, True)
+        img.set_from_pixbuf(pixbuf)
+        # Title
+        title = Gtk.Label()
+        title.set_markup("<span size='18000'><b>" +
+                         "Silver Rain" +
+                         "</b></span>\n<span size='11000'>" +
+                         TRANSLATIONS[LANGUAGE]["IMTitle"] +
+                         "</span>")
+        title.set_alignment(0, 0)
+        title.set_selectable(True)
+        # Pack
+        eventbox = Gtk.EventBox()
+        eventbox.override_background_color(Gtk.StateType.NORMAL,
+                                           Gdk.RGBA(1.0,1.0,1.0,1.0))
+        hbox = Gtk.HBox(spacing=5)
+        hbox.set_border_width(10)
+        hbox.pack_start(img, False, False, 0)
+        hbox.pack_start(title, False, False, 0)
+        eventbox.add(hbox)
+        # Header
+        self.eb_header = Gtk.EventBox()
+        self.eb_header.set_visible_window(True)
+        self.eb_header.set_border_width(0)
+        eb = Gtk.EventBox()
+        eb.set_border_width(0)
+        self.im_header = Gtk.Entry()
+        self.im_header.set_text(MESSAGE_HEADER)
+        self.im_header.set_max_length(40)
+        self.im_header.set_placeholder_text(TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
+        eb.add(self.im_header)
+        self.eb_header.add(eb)
+        # Message
+        win = Gtk.ScrolledWindow()
+        win.set_policy(Gtk.PolicyType.AUTOMATIC,
+                       Gtk.PolicyType.AUTOMATIC)
+        win.set_min_content_height(100)
+        self.eb_msg = Gtk.EventBox()
+        eb = Gtk.EventBox()
+        eb.set_border_width(1)
+        self.msg = Gtk.TextView()
+        self.msg.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.msg.set_left_margin(5)
+        self.msg.set_top_margin(5)
+        self.msg.set_border_window_size(Gtk.TextWindowType.RIGHT, 15)
+        self.msg.set_border_window_size(Gtk.TextWindowType.BOTTOM, 15)
+        win.add(self.msg)
+        eb.add(win)
+        self.eb_msg.add(eb)
+        # Pack
+        box = Gtk.VBox(spacing=5)
+        box.set_border_width(0)
+        #box.pack_start(title, False, False, 0)
+        box.pack_start(self.eb_header, False, False, 0)
+        box.pack_start(self.eb_msg, True, True, 0)
+        area = self.im.get_content_area()
+        area.set_border_width(0)
+        area.set_spacing(0)
+        area.pack_start(eventbox, False, False, 0)
+        area.pack_start(box, True, True, 0)
+        # Button
+        self.im_send_button = self.im.add_button("", Gtk.ResponseType.OK)
+        self.im_send_button.set_label(TRANSLATIONS[LANGUAGE]["Send"])
+        self.im_send_button.connect("clicked", self.im_on_send)
+        self.im_send_button.set_size_request(50, 30)
+        # Ctrl+Enter to send
+        agr = Gtk.AccelGroup()
+        self.im.add_accel_group(agr)
+        key, mod = Gtk.accelerator_parse("<Control>Return")
+        self.im_send_button.add_accelerator("activate", agr,
+                                            key, mod, Gtk.AccelFlags.VISIBLE)
+        # Show
+        area.show_all()
+
+    def im_show(self, widget):
+        if self.__im_window__:
+            return
+        self.__im_window__ = True
+        self.im.show_all()
+        self.msg.grab_focus()
+
+    def im_on_delete_event(self, window, event):
+        """ Destroy window """
+        self.__im_window__ = False
+        window.hide()
+        return True
+
+    def im_on_send(self, button):
+        color = Gdk.Color(50000, 0, 0)
+        color_rgba = Gdk.RGBA()
+        color_rgba.parse(COLOR_INVALID)
+        msg_buf = self.msg.get_buffer()
+        self.eb_header.override_background_color(Gtk.StateType.NORMAL, None)
+        self.eb_msg.override_background_color(Gtk.StateType.NORMAL, None)
+        if not self.im_header.get_text_length():
+            self.eb_header.override_background_color(Gtk.StateType.NORMAL, color_rgba)
+            self.im_header.grab_focus()
+            return
+        if not msg_buf.get_char_count():
+            self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color_rgba)
+            self.msg.grab_focus()
+            return
+        start = msg_buf.get_start_iter()
+        end = msg_buf.get_end_iter()
+        self.send_message(self.im_header.get_text(),
+                          msg_buf.get_text(start, end, True))
+        msg_buf.delete(start, end)
+        # Set 120s timer
+        self.im_send_button.set_sensitive(False)
+        self.im_countdown(120)
+
+    def im_countdown(self, count):
+        """ Set 'count' events with 1s delay """
+        counter = count
+        while counter >= 0:
+            GObject.timeout_add(counter * 1000, self.countdown_func, count - counter)
+            counter -= 1
+
+    def countdown_func(self, count):
+        """ Change delay status """
+        if count > 0:
+            self.im_send_button.set_label(TRANSLATIONS[LANGUAGE]["Send"] +
+                                          " (" + str(count) + "s)")
+        else:
+            self.im_send_button.set_label(TRANSLATIONS[LANGUAGE]["Send"])
+            self.im_send_button.set_sensitive(True)
+
+
+    def send_message(self, header, text):
+        """ Send message to station """
+        print("Send\n", header, "\n", text)
 
 ### Preferences window
     def prefs_window_create(self, widget):
         ## Dialog
         prefs = Gtk.Dialog.new()
         prefs.set_title("Silver Rain: Preferences")
-        prefs.set_resizable(True)
         prefs.set_size_request(400, 300)
         prefs.set_transient_for(self)
         prefs.set_resizable(False)
@@ -1611,9 +1776,11 @@ class SilverGUI(Gtk.Window):
         self.prefs_message_header = Gtk.Entry()
         self.prefs_message_header.set_editable(True)
         self.prefs_message_header.set_text(MESSAGE_HEADER)
+        self.prefs_message_header.set_placeholder_text(
+                                TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
         im.attach_next_to(self.prefs_message_header, text,
                           Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_general, TRANSLATIONS[LANGUAGE]["IM"], im)
+        pack_prefs_box(page_general, TRANSLATIONS[LANGUAGE]["Messenger"], im)
         ################
         ## Appearance ##
         ################
