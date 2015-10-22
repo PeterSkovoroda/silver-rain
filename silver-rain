@@ -34,6 +34,7 @@ IMG_DIR = APP_DIR + "imgs/"
 SCHED_FILE = APP_DIR + "sched.dump"
 CONFIG_FILE = APP_DIR + "config.ini"
 CSS_PATH = "silver-rain.css"
+VERSION = "1.0.1"
 #TODO:
 ICON_DIR = "icon/"
 SILVER_ICON = ICON_DIR + "silver-rain_256.png"
@@ -1057,7 +1058,7 @@ class SilverGUI(Gtk.Window):
         ## Label
         self.status = Gtk.Label()
         self.status.set_selectable(True)
-        self.status.set_yalign(0.45)
+        self.status.set_alignment(-1, 0.45)
         ## Mute Button
         icon = self.get_volume_icon()
         self.mute_button = self.create_toolbutton(icon)
@@ -1512,16 +1513,17 @@ class SilverGUI(Gtk.Window):
         self.im.connect("delete-event", self.im_on_delete_event)
         self.im.set_title("Silver Rain: Messenger")
         self.im.set_resizable(True)
-        self.im.set_default_size(300, 200)
         self.im.set_transient_for(self)
         self.im.set_modal(False)
-        ## Header
-        # Image
+        # Background
+        eventbox = Gtk.EventBox()
+        # Header
+        header = Gtk.HBox(spacing=5)
+        header.set_border_width(10)
         img = Gtk.Image()
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON_SMALL,
                                                          50, 50, True)
         img.set_from_pixbuf(pixbuf)
-        # Title
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
                          "Silver Rain" +
@@ -1530,27 +1532,14 @@ class SilverGUI(Gtk.Window):
                          "</span>")
         title.set_alignment(0, 0)
         title.set_selectable(True)
-        # Pack
-        eventbox = Gtk.EventBox()
-        eventbox.override_background_color(Gtk.StateType.NORMAL,
-                                           Gdk.RGBA(1.0,1.0,1.0,1.0))
-        hbox = Gtk.HBox(spacing=5)
-        hbox.set_border_width(10)
-        hbox.pack_start(img, False, False, 0)
-        hbox.pack_start(title, False, False, 0)
-        eventbox.add(hbox)
-        # Header
-        self.eb_header = Gtk.EventBox()
-        self.eb_header.set_visible_window(True)
-        self.eb_header.set_border_width(0)
-        eb = Gtk.EventBox()
-        eb.set_border_width(0)
-        self.im_header = Gtk.Entry()
-        self.im_header.set_text(MESSAGE_HEADER)
-        self.im_header.set_max_length(40)
-        self.im_header.set_placeholder_text(TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
-        eb.add(self.im_header)
-        self.eb_header.add(eb)
+        header.pack_start(img, False, False, 0)
+        header.pack_start(title, False, False, 0)
+        eventbox.add(header)
+        # Sender
+        self.im_sender = Gtk.Entry()
+        self.im_sender.set_text(MESSAGE_HEADER)
+        self.im_sender.set_max_length(40)
+        self.im_sender.set_placeholder_text(TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
         # Message
         win = Gtk.ScrolledWindow()
         win.set_policy(Gtk.PolicyType.AUTOMATIC,
@@ -1562,17 +1551,20 @@ class SilverGUI(Gtk.Window):
         self.msg = Gtk.TextView()
         self.msg.set_wrap_mode(Gtk.WrapMode.WORD)
         self.msg.set_left_margin(5)
-        self.msg.set_top_margin(5)
+        self.msg.set_border_window_size(Gtk.TextWindowType.TOP, 5)
         self.msg.set_border_window_size(Gtk.TextWindowType.RIGHT, 15)
         self.msg.set_border_window_size(Gtk.TextWindowType.BOTTOM, 15)
         win.add(self.msg)
         eb.add(win)
         self.eb_msg.add(eb)
+
+        color = Gdk.RGBA()
+        color.parse("#7c7c7c")
+        ret = self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color)
         # Pack
         box = Gtk.VBox(spacing=5)
-        box.set_border_width(0)
-        #box.pack_start(title, False, False, 0)
-        box.pack_start(self.eb_header, False, False, 0)
+        box.set_border_width(5)
+        box.pack_start(self.im_sender, False, False, 0)
         box.pack_start(self.eb_msg, True, True, 0)
         area = self.im.get_content_area()
         area.set_border_width(0)
@@ -1607,23 +1599,21 @@ class SilverGUI(Gtk.Window):
         return True
 
     def im_on_send(self, button):
-        color = Gdk.Color(50000, 0, 0)
-        color_rgba = Gdk.RGBA()
-        color_rgba.parse(COLOR_INVALID)
+        color = Gdk.RGBA()
+        color.parse("#7c7c7c")
         msg_buf = self.msg.get_buffer()
-        self.eb_header.override_background_color(Gtk.StateType.NORMAL, None)
-        self.eb_msg.override_background_color(Gtk.StateType.NORMAL, None)
-        if not self.im_header.get_text_length():
-            self.eb_header.override_background_color(Gtk.StateType.NORMAL, color_rgba)
-            self.im_header.grab_focus()
+        self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color)
+        if not self.im_sender.get_text_length():
+            self.im_sender.grab_focus()
             return
         if not msg_buf.get_char_count():
-            self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color_rgba)
+            color.parse(COLOR_INVALID)
+            self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color)
             self.msg.grab_focus()
             return
         start = msg_buf.get_start_iter()
         end = msg_buf.get_end_iter()
-        self.send_message(self.im_header.get_text(),
+        self.send_message(self.im_sender.get_text(),
                           msg_buf.get_text(start, end, True))
         msg_buf.delete(start, end)
         # Set 120s timer
@@ -1668,15 +1658,16 @@ class SilverGUI(Gtk.Window):
         # Title
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
-                         TRANSLATIONS[LANGUAGE]["SilverRain"] +
-                         "</b></span>\n<span size='11000'>" +
+                         "Silver Rain\n" +
+                         "</b></span>" +
+                         "<span size='11000'>" +
                          TRANSLATIONS[LANGUAGE]["Preferences"] +
                          "</span>")
         title.set_alignment(0, 0)
         # Pack
         eventbox = Gtk.EventBox()
-        eventbox.override_background_color(Gtk.StateType.NORMAL,
-                                           Gdk.RGBA(1.0,1.0,1.0,1.0))
+        #eventbox.override_background_color(Gtk.StateType.NORMAL,
+                                           #Gdk.RGBA(1.0,1.0,1.0,1.0))
         hbox = Gtk.HBox(spacing=5)
         hbox.set_border_width(10)
         hbox.pack_start(img, False, False, 0)
@@ -1988,29 +1979,45 @@ class SilverGUI(Gtk.Window):
         about = Gtk.Dialog.new()
         about.set_title("Silver Rain: About")
         about.set_transient_for(self)
-        about.set_size_request(300, 300)
+        about.set_size_request(200, -1)
         about.set_resizable(False)
-
+        # Header
+        eventbox = Gtk.EventBox()
+        header = Gtk.HBox(spacing=5)
+        header.set_border_width(0)
         img = Gtk.Image()
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON,
-                                                         150, 150, True)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON_SMALL,
+                                                         50, 50, True)
         img.set_from_pixbuf(pixbuf)
-        comment = Gtk.Label('Silver Rain application for Linux')
-        copyright = Gtk.Label('Copyright \xa9 2015 Petr Skovoroda')
-        website = Gtk.Label()
-        website.set_markup("<a href='http://silver.ru'>http://silver.ru</a>")
-        website.set_selectable(True)
+        title = Gtk.Label()
+        title.set_markup("<span size='18000'><b>Silver Rain</b></span>\n" +
+                         "<span size='11000'>Version " + VERSION + "</span>")
+        title.set_alignment(0, 0)
+        title.set_selectable(True)
+        header.pack_start(img, False, False, 0)
+        header.pack_start(title, False, False, 0)
+        eventbox.add(header)
+        # Text
         text = Gtk.Label()
-        text.set_text("This pruduct is not approved in any way\nby Silver Rain Radio")
-
-        box = about.get_content_area()
-        box.pack_start(img, False, False, 0)
-        box.pack_start(comment, False, False, 0)
-        box.pack_start(copyright, False, False, 0)
-        box.pack_start(website, False, False, 0)
-        box.pack_start(text, False, False, 0)
-
-        about.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        text.set_selectable(True)
+        text.set_markup(
+                "Silver Rain radio application for Linux\n" +
+                "\n" +
+                "Copyright \xa9 2015 Petr Skovoroda\n"
+                "Check for the latest version " +
+                "<a href='https://github.com/PeterSkovoroda/silver-rain'>" +
+                "here" + "</a>\n" +
+                "\n" +
+                "This pruduct is not approved in any way\n" +
+                "by Silver Rain Radio or anybody else."
+                )
+        # Pack
+        area = about.get_content_area()
+        area.set_spacing(20)
+        area.set_border_width(10)
+        area.pack_start(eventbox, False, False, 0)
+        area.pack_start(text, False, False, 0)
+        about.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
         about.show_all()
         about.run()
         about.destroy()
@@ -2055,18 +2062,11 @@ class SilverGUI(Gtk.Window):
 ### GStreamer callbacks
     def playback_emergency_stop(self):
         """ Change buttons """
-        self.__playing__ = False
-        self.menubar_play.set_sensitive(True)
-        self.menubar_stop.set_sensitive(False)
-        self.playback_button.set_icon_name(self.get_playback_label()[1])
-        self.playback_button.set_tooltip_text(TRANSLATIONS[LANGUAGE]["Play"])
+        self.playback_toggle(None)
 
     def recorder_emergency_stop(self):
         """ Change buttons, cancel timer """
-        self.__recording__ = False
-        self.menubar_record.set_sensitive(True)
-        self.menubar_stop_recording.set_sensitive(False)
-        self._t_recorder.cancel()
+        self.recorder_toggle(None)
 
 ### Common
     def create_menuitem(self, text, icon):
