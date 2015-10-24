@@ -39,7 +39,7 @@ IMG_DIR = APP_DIR + "imgs/"
 SCHED_FILE = APP_DIR + "sched.dump"
 CONFIG_FILE = APP_DIR + "config.ini"
 CSS_PATH = "silver-rain.css"
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 #TODO:
 ICON_DIR = "icon/"
 SILVER_ICON = ICON_DIR + "silver-rain_256.png"
