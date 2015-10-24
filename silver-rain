@@ -5,6 +5,11 @@ gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Gdk, GdkPixbuf, Notify
+try:
+    from gi.repository import AppIndicator3 as appindicator
+    APP_INDICATOR = True
+except ImportError:
+    APP_INDICATOR = False
 
 import configparser
 import json
@@ -171,7 +176,7 @@ def font_probe():
 
 DEFAULT_AUTOPLAY            = False
 DEFAULT_START_HIDDEN        = False
-DEFAULT_RECS_DIR            = os.getenv("HOME") + "/SilverRain/"
+DEFAULT_RECS_DIR            = os.getenv("HOME") + "/SilverRain"
 DEFAULT_RECS_PREFIX         = "%m-%d-%y-%H:%M-"
 DEFAULT_USE_CSS             = True
 DEFAULT_STREAM_URL          = STREAM_URL_LIST[0]
@@ -299,7 +304,7 @@ class SilverPlayer():
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
-            file = RECS_DIR + datetime.now().strftime(RECS_PREFIX) + \
+            file = RECS_DIR + "/" + datetime.now().strftime(RECS_PREFIX) + \
                                                       name + ".mp3"
             self.__recorder__.get_by_name('filesink').set_property('location',
                                                                    file)
@@ -324,23 +329,6 @@ class SilverPlayer():
         """ Set player volume [0-100] """
         self.__pipeline__.get_by_name('volume').set_property('volume',
                                                              value / 100.)
-
-    def volume_step(self, increase):
-        """ Increase/decrease volume by 5
-            Return new value """
-        value = self.__pipeline__.get_by_name('volume').get_property('volume')
-        if increase:
-            if value >= 0.95:
-                value = 1.
-            else:
-                value = value + 0.05
-        else:
-            if value <= 0.05:
-                value = 0.
-            else:
-                value = value - 0.05
-        self.__pipeline__.get_by_name('volume').set_property('volume', value)
-        return int(value * 100.)
 
     def create_pipeline(self):
         self.elements = dict()
@@ -930,6 +918,7 @@ class SilverGUI(Gtk.Window):
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         ## Mute
         self.menubar_mute = Gtk.CheckMenuItem(TRANSLATIONS[LANGUAGE]["Mute"])
+        self.menubar_mute.set_active(self.__muted__)
         self.menubar_mute.connect("toggled", self.mute_toggle)
         key, mod = Gtk.accelerator_parse("<Control>M")
         self.menubar_mute.add_accelerator("activate", agr,
@@ -999,12 +988,11 @@ class SilverGUI(Gtk.Window):
         menubar.append(help)
         return menubar
 
-    def menubar_mute_toggle(self):
-        """ Set mute button active flag """
-        if self.__muted__:
-            self.menubar_mute.set_active(False)
-        else:
-            self.menubar_mute.set_active(True)
+    def menubar_mute_toggle(self, widget=None):
+        """ Since it's impossible to just set checkbox status
+            without activating it (which is stupid, by the way),
+            this function should be called to toggle mute """
+        self.menubar_mute.set_active(not self.__muted__)
 
 ### Selection
     def selection_create(self):
@@ -1062,7 +1050,7 @@ class SilverGUI(Gtk.Window):
         ## Mute Button
         icon = self.get_volume_icon()
         self.mute_button = self.create_toolbutton(icon)
-        self.mute_button.connect("clicked", self.cp_on_mute)
+        self.mute_button.connect("clicked", self.menubar_mute_toggle)
         ## Volume scale
         ad = Gtk.Adjustment(value=self.__volume__, lower=0,
                             upper=100, step_increment=5,
@@ -1087,6 +1075,7 @@ class SilverGUI(Gtk.Window):
         return control_panel
 
     def cp_on_volume_changed(self, scale):
+        """ This actually changes volume """
         self.__volume__ = scale.get_value()
         if not self.__muted__ and self.__volume__ == 0:
             self.menubar_mute_toggle()
@@ -1095,18 +1084,88 @@ class SilverGUI(Gtk.Window):
             self.menubar_mute_toggle()
         self._player.volume_set(self.__volume__)
 
-    def cp_on_mute(self, arg):
-        self.menubar_mute_toggle()
+### App Indicator
+    def appindicator_create(self):
+        """ Ubuntu appindicator """
+        self.status_icon = appindicator.Indicator.new(
+                                "SilverRain",
+                                SILVER_ICON_SMALL,
+                                appindicator.IndicatorCategory.SYSTEM_SERVICES)
+        self.status_icon.set_status(appindicator.IndicatorStatus.ACTIVE)
+        self.status_icon.connect("scroll-event", self.appindicator_on_scroll)
+        # Popup menu
+        self.appindicator_update_menu()
+
+    def appindicator_update_menu(self):
+        """ Creates popup menu attached to appindicator """
+        if APP_INDICATOR:
+            self.status_icon.set_menu(self.status_icon_popup_menu_create())
 
 ### Status Icon
     def status_icon_create(self):
+        """ Status icon """
+        if APP_INDICATOR:
+            # Ubuntu workaround
+            return self.appindicator_create()
         self.status_icon = Gtk.StatusIcon()
         self.status_icon.set_from_file(SILVER_ICON_SMALL)
+        # Default events
         self.status_icon.connect("activate", self.status_icon_on_activate)
-        self.status_icon.connect("popup-menu", self.status_icon_popup)
         self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
+        # Popup menu
+        self.status_icon.connect("popup-menu", self.status_icon_on_popup)
+        # Tooltip
         self.status_icon.set_property("has-tooltip", True)
         self.status_icon.connect("query-tooltip", self.status_icon_tooltip)
+
+    def status_icon_popup_menu_create(self):
+        """ Show menu on right click """
+        popup_menu = Gtk.Menu()
+        if APP_INDICATOR:
+            # Since appindicator doesn't support left click event
+            activate = Gtk.MenuItem("Activate")
+            activate.connect("activate", self.status_icon_on_activate)
+            popup_menu.append(activate)
+            separator = Gtk.SeparatorMenuItem()
+            popup_menu.append(separator)
+        # Playback
+        text, icon = self.get_playback_label()
+        play = self.create_menuitem(text, icon)
+        play.connect("activate", self.playback_toggle)
+        play.set_size_request(100, -1)
+        # Record
+        text, icon = self.get_record_label()
+        record = self.create_menuitem(text, icon)
+        if text == TRANSLATIONS[LANGUAGE]["Record"]:
+            record.connect("activate", self.recorder_toggle)
+        else:
+            record.connect("activate", self.recorder_stop)
+        # Mute
+        mute = Gtk.CheckMenuItem(TRANSLATIONS[LANGUAGE]["Mute"])
+        mute.set_active(self.__muted__)
+        mute.connect("toggled", self.menubar_mute_toggle)
+        # IM
+        im = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Messenger"],
+                                 "gtk-edit")
+        im.connect("activate", self.im_show)
+        # Preferences
+        preferences = self.create_menuitem(
+                                 TRANSLATIONS[LANGUAGE]["Preferences"],
+                                 "gtk-preferences")
+        preferences.connect("activate", self.prefs_window_create)
+        # Quit
+        quit = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Quit"], "gtk-quit")
+        quit.connect("activate", Gtk.main_quit)
+        # Separator
+        sep = []
+        for i in range(4):
+            sep.append(Gtk.SeparatorMenuItem())
+
+        for item in [play, record, sep[0], mute, sep[1],
+                     im, sep[2], preferences, sep[3], quit]:
+            popup_menu.append(item)
+        popup_menu.show_all()
+        return popup_menu
 
     def status_icon_tooltip(self, widget, x, y, keyboard_mode, tooltip):
         # Silver Rain
@@ -1151,68 +1210,31 @@ class SilverGUI(Gtk.Window):
         else:
             self.hide()
 
-    def status_icon_on_scroll(self, icon, data):
-        """ Change volume by scrolling on status icon """
-        direction = data.direction
-        if direction == Gdk.ScrollDirection.UP:
-            self.__volume__ = self._player.volume_step(True)
-            if self.__muted__:
-                self.menubar_mute_toggle()
-        elif direction == Gdk.ScrollDirection.DOWN:
-            self.__volume__ = self._player.volume_step(False)
-            if self.__volume__ == 0:
-                self.menubar_mute_toggle()
-        self.volume.set_value(self.__volume__)
-
-    def status_icon_popup(self, icon, button, time):
-        """ Show menu on right click """
-        self.popup_menu = Gtk.Menu()
-        # Playback
-        text, icon = self.get_playback_label()
-        play = self.create_menuitem(text, icon)
-        play.connect("activate", self.playback_toggle)
-        play.set_size_request(100, -1)
-        # Record
-        text, icon = self.get_record_label()
-        record = self.create_menuitem(text, icon)
-        if text == TRANSLATIONS[LANGUAGE]["Record"]:
-            record.connect("activate", self.recorder_toggle)
-        else:
-            record.connect("activate", self.recorder_stop)
-        # Mute
-        mute = Gtk.CheckMenuItem(TRANSLATIONS[LANGUAGE]["Mute"])
-        if self.__muted__:
-            mute.set_active(True)
-        mute.connect("toggled", self.popup_on_mute)
-        # IM
-        im = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Messenger"],
-                                 "gtk-edit")
-        im.connect("activate", self.im_show)
-        # Preferences
-        preferences = self.create_menuitem(
-                                 TRANSLATIONS[LANGUAGE]["Preferences"],
-                                 "gtk-preferences")
-        preferences.connect("activate", self.prefs_window_create)
-        # Quit
-        quit = self.create_menuitem(TRANSLATIONS[LANGUAGE]["Quit"], "gtk-quit")
-        quit.connect("activate", Gtk.main_quit)
-        # Separator
-        sep = []
-        for i in range(4):
-            sep.append(Gtk.SeparatorMenuItem())
-
-        for item in [play, record, sep[0], mute,
-                     sep[1], im, sep[2], preferences, sep[3], quit]:
-            self.popup_menu.append(item)
-        self.popup_menu.show_all()
-
+    def status_icon_on_popup(self, icon, button, time):
+        self.popup_menu = self.status_icon_popup_menu_create()
         def pos_func(menu, x, y, icon):
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
         self.popup_menu.popup(None, None, pos_func,
-                              self.status_icon, button, time)
+                         self.status_icon, button, time)
 
-    def popup_on_mute(self, arg):
-        self.menubar_mute_toggle()
+    def status_icon_on_scroll(self, icon, data):
+        """ Change volume by scrolling on status icon """
+        self.appindicator_on_scroll(None, 0, data.direction)
+
+    def appindicator_on_scroll(self, indicator, steps, direction):
+        """ Change volume by scrolling on indicator """
+        if direction == Gdk.ScrollDirection.UP:
+            if self.__volume__ >= 95:
+                self.__volume__ = 100
+            else:
+                self.__volume__ = self.__volume__ + 5
+        elif direction == Gdk.ScrollDirection.DOWN:
+            if self.__volume__ <= 5:
+                self.__volume__ = 0
+            else:
+                self.__volume__ = self.__volume__ - 5
+        self.volume.set_value(self.__volume__)
+
 
 ### TreeView
     def sched_tree_model_create(self):
@@ -1539,7 +1561,8 @@ class SilverGUI(Gtk.Window):
         self.im_sender = Gtk.Entry()
         self.im_sender.set_text(MESSAGE_HEADER)
         self.im_sender.set_max_length(40)
-        self.im_sender.set_placeholder_text(TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
+        self.im_sender.set_placeholder_text(
+                                TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
         # Message
         win = Gtk.ScrolledWindow()
         win.set_policy(Gtk.PolicyType.AUTOMATIC,
@@ -1560,7 +1583,8 @@ class SilverGUI(Gtk.Window):
 
         color = Gdk.RGBA()
         color.parse("#7c7c7c")
-        ret = self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color)
+        ret = self.eb_msg.override_background_color(Gtk.StateType.NORMAL,
+                                                    color)
         # Pack
         box = Gtk.VBox(spacing=5)
         box.set_border_width(5)
@@ -1624,7 +1648,8 @@ class SilverGUI(Gtk.Window):
         """ Set 'count' events with 1s delay """
         counter = count
         while counter >= 0:
-            GObject.timeout_add(counter * 1000, self.countdown_func, count - counter)
+            GObject.timeout_add(counter * 1000,
+                                self.countdown_func, count - counter)
             counter -= 1
 
     def countdown_func(self, count):
@@ -1706,7 +1731,8 @@ class SilverGUI(Gtk.Window):
         general.attach(self.prefs_autoplay, 0, 0, 2, 1)
         # Start Hidden
         self.prefs_start_hidden = Gtk.CheckButton()
-        self.prefs_start_hidden.set_label(TRANSLATIONS[LANGUAGE]["StartHidden"])
+        self.prefs_start_hidden.set_label(
+                                      TRANSLATIONS[LANGUAGE]["StartHidden"])
         self.prefs_start_hidden.set_active(START_HIDDEN)
         general.attach_next_to(self.prefs_start_hidden, self.prefs_autoplay,
                                Gtk.PositionType.BOTTOM, 2, 1)
@@ -1729,9 +1755,10 @@ class SilverGUI(Gtk.Window):
                                Gtk.PositionType.RIGHT, 1, 1)
         self.prefs_need_restart = Gtk.Label()
         self.prefs_need_restart.set_alignment(0, 0)
-        self.prefs_need_restart.set_markup("<i>" +
-                                           TRANSLATIONS[LANGUAGE]["NeedRestart"] +
-                                           "</i>")
+        self.prefs_need_restart.set_markup(
+                                        "<i>" +
+                                        TRANSLATIONS[LANGUAGE]["NeedRestart"] +
+                                        "</i>")
         general.attach_next_to(self.prefs_need_restart, text,
                                Gtk.PositionType.BOTTOM, 2, 1)
         pack_prefs_box(page_general,
@@ -1859,7 +1886,8 @@ class SilverGUI(Gtk.Window):
                                                               stream_url_store)
         self.prefs_stream_url.set_entry_text_column(0)
         self.prefs_stream_url.set_active(STREAM_URL_LIST.index(STREAM_URL))
-        network.attach_next_to(self.prefs_stream_url, text, Gtk.PositionType.RIGHT, 1, 1)
+        network.attach_next_to(self.prefs_stream_url, text,
+                               Gtk.PositionType.RIGHT, 1, 1)
         pack_prefs_box(page_network, "Network", network)
 
         ## Notebook
@@ -2070,7 +2098,7 @@ class SilverGUI(Gtk.Window):
 
 ### Common
     def create_menuitem(self, text, icon):
-        """ Create Menu item with icon """
+        """ Create menu item with icon """
         icontheme = Gtk.IconTheme.get_default()
         icon = icontheme.load_icon(icon, 16, 0)
         img = Gtk.Image()
@@ -2087,28 +2115,27 @@ class SilverGUI(Gtk.Window):
         return button
 
     def playback_toggle(self, button):
-        """ Change buttons, toggle player """
+        """ Update interface, toggle player """
         self.__playing__ = not self.__playing__
         self.playback_button.set_icon_name(self.get_playback_label()[1])
+        # Menubar
         self.menubar_play.set_sensitive(not self.__playing__)
         self.menubar_stop.set_sensitive(self.__playing__)
-
-        if self.__playing__:
-            self.playback_button.set_tooltip_text(
-                                                TRANSLATIONS[LANGUAGE]["Stop"])
-        else:
-            self.playback_button.set_tooltip_text(
-                                                TRANSLATIONS[LANGUAGE]["Play"])
-
+        # Control panel
+        self.playback_button.set_tooltip_text(self.get_playback_label()[0])
+        # Appindicator
+        self.appindicator_update_menu()
         self._player.playback_toggle()
         self.show_notification_on_playback()
 
     def recorder_toggle(self, button):
         """ Change status, toggle recorder, set timer """
         self.__recording__ = not self.__recording__
-        # Change menubar
+        # Menubar
         self.menubar_record.set_sensitive(not self.__recording__)
         self.menubar_stop_recording.set_sensitive(self.__recording__)
+        # Appindicator
+        self.appindicator_update_menu()
         if self.__recording__:
             # Set timer
             today = datetime.now()
@@ -2119,27 +2146,32 @@ class SilverGUI(Gtk.Window):
             self._t_recorder = threading.Timer(timeout,
                             self.timers_callback_recorder_stop)
             self._t_recorder.start()
-
+        # Get name
         if not self.__SCHEDULE_ERROR__:
             name = self._schedule.get_event_title()
         else:
             name = "SilverRain"
+        # Start recorder
         self._player.recorder_toggle(name)
 
     def recorder_stop(self, button):
+        """ Cancel timer, toggle recorder """
         self._t_recorder.cancel()
         self.recorder_toggle(None)
 
     def mute_toggle(self, button, val=0):
+        """ Set volume, update interface """
         if self.__muted__:
             self.__volume__ = self.__muted__
             self.__muted__ = 0
         else:
             self.__muted__ = self.__volume__ or 5
             self.__volume__ = 0
-
-        self._player.volume_set(self.__volume__)
+        # Control panel
         self.mute_button.set_icon_name(self.get_volume_icon())
+        # Appindicator
+        self.appindicator_update_menu()
+        # This actually gonna mute player
         self.volume.set_value(self.__volume__)
 
     def get_playback_label(self):
