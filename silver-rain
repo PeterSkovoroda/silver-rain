@@ -5,6 +5,7 @@ gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Gdk, GdkPixbuf, Notify
+
 try:
     from gi.repository import AppIndicator3 as appindicator
     APP_INDICATOR = True
@@ -14,9 +15,11 @@ except ImportError:
 import configparser
 import json
 import os
+import random
 import re
 import requests
 import signal
+import string
 import subprocess
 import textwrap
 import threading
@@ -39,18 +42,22 @@ IMG_DIR = APP_DIR + "imgs/"
 SCHED_FILE = APP_DIR + "sched.dump"
 CONFIG_FILE = APP_DIR + "config.ini"
 CSS_PATH = "silver-rain.css"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 #TODO:
 ICON_DIR = "icon/"
 SILVER_ICON = ICON_DIR + "silver-rain_256.png"
 SILVER_ICON_SMALL = ICON_DIR + "silver-rain_128.png"
 # Network
-STREAM_URL_LIST = [ 'http://icecast.silver.cdnvideo.ru/silver',
-                    'http://radiosilver.corbina.net:8000/silver128.mp3',
-                    'http://radiosilver.corbina.net:8000/silver48.mp3' ]
+
+STREAM_URL_LIST = [ 'http://radiosilver.corbina.net:8000/silver128a.mp3',
+                    'http://radiosilver.corbina.net:8000/silver48a.mp3',
+                    'http://icecast.silver.cdnvideo.ru/silver' ]
 SILVER_RAIN_URL = "http://silver.ru"
 SCHED_URL       = "http://silver.ru/programms/"
-COLOR_INVALID   = "#FF4545"
+MESSENGER_URL   = "http://silver.ru/ajax/send_message_in_studio.php"
+BX_USER_ID      = ""
+PHPSESSID       = ""
+SESSID          = ""
 
 ########################################################################
 # Translations
@@ -63,7 +70,7 @@ TRANSLATIONS    = [
                      'MenuHelp'         : 'Help',
                      'Play'             : 'Play',
                      'Stop'             : 'Stop',
-                     'Record'           : 'Record',
+                     'Record'           : 'Record program',
                      'StopRecording'    : 'Stop recording',
                      'Mute'             : 'Mute',
                      'Quit'             : 'Quit',
@@ -101,6 +108,8 @@ TRANSLATIONS    = [
                      'IMHeaderPlaceholder' : 'Name e-mail/phone number',
                      'IMTextPlaceholder' : 'Text',
                      'Send'             : 'Send',
+                     'ProgramPage'      : 'Program page',
+                     'DontRecord'       : 'Don\'t record',
                     },
 
                     {'WeekdayList'      : ['Понедельник', 'Вторник', 'Среда',
@@ -123,9 +132,9 @@ TRANSLATIONS    = [
                      'Updating'         : 'Обновление расписания...',
                      'UpdateFailed'     : 'Не удалось выполнить обновление',
                      'SilverRain'       : 'Серебряный Дождь',
-                     'General'          : 'Основные',
+                     'General'          : 'General',
                      'Appearance'       : 'Appearance',
-                     'Network'          : 'Соединение',
+                     'Network'          : 'Network',
                      'Autoplay'         : 'Начинать воспроизведение при старте',
                      'StartHidden'      : 'Сворачивать в трей при запуске',
                      'Language'         : 'Язык:',
@@ -148,6 +157,8 @@ TRANSLATIONS    = [
                      'IMHeaderPlaceholder' : 'Имя, e-mail/номер телефона',
                      'IMTextPlaceholder' : 'Текст сообщения',
                      'Send'             : 'Отправить',
+                     'ProgramPage'      : 'Страница программы',
+                     'DontRecord'       : 'Не записывать',
                     }
                   ]
 WEEKDAY_LIST = TRANSLATIONS[0]['WeekdayList']
@@ -191,6 +202,8 @@ DEFAULT_SELECTED_FONT       = DEFAULT_FONT_FAMILY + " Bold " + \
                               DEFAULT_FONT_SIZE
 DEFAULT_LANGUAGE            = 0
 DEFAULT_MESSAGE_HEADER      = ""
+
+COLOR_INVALID   = "#FF4545"
 
 ########################################################################
 # Settings
@@ -643,7 +656,8 @@ class SilverSchedule():
         # Follow redirects
         resp = session.get(resp.url)
         xhtml = resp.text
-#TODO:  come up with something better
+#XXX    This is wrong
+#XXX    There must be another way
         xhtml = re.sub(
                 r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$',
                 r'\1', xhtml)
@@ -725,7 +739,7 @@ class SilverSchedule():
                         prev["end"] > item["start"]:
                     # If there are two identical programms in a row
                     # I can't resolve more complicated errors
-                    # I just hope they'll never happen
+                    # I just hope they will never happen
                     if prev["end"] > item["end"]:
                         item["end"] = prev["end"]
                     if prev["start"] < item["start"]:
@@ -1235,7 +1249,6 @@ class SilverGUI(Gtk.Window):
                 self.__volume__ = self.__volume__ - 5
         self.volume.set_value(self.__volume__)
 
-
 ### TreeView
     def sched_tree_model_create(self):
         """ Create schedule tree """
@@ -1311,7 +1324,8 @@ class SilverGUI(Gtk.Window):
         # Create popup menu
         self.sched_popup = Gtk.Menu()
         # Program url
-        url = self.create_menuitem("Program page", "web-browser")
+        url = self.create_menuitem(TRANSLATIONS[LANGUAGE]["ProgramPage"],
+                                   "web-browser")
         url.set_size_request(100, -1)
         event_url = model.get_value(iter, 4)
         url.connect("activate", self.url_open, event_url)
@@ -1319,10 +1333,13 @@ class SilverGUI(Gtk.Window):
         # Record program
         if model.get_value(iter, 1):
             if not model.get_value(iter, 10):
-                rec = self.create_menuitem("Record program", "media-record")
+                rec = self.create_menuitem(
+                        TRANSLATIONS[LANGUAGE]["Record"],
+                        "media-record")
                 rec.connect("activate", self.sched_record_set, model, iter)
             else:
-                rec = self.create_menuitem("Don't record", "gtk-cancel")
+                rec = self.create_menuitem(
+                        TRANSLATIONS[LANGUAGE]["DontRecord"], "gtk-cancel")
                 rec.connect("activate", self.sched_record_cancel, model, iter)
             self.sched_popup.append(rec)
 
@@ -1640,12 +1657,58 @@ class SilverGUI(Gtk.Window):
         self.send_message(self.im_sender.get_text(),
                           msg_buf.get_text(start, end, True))
         msg_buf.delete(start, end)
-        # Set 120s timer
-        self.im_send_button.set_sensitive(False)
-        self.im_countdown(120)
+
+    def send_message(self, header, text):
+        """ Send message to station """
+#XXX    Ok, now this is definitely wrong. I should ask somebody
+        if not SESSID:
+            self.get_session()
+        # Serialize message
+        message = urllib.parse.urlencode({'sessid' : SESSID,
+                                          'web_form_submit' : 'Y',
+                                          'WEB_FORM_ID' : 4,
+                                          'form_text_81' : header,
+                                          'form_text_82' : text})
+        headers = {
+                'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) ' + \
+                               'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
+                               'Chrome/41.0.2227.0 Safari/537.36',
+                'Accept'            : '*/*',
+                'Accept-Encoding'   : 'gzip, deflate',
+                'Accept-Language'   : 'en-US,en;q=0.8,ru;q=0.6',
+                'Content-Type'      : 'application/x-www-form-urlencoded; ' + \
+                                      'charset=UTF-8',
+                'Cookie' : 'BX_USER_ID={0}; PHPSESSID={1}'.format(BX_USER_ID,
+                                                                  PHPSESSID),
+                'X-Requested-With'  : 'XMLHttpRequest' }
+        print("########################################")
+        print("MESSAGE:", message)
+        for key in headers:
+            print(key, ":", headers[key])
+        print("########################################")
+        # POST request
+        s = requests.Session()
+        response = s.post(MESSENGER_URL, data=message, headers=headers)
+        if response.status_code != 200:
+            self.error_show("Connection error {0}".format(response.status_code))
+            print(response)
+            return
+        response_data = response.json()
+
+        if response_data["type"] == "error":
+            self.error_show("Couldn't send message.")
+        elif response_data["type"] == "success":
+            print("success")
+            # Set 120s timer
+            self.im_send_button.set_sensitive(False)
+            self.im_countdown(120)
+        else:
+            # This should never happen
+            print("something went wrong")
+            pass
 
     def im_countdown(self, count):
-        """ Set 'count' events with 1s delay """
+        """ Set countdown timer """
         counter = count
         while counter >= 0:
             GObject.timeout_add(counter * 1000,
@@ -1653,7 +1716,7 @@ class SilverGUI(Gtk.Window):
             counter -= 1
 
     def countdown_func(self, count):
-        """ Change delay status """
+        """ Show seconds remaining """
         if count > 0:
             self.im_send_button.set_label(TRANSLATIONS[LANGUAGE]["Send"] +
                                           " (" + str(count) + "s)")
@@ -1661,10 +1724,35 @@ class SilverGUI(Gtk.Window):
             self.im_send_button.set_label(TRANSLATIONS[LANGUAGE]["Send"])
             self.im_send_button.set_sensitive(True)
 
+    def get_session(self):
+        global BX_USER_ID
+        global PHPSESSID
+        global SESSID
 
-    def send_message(self, header, text):
-        """ Send message to station """
-        print("Send\n", header, "\n", text)
+        # Generate user id
+        BX_USER_ID = id_generator()
+        # Download index page
+        s = requests.Session()
+        s.headers = {
+                'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64)' + \
+                               'AppleWebKit/537.36 (KHTML, like Gecko)' + \
+                               'Chrome/41.0.2227.0 Safari/537.36',
+                'Accept'     : 'text/html,application/xhtml+xml,' + \
+                               'application/xml;q=0.9,image/webp,' + \
+                               '*/*;q=0.8',
+                'Accept-Encoding' : 'gzip, deflate, sdch',
+                'Accept-Language' : ' en-US,en;q=0.8',
+                'Cookie' : 'BX_USER_ID={0}'.format(BX_USER_ID),
+                'DNT' : '1',
+                'Upgrade-Insecure-Requests' : '1' }
+        resp = s.get(SILVER_RAIN_URL)
+        # Get phpsessid from cookies
+        PHPSESSID = re.sub(r'PHPSESSID=(.*?);.*$', r'\1',
+                           resp.headers['Set-Cookie'])
+        # Get sessid from form parameters
+        SESSID = re.sub(r'^.*name="sessid" id="sessid_6" value="(.*?)".*$',
+                        r'\1', resp.text)
+        print("BX_USER_ID:", BX_USER_ID, "PHPSESSID:", PHPSESSID, "SESSID:", SESSID)
 
 ### Preferences window
     def prefs_window_create(self, widget):
@@ -1803,7 +1891,6 @@ class SilverGUI(Gtk.Window):
         ## Appearance ##
         ################
         page_appearance = create_page()
-        ## Sched bg colors
         # Background
         colors = create_prefs_grid()
         text = Gtk.Label(TRANSLATIONS[LANGUAGE]["BgColor"])
@@ -1835,7 +1922,6 @@ class SilverGUI(Gtk.Window):
                               Gtk.PositionType.RIGHT, 1, 1)
         pack_prefs_box(page_appearance,
                        TRANSLATIONS[LANGUAGE]["Colors"], colors)
-        ## Fonts
         # Default font
         fonts = create_prefs_grid()
         text = Gtk.Label(TRANSLATIONS[LANGUAGE]["Font"])
@@ -1888,7 +1974,8 @@ class SilverGUI(Gtk.Window):
         self.prefs_stream_url.set_active(STREAM_URL_LIST.index(STREAM_URL))
         network.attach_next_to(self.prefs_stream_url, text,
                                Gtk.PositionType.RIGHT, 1, 1)
-        pack_prefs_box(page_network, "Network", network)
+        pack_prefs_box(page_network,
+                       TRANSLATIONS[LANGUAGE]["Network"], network)
 
         ## Notebook
         notebook = Gtk.Notebook()
@@ -2030,18 +2117,17 @@ class SilverGUI(Gtk.Window):
         text.set_selectable(True)
         text.set_markup(
                 "Silver Rain radio application for Linux\n" +
+                "This pruduct is not approved in any way\n" +
+                "by Silver Rain Radio or anybody else.\n" +
                 "\n" +
-                "Copyright \xa9 2015 Petr Skovoroda\n"
                 "Check for the latest version " +
                 "<a href='https://github.com/PeterSkovoroda/silver-rain'>" +
                 "here" + "</a>\n" +
-                "\n" +
-                "This pruduct is not approved in any way\n" +
-                "by Silver Rain Radio or anybody else."
+                "Copyright \xa9 2015 Petr Skovoroda"
                 )
         # Pack
         area = about.get_content_area()
-        area.set_spacing(20)
+        area.set_spacing(10)
         area.set_border_width(10)
         area.pack_start(eventbox, False, False, 0)
         area.pack_start(text, False, False, 0)
@@ -2251,6 +2337,10 @@ def parse_time(str):
         return 86400.0
     d = timedelta(hours=x.hour, minutes=x.minute)
     return d.total_seconds()
+
+def id_generator(length=32):
+    return ''.join(random.choice(string.ascii_lowercase + string.digits) \
+                   for i in range(length))
 
 ########################################################################
 # Boom, baby
