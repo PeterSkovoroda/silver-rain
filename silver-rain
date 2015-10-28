@@ -14,6 +14,7 @@ except ImportError:
 
 import configparser
 import json
+import logging
 import os
 import random
 import re
@@ -46,7 +47,7 @@ VERSION = "1.2.1"
 #TODO:
 ICON_DIR = "icon/"
 SILVER_ICON = ICON_DIR + "silver-rain_128.png"
-SILVER_ICON_SMALL = ICON_DIR + "silver-rain_64.png"
+SILVER_ICON_SMALL = ICON_DIR + "silver-rain_128.png"
 # Network
 
 STREAM_URL_LIST = [ 'http://radiosilver.corbina.net:8000/silver128a.mp3',
@@ -99,7 +100,7 @@ TRANSLATIONS    = [
                      'Recsprefix'       : 'Recordings prefix:',
                      'Messenger'        : 'Send message',
                      'IMTitle'          : 'Send a message to the studio',
-                     'IMHeader'         : 'Default message header:',
+                     'IMHeader'         : 'Default message sender:',
                      'Colors'           : 'Colors',
                      'BgColor'          : 'Background color:',
                      'AltBgColor'       : 'Alternate background color:',
@@ -114,6 +115,8 @@ TRANSLATIONS    = [
                      'Send'             : 'Send',
                      'ProgramPage'      : 'Program page',
                      'DontRecord'       : 'Don\'t record',
+                     'MessengerSuccess' : 'Message sent',
+                     'MessengerError'   : 'Couldn\'t send message',
                     },
 
                     {'WeekdayList'      : ['Понедельник', 'Вторник', 'Среда',
@@ -123,7 +126,7 @@ TRANSLATIONS    = [
                      'MenuHelp'         : 'Помощь',
                      'Play'             : 'Играть',
                      'Stop'             : 'Стоп',
-                     'Record'           : 'Запись',
+                     'Record'           : 'Записать программу',
                      'Mute'             : 'Выключить звук',
                      'StopRecording'    : 'Остановить запись',
                      'Quit'             : 'Выход',
@@ -136,19 +139,19 @@ TRANSLATIONS    = [
                      'Updating'         : 'Обновление расписания...',
                      'UpdateFailed'     : 'Не удалось выполнить обновление',
                      'SilverRain'       : 'Серебряный Дождь',
-                     'General'          : 'General',
-                     'Appearance'       : 'Appearance',
-                     'Network'          : 'Network',
-                     'Autoplay'         : 'Начинать воспроизведение при старте',
+                     'General'          : 'Основные',
+                     'Appearance'       : 'Внешний вид',
+                     'Network'          : 'Сеть',
+                     'Autoplay'        : 'Начинать воспроизведение при старте',
                      'StartHidden'      : 'Сворачивать в трей при запуске',
                      'Language'         : 'Язык:',
                      'NeedRestart'      : 'Требуется перезапуск приложения',
                      'Recordings'       : 'Записи',
-                     'Recsdirpath'      : 'Recordings directory path:',
-                     'Recsprefix'       : 'Recordings prefix:',
+                     'Recsdirpath'      : 'Путь для сохранения записей:',
+                     'Recsprefix'       : 'Префикс:',
                      'Messenger'        : 'SMS-портал',
                      'IMTitle'          : 'Отправить сообщение в студию',
-                     'IMHeader'         : 'Заголовок сообщения:',
+                     'IMHeader'         : 'Подпись:',
                      'Colors'           : 'Цвета',
                      'BgColor'          : 'Цвет фона:',
                      'AltBgColor'       : 'Альтернативный цвет фона:',
@@ -163,6 +166,8 @@ TRANSLATIONS    = [
                      'Send'             : 'Отправить',
                      'ProgramPage'      : 'Страница программы',
                      'DontRecord'       : 'Не записывать',
+                     'MessengerSuccess' : 'Сообщение отправлено',
+                     'MessengerError'   : 'Не удалось отправить сообщение',
                     }
                   ]
 WEEKDAY_LIST = TRANSLATIONS[0]['WeekdayList']
@@ -201,11 +206,12 @@ DEFAULT_SELECTED_BG_COLOR   = "#FF4545"
 DEFAULT_SELECTED_FONT_COLOR = "white"
 DEFAULT_FONT_FAMILY         = font_probe()
 DEFAULT_FONT_SIZE           = "11"
-DEFAULT_FONT                = DEFAULT_FONT_FAMILY + " " + DEFAULT_FONT_SIZE
-DEFAULT_SELECTED_FONT       = DEFAULT_FONT_FAMILY + " Bold " + \
-                              DEFAULT_FONT_SIZE
+DEFAULT_FONT                = "{0} {1}".format(DEFAULT_FONT_FAMILY,
+                                               DEFAULT_FONT_SIZE)
+DEFAULT_SELECTED_FONT       = "{0} Bold {1}".format(DEFAULT_FONT_FAMILY,
+                                                    DEFAULT_FONT_SIZE)
 DEFAULT_LANGUAGE            = 0
-DEFAULT_MESSAGE_HEADER      = ""
+DEFAULT_MESSAGE_SENDER      = ""
 
 COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
 COLOR_INVALID               = "#FF4545"
@@ -230,7 +236,7 @@ def config_save():
             'Font'              : FONT,
             'SelectedFont'      : SELECTED_FONT,
             'Language'          : LANGUAGE,
-            'MessageHeader'     : MESSAGE_HEADER
+            'MessageSender'     : MESSAGE_SENDER
             }
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
@@ -279,9 +285,9 @@ def config_load():
     global LANGUAGE
     LANGUAGE = int(config.get('GENERAL', 'Language',
                                 fallback=DEFAULT_LANGUAGE))
-    global MESSAGE_HEADER
-    MESSAGE_HEADER = config.get('GENERAL', 'MessageHeader',
-                                fallback=DEFAULT_MESSAGE_HEADER)
+    global MESSAGE_SENDER
+    MESSAGE_SENDER = config.get('GENERAL', 'MessageSender',
+                                fallback=DEFAULT_MESSAGE_SENDER)
 
 ########################################################################
 # GStreamer
@@ -643,10 +649,7 @@ class SilverSchedule():
         """ Load schedule from site """
         # Create session with fake user-agent
         session = requests.Session()
-        session.headers['User-Agent'] = \
-                'Mozilla/5.0 (X11; Linux x86_64) ' + \
-                'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
-                'Chrome/41.0.2227.0 Safari/537.36'
+        session.headers['User-Agent'] = USER_AGENT
         # Default event icon
         music_icon_src = ''
         # Weekdays parser
@@ -654,12 +657,14 @@ class SilverSchedule():
                         'Чт' : [3], 'Пт' : [4], 'Сб' : [5],
                         'По будням' : list(range(0,5)),
                         'По выходным' : [5, 6]}
-        # Download sched
-        resp = session.get(SCHED_URL)
-#TODO:  handle connection error
-#           return False
-        # Follow redirects
-        resp = session.get(resp.url)
+        # Download schedule
+        try:
+            resp = session.get(SCHED_URL)
+            # Follow redirects
+            resp = session.get(resp.url)
+        except requests.exceptions.RequestException as e:
+            logging.error(str(e))
+            return False
         xhtml = resp.text
         # XXX XXX XXX
         # This is wrong
@@ -1191,8 +1196,8 @@ class SilverGUI(Gtk.Window):
     def status_icon_tooltip(self, widget, x, y, keyboard_mode, tooltip):
         # Silver Rain
         silver = Gtk.Label()
-        silver.set_markup("<b>" + TRANSLATIONS[LANGUAGE]["SilverRain"] +
-                          "</b>")
+        silver.set_markup("<b>{0}</b>".format(
+                                         TRANSLATIONS[LANGUAGE]["SilverRain"]))
         # Icon
         img = Gtk.Image.new_from_pixbuf(self._schedule.get_event_icon())
         # Program
@@ -1409,22 +1414,24 @@ class SilverGUI(Gtk.Window):
             # Initialize schedule
             ret = self._schedule.update_schedule(refresh)
             if not ret:
-                self.__SCHEDULE_ERROR__ = True
-                if refresh:
-                    self.timers_clean()
+                if not refresh:
+                    self.__SCHEDULE_ERROR__ = True
                 GObject.idle_add(error)
-            if not refresh:
-                # Initialization
-                # Create treeview
-                self.sched_tree_create()
-                # Initialize timers
-                self.timers_init_event_timer()
             else:
-                # Refresh treeview
-                self.sched_tree_model_create()
-                self.sched_tree.set_model(self.sched_tree_model)
-                self.timers_reset()
-            GObject.idle_add(cleanup)
+                # Reset error flag
+                self.__SCHEDULE_ERROR__ = False
+                if not refresh:
+                    # Initialization
+                    # Create treeview
+                    self.sched_tree_create()
+                    # Initialize timers
+                    self.timers_init_event_timer()
+                else:
+                    # Refresh treeview
+                    self.sched_tree_model_create()
+                    self.sched_tree.set_model(self.sched_tree_model)
+                    self.timers_reset()
+                GObject.idle_add(cleanup)
 
         def cleanup():
             t.join()
@@ -1445,8 +1452,6 @@ class SilverGUI(Gtk.Window):
 
         # Show updating status
         self.status_set_schedule_updating()
-        # Reset error flag
-        self.__SCHEDULE_ERROR__ = False
         # Show updating message
         t = threading.Thread(target=init_sched)
         t.start()
@@ -1461,9 +1466,8 @@ class SilverGUI(Gtk.Window):
         self.sched_refresh_button.hide()
         self.spinner.show()
         self.spinner.start()
-        self.status.set_text("<span size='12000'><b>" +
-                             TRANSLATIONS[LANGUAGE]["Updating"] +
-                             "</b></span>")
+        self.status.set_text("<span size='12000'><b>{0}</b></span>".format(
+                             TRANSLATIONS[LANGUAGE]["Updating"]))
         self.status.set_use_markup(True)
 
     def status_set_playing(self):
@@ -1478,17 +1482,16 @@ class SilverGUI(Gtk.Window):
         self.spinner.stop()
         self.spinner.hide()
         self.sched_refresh_button.show()
-        self.status.set_text("<span size='12000'><b>" +
-                             TRANSLATIONS[LANGUAGE]["UpdateFailed"] +
-                             "</b></span>")
+        self.status.set_text("<span size='12000'><b>{0}</b></span>".format(
+                             TRANSLATIONS[LANGUAGE]["UpdateFailed"]))
         self.status.set_use_markup(True)
+        GObject.timeout_add(10000, self.status_update)
 
     def status_update(self):
         """ Show program name in status """
         if not self.__SCHEDULE_ERROR__:
-            self.status.set_text("<span size='12000'><b>" +
-                                 self._schedule.get_event_title() +
-                                 "</b></span>")
+            self.status.set_text("<span size='12000'><b>{0}</b></span>".format(
+                                 self._schedule.get_event_title()))
             self.status.set_use_markup(True)
 
     def sched_tree_reset_current(self):
@@ -1573,9 +1576,8 @@ class SilverGUI(Gtk.Window):
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
                          "Silver Rain" +
-                         "</b></span>\n<span size='11000'>" +
-                         TRANSLATIONS[LANGUAGE]["IMTitle"] +
-                         "</span>")
+                         "</b></span>\n<span size='11000'>{0}</span>".format(
+                         TRANSLATIONS[LANGUAGE]["IMTitle"]))
         title.set_alignment(0, 0)
         title.set_selectable(True)
         header.pack_start(img, False, False, 0)
@@ -1583,7 +1585,7 @@ class SilverGUI(Gtk.Window):
         eventbox.add(header)
         # Sender
         self.im_sender = Gtk.Entry()
-        self.im_sender.set_text(MESSAGE_HEADER)
+        self.im_sender.set_text(MESSAGE_SENDER)
         self.im_sender.set_max_length(40)
         self.im_sender.set_placeholder_text(
                                 TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
@@ -1608,11 +1610,15 @@ class SilverGUI(Gtk.Window):
         color = Gdk.RGBA()
         color.parse(COLOR_TEXTVIEW_BORDER)
         self.eb_msg.override_background_color(Gtk.StateType.NORMAL, color)
+        # Message status
+        self.messenger_status = Gtk.Label()
+        self.messenger_status.set_alignment(0.1, 0.5)
         # Pack
         box = Gtk.VBox(spacing=5)
         box.set_border_width(5)
         box.pack_start(self.im_sender, False, False, 0)
         box.pack_start(self.eb_msg, True, True, 0)
+        box.pack_end(self.messenger_status, False, False, 0)
         area = self.im.get_content_area()
         area.set_border_width(0)
         area.set_spacing(0)
@@ -1631,13 +1637,14 @@ class SilverGUI(Gtk.Window):
                                             key, mod, Gtk.AccelFlags.VISIBLE)
         # Show
         area.show_all()
+        self.messenger_status.hide()
 
     def im_show(self, widget):
         """ Show messenger """
         if self.__im_window__:
             return
         self.__im_window__ = True
-        self.im.show_all()
+        self.im.show()
         self.msg.grab_focus()
 
     def im_on_delete_event(self, window, event):
@@ -1665,9 +1672,13 @@ class SilverGUI(Gtk.Window):
         res = self.send_message(self.im_sender.get_text(),
                                 msg_buf.get_text(start, end, True))
         if res == "error":
-            print("Couldn't send message.") #TODO: put somewhere
+            self.messenger_status.set_markup("<i>{0}</i>".format(
+                                   TRANSLATIONS[LANGUAGE]["MessengerError"]))
+            self.messenger_status.show()
         elif res == "success":
-            print("success")                #TODO: put somewhere
+            self.messenger_status.set_markup("<i>{0}</i>".format(
+                                   TRANSLATIONS[LANGUAGE]["MessengerSuccess"]))
+            self.messenger_status.show()
             # Clear text form
             msg_buf.delete(start, end)
             # Set 120s timer
@@ -1676,6 +1687,7 @@ class SilverGUI(Gtk.Window):
         else:
             # This should never happen
             pass
+        GObject.timeout_add(10000, self.messenger_status.hide)
 
     def im_countdown(self, count):
         """ Set countdown timer """
@@ -1692,6 +1704,7 @@ class SilverGUI(Gtk.Window):
                                           " (" + str(count) + "s)")
         else:
             self.im_send_button.set_label(TRANSLATIONS[LANGUAGE]["Send"])
+            self.messenger_status.hide()
             self.im_send_button.set_sensitive(True)
 
 
@@ -1704,7 +1717,11 @@ class SilverGUI(Gtk.Window):
 
         if not SESSID:
             # Get session vars
-            self.get_session()
+            try:
+                self.get_session()
+            except requests.exceptions.RequestException as e:
+                self.error_show(str(e))
+                return "error"
         # Emulate browser session
         s = requests.Session()
         headers = {
@@ -1724,11 +1741,18 @@ class SilverGUI(Gtk.Window):
                                           'form_text_81' : header,
                                           'form_text_82' : text})
         # POST request
-        response = s.post(MESSENGER_URL, data=message, headers=headers)
-        if response.status_code != 200:
-            self.error_show("Connection error {0}".format(response.status_code))
-            print(response)
+        try:
+            response = s.post(MESSENGER_URL, data=message, headers=headers)
+        except requests.exceptions.RequestException as e:
+            self.error_show(str(e))
             return "error"
+
+        if response.status_code != 200:
+            self.error_show("Connection error {0}".format(
+                            response.status_code))
+            logging.error(response)
+            return "error"
+
         response_data = response.json()
         return response_data["type"]
 
@@ -1791,10 +1815,9 @@ class SilverGUI(Gtk.Window):
                          TRANSLATIONS[LANGUAGE]["Preferences"] +
                          "</span>")
         title.set_alignment(0, 0)
+        title.set_selectable(True)
         # Pack
         eventbox = Gtk.EventBox()
-        #eventbox.override_background_color(Gtk.StateType.NORMAL,
-                                           #Gdk.RGBA(1.0,1.0,1.0,1.0))
         hbox = Gtk.HBox(spacing=5)
         hbox.set_border_width(10)
         hbox.pack_start(img, False, False, 0)
@@ -1867,7 +1890,7 @@ class SilverGUI(Gtk.Window):
                        TRANSLATIONS[LANGUAGE]["General"], general)
         ## Recordings
         recordings = create_prefs_grid()
-        text = Gtk.Label("Recordings directory path:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["Recsdirpath"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         recordings.attach(text, 0, 0, 1, 1)
@@ -1876,7 +1899,7 @@ class SilverGUI(Gtk.Window):
         self.prefs_recs_dir.set_action(Gtk.FileChooserAction.SELECT_FOLDER)
         recordings.attach_next_to(self.prefs_recs_dir, text,
                                   Gtk.PositionType.RIGHT, 1, 1)
-        text = Gtk.Label("Recordings prefix:")
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["Recsprefix"])
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         recordings.attach(text, 0, 1, 1, 1)
@@ -1895,7 +1918,7 @@ class SilverGUI(Gtk.Window):
         im.attach(text, 0, 0, 1, 1)
         self.prefs_message_header = Gtk.Entry()
         self.prefs_message_header.set_editable(True)
-        self.prefs_message_header.set_text(MESSAGE_HEADER)
+        self.prefs_message_header.set_text(MESSAGE_SENDER)
         self.prefs_message_header.set_placeholder_text(
                                 TRANSLATIONS[LANGUAGE]["IMHeaderPlaceholder"])
         im.attach_next_to(self.prefs_message_header, text,
@@ -1980,6 +2003,9 @@ class SilverGUI(Gtk.Window):
         text.set_alignment(0, 0.5)
         network.attach(text, 0, 0, 1, 1)
         stream_url_store = Gtk.ListStore(str)
+        # If stream address defined by user
+        if STREAM_URL not in STREAM_URL_LIST:
+            STREAM_URL_LIST.append(STREAM_URL)
         for url in STREAM_URL_LIST:
             stream_url_store.append([url])
         self.prefs_stream_url = Gtk.ComboBox.new_with_model_and_entry(
@@ -2048,8 +2074,8 @@ class SilverGUI(Gtk.Window):
         RECS_DIR = self.prefs_recs_dir.get_filename()
         global RECS_PREFIX
         RECS_PREFIX = self.prefs_recs_prefix.get_text()
-        global MESSAGE_HEADER
-        MESSAGE_HEADER = self.prefs_message_header.get_text()
+        global MESSAGE_SENDER
+        MESSAGE_SENDER = self.prefs_message_header.get_text()
         # Appearance
         global SELECTED_BG_COLOR
         SELECTED_BG_COLOR = rgba_to_hex(self.prefs_selection_color.get_rgba())
@@ -2082,6 +2108,8 @@ class SilverGUI(Gtk.Window):
         self.sched_tree_model_create()
         self.sched_tree.set_model(self.sched_tree_model)
         self.sched_tree_mark_current()
+        # Update messenger
+        self.im_sender.set_text(MESSAGE_SENDER)
 
     def prefs_reset_appearance(self, widget):
         """ Reset default settings """
@@ -2162,9 +2190,8 @@ class SilverGUI(Gtk.Window):
         img = Gtk.Image()
         img.set_from_pixbuf(icon)
         # Message
-        text = Gtk.Label("<span size='12000'><b>" + title + ": </b></span>" +
-                "\n".join(textwrap.wrap(message, 50)))
-        text.set_use_markup(True)
+        text = Gtk.Label("{0}: {1}".format(title,
+                         "\n".join(textwrap.wrap(message, 50))))
         # Pack
         grid = Gtk.Grid()
         grid.set_column_spacing(10)
@@ -2190,11 +2217,13 @@ class SilverGUI(Gtk.Window):
 ### GStreamer callbacks
     def playback_emergency_stop(self):
         """ Change buttons """
-        self.playback_toggle(None)
+        if self.__playing__:
+            self.playback_toggle(None)
 
     def recorder_emergency_stop(self):
         """ Change buttons, cancel timer """
-        self.recorder_toggle(None)
+        if self.__recording__:
+            self.recorder_toggle(None)
 
 ### Common
     def create_menuitem(self, text, icon):
@@ -2352,10 +2381,6 @@ def parse_time(str):
     d = timedelta(hours=x.hour, minutes=x.minute)
     return d.total_seconds()
 
-def id_generator(length=32):
-    return ''.join(random.choice(string.ascii_lowercase + string.digits) \
-                   for i in range(length))
-
 ########################################################################
 # Boom, baby
 GObject.threads_init()
@@ -2384,7 +2409,7 @@ if not os.path.exists(CONFIG_FILE):
     FONT = DEFAULT_FONT
     SELECTED_FONT = DEFAULT_SELECTED_FONT
     LANGUAGE = DEFAULT_LANGUAGE
-    MESSAGE_HEADER = DEFAULT_MESSAGE_HEADER
+    MESSAGE_SENDER = DEFAULT_MESSAGE_SENDER
     # Create configuration file
     config_save()
 else:
