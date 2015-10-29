@@ -123,7 +123,7 @@ TRANSLATIONS    = [
                      'Font'             : 'Font:',
                      'SelFont'          : 'Selection font:',
                      'ResetDefault'     : 'Reset default settings',
-                     'StreamUrl'        : 'Stream url',
+                     'StreamUrl'        : 'Stream url:',
                      'IMHeaderPlaceholder' : 'Name e-mail/phone number',
                      'IMTextPlaceholder' : 'Text',
                      'Send'             : 'Send',
@@ -131,6 +131,11 @@ TRANSLATIONS    = [
                      'DontRecord'       : 'Don\'t record',
                      'MessengerSuccess' : 'Message sent',
                      'MessengerError'   : 'Couldn\'t send message',
+                     'Proxy'            : 'Proxy',
+                     'UseProxy'         : 'Use proxy',
+                     'ProxyUri'         : 'URI:',
+                     'ProxyUsername'    : 'Username:',
+                     'ProxyPassword'    : 'Password:',
                     },
 
                     {'WeekdayList'      : ['Понедельник', 'Вторник', 'Среда',
@@ -174,7 +179,7 @@ TRANSLATIONS    = [
                      'Font'             : 'Основной шрифт:',
                      'SelFont'          : 'Шрифт выделенной области:',
                      'ResetDefault'     : 'Восстановить стандартные настройки',
-                     'StreamUrl'        : 'Адрес стрима',
+                     'StreamUrl'        : 'Адрес стрима:',
                      'IMHeaderPlaceholder' : 'Имя, e-mail/номер телефона',
                      'IMTextPlaceholder' : 'Текст сообщения',
                      'Send'             : 'Отправить',
@@ -182,6 +187,11 @@ TRANSLATIONS    = [
                      'DontRecord'       : 'Не записывать',
                      'MessengerSuccess' : 'Сообщение отправлено',
                      'MessengerError'   : 'Не удалось отправить сообщение',
+                     'Proxy'            : 'Прокси',
+                     'UseProxy'         : 'Использовать прокси',
+                     'ProxyUri'         : 'URI:',
+                     'ProxyUsername'    : 'Username:',
+                     'ProxyPassword'    : 'Password:',
                     }
                   ]
 WEEKDAY_LIST = TRANSLATIONS[0]['WeekdayList']
@@ -226,6 +236,10 @@ DEFAULT_SELECTED_FONT       = "{0} Bold {1}".format(DEFAULT_FONT_FAMILY,
                                                     DEFAULT_FONT_SIZE)
 DEFAULT_LANGUAGE            = 0
 DEFAULT_MESSAGE_SENDER      = ""
+DEFAULT_PROXY_REQUIRED      = False
+DEFAULT_PROXY_URI           = ""
+DEFAULT_PROXY_ID            = ""
+DEFAULT_PROXY_PW            = ""
 
 COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
 COLOR_INVALID               = "#FF4545"
@@ -250,7 +264,11 @@ def config_save():
             'Font'              : FONT,
             'SelectedFont'      : SELECTED_FONT,
             'Language'          : LANGUAGE,
-            'MessageSender'     : MESSAGE_SENDER
+            'MessageSender'     : MESSAGE_SENDER,
+            'ProxyRequired'     : PROXY_REQUIRED,
+            'ProxyUri'          : PROXY_URI,
+            'ProxyId'           : PROXY_ID,
+            'ProxyPw'           : PROXY_PW
             }
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
@@ -302,6 +320,18 @@ def config_load():
     global MESSAGE_SENDER
     MESSAGE_SENDER = config.get('GENERAL', 'MessageSender',
                                 fallback=DEFAULT_MESSAGE_SENDER)
+    global PROXY_REQUIRED
+    PROXY_REQUIRED = config.getboolean('GENERAL', 'ProxyRequired',
+                                fallback=DEFAULT_PROXY_REQUIRED)
+    global PROXY_URI
+    PROXY_URI = config.get('GENERAL', 'ProxyUri',
+                                fallback=DEFAULT_PROXY_URI)
+    global PROXY_ID
+    PROXY_ID = config.get('GENERAL', 'ProxyId',
+                                fallback=DEFAULT_PROXY_ID)
+    global PROXY_PW
+    PROXY_PW = config.get('GENERAL', 'ProxyPw',
+                                fallback=DEFAULT_PROXY_PW)
 
 ########################################################################
 # GStreamer
@@ -322,12 +352,43 @@ class SilverPlayer():
         self.__pipeline__.set_state(Gst.State.NULL)
         self.__recorder__.set_state(Gst.State.NULL)
 
+    def reset_network_settings(self):
+        """ Set new network settings """
+        self.__pipeline__.get_by_name('source').set_property('location',
+                                                    STREAM_URL)
+        self.__recorder__.get_by_name('source').set_property('location',
+                                                    STREAM_URL)
+        if PROXY_REQUIRED:
+            self.__pipeline__.get_by_name('source').set_property('proxy',
+                                                    PROXY_URI)
+            self.__pipeline__.get_by_name('source').set_property(
+                                                    'proxy-id', PROXY_ID)
+            self.__pipeline__.get_by_name('source').set_property(
+                                                    'proxy-pw', PROXY_PW)
+            self.__recorder__.get_by_name('source').set_property('proxy',
+                                                    PROXY_URI)
+            self.__recorder__.get_by_name('source').set_property(
+                                                    'proxy-id', PROXY_ID)
+            self.__recorder__.get_by_name('source').set_property(
+                                                    'proxy-pw', PROXY_PW)
+        else:
+            self.__pipeline__.get_by_name('source').set_property('proxy',
+                                                    '')
+            self.__pipeline__.get_by_name('source').set_property(
+                                                    'proxy-id', '')
+            self.__pipeline__.get_by_name('source').set_property(
+                                                    'proxy-pw', '')
+            self.__pipeline__.get_by_name('source').set_property('proxy',
+                                                    '')
+            self.__pipeline__.get_by_name('source').set_property(
+                                                    'proxy-id', '')
+            self.__pipeline__.get_by_name('source').set_property(
+                                                    'proxy-pw', '')
+
     def playback_toggle(self):
         """ Playback trigger """
         self.__playing__ = not self.__playing__
         if self.__playing__:
-            self.__pipeline__.get_by_name('source').set_property('location',
-                                                                 STREAM_URL)
             ret = self.__pipeline__.set_state(Gst.State.PLAYING)
         else:
             # Switch state to READY instead of STOP to prevent EOS
@@ -405,6 +466,10 @@ class SilverPlayer():
         self.elements["source"].set_property('location', STREAM_URL)
         self.elements["source"].set_property('is-live', True)
         self.elements["source"].set_property('compress', True)
+        if PROXY_REQUIRED:
+            self.elements["source"].set_property('proxy', PROXY_URI)
+            self.elements["source"].set_property('proxy-id', PROXY_ID)
+            self.elements["source"].set_property('proxy-pw', PROXY_PW)
         self.elements["volume"].set_property('volume', 1.)
 
         # Link elements
@@ -464,6 +529,10 @@ class SilverPlayer():
         self.relements["source"].set_property('location', STREAM_URL)
         self.relements["source"].set_property('is-live', True)
         self.relements["source"].set_property('compress', True)
+        if PROXY_REQUIRED:
+            self.relements["source"].set_property('proxy', PROXY_URI)
+            self.relements["source"].set_property('proxy-id', PROXY_ID)
+            self.relements["source"].set_property('proxy-pw', PROXY_PW)
         self.relements["filesink"].set_property('location', "file.mp3")
 
         # Link relements
@@ -2011,6 +2080,7 @@ class SilverGUI(Gtk.Window):
         ### Network ###
         ###############
         page_network = create_page()
+        # Stream url
         network = create_prefs_grid()
         text = Gtk.Label(TRANSLATIONS[LANGUAGE]["StreamUrl"])
         text.set_size_request(180, -1)
@@ -2030,6 +2100,48 @@ class SilverGUI(Gtk.Window):
                                Gtk.PositionType.RIGHT, 1, 1)
         pack_prefs_box(page_network,
                        TRANSLATIONS[LANGUAGE]["Network"], network)
+        # Proxy
+        proxy = create_prefs_grid()
+        self.prefs_use_proxy = Gtk.CheckButton()
+        self.prefs_use_proxy.set_label(TRANSLATIONS[LANGUAGE]["UseProxy"])
+        self.prefs_use_proxy.set_active(PROXY_REQUIRED)
+        self.prefs_use_proxy.connect("toggled", self.prefs_on_use_proxy)
+        proxy.attach(self.prefs_use_proxy, 0, 0, 2, 1)
+
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["ProxyUri"])
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        proxy.attach(text, 0, 1, 1, 1)
+        self.prefs_proxy_uri = Gtk.Entry()
+        self.prefs_proxy_uri.set_text(PROXY_URI)
+        self.prefs_proxy_uri.set_editable(True)
+        self.prefs_proxy_uri.set_sensitive(PROXY_REQUIRED)
+        proxy.attach_next_to(self.prefs_proxy_uri, text,
+                             Gtk.PositionType.RIGHT, 1, 1)
+
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["ProxyUsername"])
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        proxy.attach(text, 0, 2, 1, 1)
+        self.prefs_proxy_username = Gtk.Entry()
+        self.prefs_proxy_username.set_text(PROXY_ID)
+        self.prefs_proxy_username.set_editable(True)
+        self.prefs_proxy_username.set_sensitive(PROXY_REQUIRED)
+        proxy.attach_next_to(self.prefs_proxy_username, text,
+                             Gtk.PositionType.RIGHT, 1, 1)
+
+        text = Gtk.Label(TRANSLATIONS[LANGUAGE]["ProxyPassword"])
+        text.set_alignment(0, 0.5)
+        text.set_size_request(180, -1)
+        proxy.attach(text, 0, 3, 1, 1)
+        self.prefs_proxy_password = Gtk.Entry()
+        self.prefs_proxy_password.set_text(PROXY_PW)
+        self.prefs_proxy_password.set_editable(True)
+        self.prefs_proxy_password.set_sensitive(PROXY_REQUIRED)
+        proxy.attach_next_to(self.prefs_proxy_password, text,
+                             Gtk.PositionType.RIGHT, 1, 1)
+
+        pack_prefs_box(page_network, TRANSLATIONS[LANGUAGE]["Proxy"], proxy)
 
         ## Notebook
         notebook = Gtk.Notebook()
@@ -2066,6 +2178,12 @@ class SilverGUI(Gtk.Window):
                 Gtk.Widget.grab_focus(self.prefs_recs_dir)
 
         prefs.destroy()
+
+    def prefs_on_use_proxy(self, combo):
+        state = combo.get_active()
+        self.prefs_proxy_uri.set_sensitive(state)
+        self.prefs_proxy_username.set_sensitive(state)
+        self.prefs_proxy_password.set_sensitive(state)
 
     def prefs_on_language_changed(self, combo):
         self.prefs_need_restart.show()
@@ -2113,6 +2231,14 @@ class SilverGUI(Gtk.Window):
             STREAM_URL = model[iter][0]
         else:
             STREAM_URL = self.prefs_stream_url.get_child().get_text()
+        global PROXY_REQUIRED
+        PROXY_REQUIRED = self.prefs_use_proxy.get_active()
+        global PROXY_URI
+        PROXY_URI = self.prefs_proxy_uri.get_text()
+        global PROXY_ID
+        PROXY_ID = self.prefs_proxy_username.get_text()
+        global PROXY_PW
+        PROXY_PW = self.prefs_proxy_password.get_text()
         # Save config file
         config_save()
         # Restore language
@@ -2124,6 +2250,8 @@ class SilverGUI(Gtk.Window):
         self.sched_tree_mark_current()
         # Update messenger
         self.im_sender.set_text(MESSAGE_SENDER)
+        # Update player
+        self._player.reset_network_settings()
 
     def prefs_reset_appearance(self, widget):
         """ Reset default settings """
@@ -2424,6 +2552,10 @@ if not os.path.exists(CONFIG_FILE):
     SELECTED_FONT = DEFAULT_SELECTED_FONT
     LANGUAGE = DEFAULT_LANGUAGE
     MESSAGE_SENDER = DEFAULT_MESSAGE_SENDER
+    PROXY_REQUIRED = DEFAULT_PROXY_REQUIRED
+    PROXY_URI = DEFAULT_PROXY_URI
+    PROXY_ID = DEFAULT_PROXY_ID
+    PROXY_PW = DEFAULT_PROXY_PW
     # Create configuration file
     config_save()
 else:
