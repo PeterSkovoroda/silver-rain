@@ -38,12 +38,11 @@ except ImportError as err:
 
 ########################################################################
 # System files and variables
-APP_DIR = ".silver/"
+APP_DIR = os.getenv("HOME") + "/.silver/"
 IMG_DIR = APP_DIR + "imgs/"
 SCHED_FILE = APP_DIR + "sched.dump"
 CONFIG_FILE = APP_DIR + "config.ini"
-CSS_PATH = "silver-rain.css"
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 #TODO:
 ICON_DIR = "icon/"
 SILVER_ICON = ICON_DIR + "silver-rain_128.png"
@@ -222,7 +221,8 @@ DEFAULT_AUTOPLAY            = False
 DEFAULT_START_HIDDEN        = False
 DEFAULT_RECS_DIR            = os.getenv("HOME") + "/SilverRain"
 DEFAULT_RECS_PREFIX         = "%m-%d-%y-%H:%M-"
-DEFAULT_USE_CSS             = True
+DEFAULT_USE_CSS             = False
+DEFAULT_CSS_PATH            = ""
 DEFAULT_STREAM_URL          = STREAM_URL_LIST[0]
 DEFAULT_BG_COLORS           = ["white", "gray95"]
 DEFAULT_FONT_COLOR          = "black"
@@ -255,6 +255,7 @@ def config_save():
             'RecordsDirectory'  : RECS_DIR,
             'RecordsPrefix'     : re.sub('%', '%%', RECS_PREFIX),
             'UseCSS'            : USE_CSS,
+            'CSSPath'           : CSS_PATH,
             'StreamURL'         : STREAM_URL,
             'BgColor0'          : BG_COLORS[0],
             'BgColor1'          : BG_COLORS[1],
@@ -291,6 +292,9 @@ def config_load():
     global USE_CSS
     USE_CSS = config.getboolean('GENERAL', 'UseCSS',
                                 fallback=DEFAULT_USE_CSS)
+    global CSS_PATH
+    CSS_PATH = config.get('GENERAL', 'CSSPath',
+                                fallback=DEFAULT_CSS_PATH)
     global STREAM_URL
     STREAM_URL = config.get('GENERAL', 'StreamURL',
                                 fallback=DEFAULT_STREAM_URL)
@@ -2543,6 +2547,7 @@ if not os.path.exists(CONFIG_FILE):
     RECS_DIR = DEFAULT_RECS_DIR
     RECS_PREFIX = DEFAULT_RECS_PREFIX
     USE_CSS = DEFAULT_USE_CSS
+    CSS_PATH = DEFAULT_CSS_PATH
     STREAM_URL = DEFAULT_STREAM_URL
     BG_COLORS = DEFAULT_BG_COLORS
     FONT_COLOR = DEFAULT_FONT_COLOR
@@ -2565,7 +2570,7 @@ if not os.path.exists(RECS_DIR):
     os.makedirs(RECS_DIR)
 
 # Load css
-if USE_CSS:
+if USE_CSS and CSS_PATH:
     css_load()
 
 # Init
