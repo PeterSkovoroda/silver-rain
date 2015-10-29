@@ -27,9 +27,9 @@ import threading
 import urllib.request
 
 from collections import deque
-from datetime import date
 from datetime import datetime
 from datetime import timedelta
+from datetime import tzinfo
 
 try:
     from lxml import etree
@@ -63,6 +63,20 @@ USER_AGENT      = 'Mozilla/5.0 (X11; Linux x86_64) ' + \
                   'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
                   'Chrome/41.0.2227.0 Safari/537.36'
 BITRIX_SERVER   = "http://bitrix.info/ba.js"
+
+########################################################################
+# Timezone
+# It's hard to work with utc, since schedule defined for MSK zone,
+# so use timezone synchronization, which is actually a bad idea
+class MSK(tzinfo):
+    def utcoffset(self, dt):
+        return timedelta(hours=3)
+
+    def dst(self, dt):
+        return timedelta(hours=0)
+
+    def tzname(self, dt):
+        return "MSK"
 
 ########################################################################
 # Translations
@@ -328,8 +342,8 @@ class SilverPlayer():
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
-            file = RECS_DIR + "/" + datetime.now().strftime(RECS_PREFIX) + \
-                                                      name + ".mp3"
+            file = RECS_DIR + "/" + \
+                   datetime.now(MSK()).strftime(RECS_PREFIX) + name + ".mp3"
             self.__recorder__.get_by_name('filesink').set_property('location',
                                                                    file)
             ret = self.__recorder__.set_state(Gst.State.PLAYING)
@@ -618,7 +632,7 @@ class SilverSchedule():
 
     def _sched_gen_daily_agenda(self):
         """ Create a list of main events for today """
-        today = datetime.now()
+        today = datetime.now(MSK())
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
         position = 0
@@ -834,8 +848,8 @@ class SilverGUI(Gtk.Window):
         # Notifications
         self.notification = Notify.Notification.new("Header", "Body", "image")
         # TreeView
-        self.__weekday_filter__ = date.today().strftime("%A")
-        self.__today__ = date.today()
+        self.__weekday_filter__ = datetime.now(MSK()).strftime("%A")
+        self.__today__ = datetime.now(MSK())
         self.__cell_bg_old__ = ''
         self.__cell_fg_old__ = ''
         # Create main window
@@ -1384,7 +1398,7 @@ class SilverGUI(Gtk.Window):
 
     def timers_init_event_timer(self):
         """ Raise handler when event ends """
-        today = datetime.now()
+        today = datetime.now(MSK())
         now = timedelta(hours=today.hour,
                 minutes=today.minute, seconds=today.second).total_seconds()
         timeout = int(self._schedule.get_event_end() - now)
@@ -1535,7 +1549,7 @@ class SilverGUI(Gtk.Window):
         self.sched_tree_reset_current()
         if self._schedule.update_current_event():
             # Update selection
-            self.__today__ = date.today()
+            self.__today__ = datetime.now(MSK())
             self.selection_update()
         self.sched_tree_check_recorder()
         self.sched_tree_mark_current()
@@ -2267,7 +2281,7 @@ class SilverGUI(Gtk.Window):
         self.appindicator_update_menu()
         if self.__recording__:
             # Set timer
-            today = datetime.now()
+            today = datetime.now(MSK())
             now = timedelta(hours=today.hour,
                             minutes=today.minute,
                             seconds=today.second).total_seconds()
