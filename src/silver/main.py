@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+"""
+Copyright (C) 2015 Petr Skovoroda <petrskovoroda@gmail.com>
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public
+License along with this program; if not, write to the
+Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+Boston, MA 02110-1301 USA
+"""
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -38,15 +56,12 @@ except ImportError as err:
 
 ########################################################################
 # System files and variables
+from silver.globals import VERSION
 APP_DIR = os.getenv("HOME") + "/.silver/"
 IMG_DIR = APP_DIR + "imgs/"
 SCHED_FILE = APP_DIR + "sched.dump"
 CONFIG_FILE = APP_DIR + "config.ini"
-VERSION = "1.2.2"
-#TODO:
-ICON_DIR = "icon/"
-SILVER_ICON = ICON_DIR + "silver-rain_128.png"
-SILVER_ICON_SMALL = ICON_DIR + "silver-rain_128.png"
+ICON = "silver-rain"
 # Network
 
 STREAM_URL_LIST = [ 'http://radiosilver.corbina.net:8000/silver128a.mp3',
@@ -243,6 +258,46 @@ DEFAULT_PROXY_PW            = ""
 
 COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
 COLOR_INVALID               = "#FF4545"
+
+def config_init_default():
+    global AUTOPLAY
+    AUTOPLAY = DEFAULT_AUTOPLAY
+    global START_HIDDEN
+    START_HIDDEN = DEFAULT_START_HIDDEN
+    global RECS_DIR
+    RECS_DIR = DEFAULT_RECS_DIR
+    global RECS_PREFIX
+    RECS_PREFIX = DEFAULT_RECS_PREFIX
+    global USE_CSS
+    USE_CSS = DEFAULT_USE_CSS
+    global CSS_PATH
+    CSS_PATH = DEFAULT_CSS_PATH
+    global STREAM_URL
+    STREAM_URL = DEFAULT_STREAM_URL
+    global BG_COLORS
+    BG_COLORS = DEFAULT_BG_COLORS
+    global FONT_COLOR
+    FONT_COLOR = DEFAULT_FONT_COLOR
+    global SELECTED_BG_COLOR
+    SELECTED_BG_COLOR = DEFAULT_SELECTED_BG_COLOR
+    global SELECTED_FONT_COLOR
+    SELECTED_FONT_COLOR = DEFAULT_SELECTED_FONT_COLOR
+    global FONT
+    FONT = DEFAULT_FONT
+    global SELECTED_FONT
+    SELECTED_FONT = DEFAULT_SELECTED_FONT
+    global LANGUAGE
+    LANGUAGE = DEFAULT_LANGUAGE
+    global MESSAGE_SENDER
+    MESSAGE_SENDER = DEFAULT_MESSAGE_SENDER
+    global PROXY_REQUIRED
+    PROXY_REQUIRED = DEFAULT_PROXY_REQUIRED
+    global PROXY_URI
+    PROXY_URI = DEFAULT_PROXY_URI
+    global PROXY_ID
+    PROXY_ID = DEFAULT_PROXY_ID
+    global PROXY_PW
+    PROXY_PW = DEFAULT_PROXY_PW
 
 ########################################################################
 # Settings
@@ -951,6 +1006,7 @@ class SilverGUI(Gtk.Window):
         """ Init parent window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(0)
+        self.set_icon_name(ICON)
         self.set_default_size(650, 450)
         self.connect("delete-event", self.main_window_on_delete_event)
         # Container
@@ -1202,7 +1258,7 @@ class SilverGUI(Gtk.Window):
         """ Ubuntu appindicator """
         self.status_icon = appindicator.Indicator.new(
                                 "SilverRain",
-                                SILVER_ICON_SMALL,
+                                ICON,
                                 appindicator.IndicatorCategory.SYSTEM_SERVICES)
         self.status_icon.set_status(appindicator.IndicatorStatus.ACTIVE)
         self.status_icon.connect("scroll-event", self.appindicator_on_scroll)
@@ -1221,7 +1277,7 @@ class SilverGUI(Gtk.Window):
             # Ubuntu workaround
             return self.appindicator_create()
         self.status_icon = Gtk.StatusIcon()
-        self.status_icon.set_from_file(SILVER_ICON_SMALL)
+        self.status_icon.set_from_icon_name(ICON)
         # Default events
         self.status_icon.connect("activate", self.status_icon_on_activate)
         self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
@@ -1656,10 +1712,8 @@ class SilverGUI(Gtk.Window):
         # Header
         header = Gtk.HBox(spacing=5)
         header.set_border_width(10)
-        img = Gtk.Image()
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON,
-                                                         50, 50, True)
-        img.set_from_pixbuf(pixbuf)
+        img = Gtk.Image.new_from_icon_name(ICON, 64)
+        img.set_pixel_size(50)
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
                          "Silver Rain" +
@@ -1889,10 +1943,8 @@ class SilverGUI(Gtk.Window):
         prefs.set_resizable(False)
         ## Header
         # Image
-        img = Gtk.Image()
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON,
-                                                         50, 50, True)
-        img.set_from_pixbuf(pixbuf)
+        img = Gtk.Image.new_from_icon_name(ICON, 64)
+        img.set_pixel_size(50)
         # Title
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
@@ -2288,10 +2340,8 @@ class SilverGUI(Gtk.Window):
         eventbox = Gtk.EventBox()
         header = Gtk.HBox(spacing=5)
         header.set_border_width(0)
-        img = Gtk.Image()
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(SILVER_ICON,
-                                                         50, 50, True)
-        img.set_from_pixbuf(pixbuf)
+        img = Gtk.Image.new_from_icon_name(ICON, 64)
+        img.set_pixel_size(50)
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>Silver Rain</b></span>\n" +
                          "<span size='11000'>Version " + VERSION + "</span>")
@@ -2309,7 +2359,7 @@ class SilverGUI(Gtk.Window):
                 "by Silver Rain Radio or anybody else.\n" +
                 "\n" +
                 "Check for the latest version " +
-                "<a href='https://github.com/PeterSkovoroda/silver-rain'>" +
+                "<a href='https://github.com/PetrSkovoroda/silver-rain'>" +
                 "here" + "</a>\n" +
                 "Copyright \xa9 2015 Petr Skovoroda"
                 )
@@ -2529,57 +2579,43 @@ def parse_time(str):
 
 ########################################################################
 # Boom, baby
-GObject.threads_init()
-Gst.init(None)
-signal.signal(signal.SIGINT, signal.SIG_DFL)
-Notify.init("Silver Rain")
+def let_it_rain():
+    GObject.threads_init()
+    Gst.init(None)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    Notify.init("Silver Rain")
 
-# Create directories if they don't exist
-for dir in [APP_DIR, IMG_DIR]:
-    if not os.path.exists(dir):
-        os.makedirs(dir)
+    # Create directories if they don't exist
+    for dir in [APP_DIR, IMG_DIR]:
+        if not os.path.exists(dir):
+            os.makedirs(dir)
 
-# Read config
-if not os.path.exists(CONFIG_FILE):
-    # Initialize default settings
-    AUTOPLAY = DEFAULT_AUTOPLAY
-    START_HIDDEN = DEFAULT_START_HIDDEN
-    RECS_DIR = DEFAULT_RECS_DIR
-    RECS_PREFIX = DEFAULT_RECS_PREFIX
-    USE_CSS = DEFAULT_USE_CSS
-    CSS_PATH = DEFAULT_CSS_PATH
-    STREAM_URL = DEFAULT_STREAM_URL
-    BG_COLORS = DEFAULT_BG_COLORS
-    FONT_COLOR = DEFAULT_FONT_COLOR
-    SELECTED_BG_COLOR = DEFAULT_SELECTED_BG_COLOR
-    SELECTED_FONT_COLOR = DEFAULT_SELECTED_FONT_COLOR
-    FONT = DEFAULT_FONT
-    SELECTED_FONT = DEFAULT_SELECTED_FONT
-    LANGUAGE = DEFAULT_LANGUAGE
-    MESSAGE_SENDER = DEFAULT_MESSAGE_SENDER
-    PROXY_REQUIRED = DEFAULT_PROXY_REQUIRED
-    PROXY_URI = DEFAULT_PROXY_URI
-    PROXY_ID = DEFAULT_PROXY_ID
-    PROXY_PW = DEFAULT_PROXY_PW
-    # Create configuration file
-    config_save()
-else:
-    config_load()
+    # Read config
+    if not os.path.exists(CONFIG_FILE):
+        # Initialize default settings
+        config_init_default()
+        # Create configuration file
+        config_save()
+    else:
+        config_load()
 
-if not os.path.exists(RECS_DIR):
-    os.makedirs(RECS_DIR)
+    if not os.path.exists(RECS_DIR):
+        os.makedirs(RECS_DIR)
 
-# Load css
-if USE_CSS and CSS_PATH:
-    css_load()
+    # Load css
+    if USE_CSS and CSS_PATH:
+        css_load()
 
-# Init
-silver_player = SilverPlayer()
-silver_schedule = SilverSchedule()
-silver_window = SilverGUI(silver_player, silver_schedule)
-# Run loop
-Gtk.main()
-# Cleanup
-Notify.uninit()
-silver_window.clean()
-silver_player.clean()
+    # Init
+    silver_player = SilverPlayer()
+    silver_schedule = SilverSchedule()
+    silver_window = SilverGUI(silver_player, silver_schedule)
+    # Run loop
+    Gtk.main()
+    # Cleanup
+    Notify.uninit()
+    silver_window.clean()
+    silver_player.clean()
+
+if __name__ == '__main__':
+    let_it_rain()
