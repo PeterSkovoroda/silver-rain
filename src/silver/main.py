@@ -716,23 +716,32 @@ class SilverSchedule():
     def fill_tree_strore(self, store):
         """ Fill TreeStore object """
         it = None
-
         for x in range(7):
             bg_dark = False
             ch_dark = bg_dark
 
             for item in self.__sched_week__[x]:
+                ICON_EXIST = True
                 host = ' и '.join(item["host"])
                 font = FONT
+                icon = None
                 # Download icon if it doesn't exist
                 if not os.path.exists(item["icon"]):
-                    urllib.request.urlretrieve(item["icon_url"], item["icon"])
+                    try:
+                        urllib.request.urlretrieve(item["icon_url"],
+                                                   item["icon"])
+                    except urllib.error.URLError as e:
+                        logging.error("Couldn't download icon from url:" +
+                                      "{0}\n{1}".format(item["icon_url"], e))
+                        ICON_EXIST = False
+                # Insert program
                 if item["is_main"]:
                     # Main event
                     bg_color = BG_COLORS[bg_dark]
                     fg_color = FONT_COLOR
                     # Get pixbuf
-                    icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
+                    if ICON_EXIST:
+                        icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
                     # Insert item
                     it = store.append(None, [item["weekday"], item["is_main"],
                                              item["time"], item["title"],
@@ -747,9 +756,9 @@ class SilverSchedule():
                     bg_color = BG_COLORS[ch_dark]
                     fg_color = FONT_COLOR
                     # Get pixbuf
-                    icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                                                            item["icon"],
-                                                            60, 60, True)
+                    if ICON_EXIST:
+                        icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                                                    item["icon"], 60, 60, True)
                     # Insert item
                     store.append(it, [item["weekday"], item["is_main"],
                                  item["time"], item["title"], item["url"],
@@ -825,12 +834,17 @@ class SilverSchedule():
                 # Event happens randomly or never
                 continue
             # Get icon
-            if obj[0][0][0].attrib['src'][0] == '/':
-                icon_src = SILVER_RAIN_URL + \
-                           obj[0][0][0].attrib['src'].split("?")[0]
-            else:
-                icon_src = "http://" + \
-                                 obj[0][0][0].attrib['src'].split("?")[0]
+            icon_src = obj[0][0][0].attrib['src'].split("?")[0]
+            if icon_src[:7] != "http://":
+                if icon_src[:2] == "//":
+                    # //url/name.png
+                    icon_src = "http:" + icon_src
+                elif icon_src[0] == "/":
+                    # /name.png
+                    icon_src = SILVER_RAIN_URL + icon_src
+                else:
+                    # url/name.png
+                    icon_src = "http://" + icon_src
             icon_name = icon_src.split("/")[-1]
             # Get title
             title = obj[1][0][0].text
@@ -901,15 +915,13 @@ class SilverSchedule():
                     item["time"] = str_time(item["start"], item["end"])
                     self.__sched_week__[wd].remove(prev)
                 prev = item
-
             # Fill spaces with music
             time = 0.0
             pos = 0
-            last = []
+            last = {"end" : 0}
             for item in self.__sched_week__[wd]:
                 if not item["is_main"]:
                     continue
-
                 if item["start"] > time:
                     # If doesn't start right after the last one
                     program = {}
@@ -1431,7 +1443,6 @@ class SilverGUI(Gtk.Window):
     def sched_tree_create(self):
         """ Create schedule tree """
         self.sched_tree_model_create()
-
         self.sched_tree = Gtk.TreeView.new_with_model(self.sched_tree_model)
         self.sched_tree.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
         self.sched_tree.connect('button-release-event',
@@ -1445,6 +1456,7 @@ class SilverGUI(Gtk.Window):
         renderer = Gtk.CellRendererText()
         renderer.set_padding(10, 0)
         renderer.set_alignment(0.5, 0.5)
+        renderer.set_property('height', 50)
         # Time
         column = Gtk.TreeViewColumn(TRANSLATIONS[LANGUAGE]["Time"], renderer,
                                     text=2, background=7, foreground=8, font=9)
