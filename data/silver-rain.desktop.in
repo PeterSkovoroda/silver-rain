@@ -1,0 +1,13 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Type=Application
+Name=Silver Rain
+GenericName=Silver Rain radio application
+Comment=Listen to Silver Rain radio online
+Comment[ru]=Слушать радиостанцию Серебряный Дождь онлайн
+TryExec=silver-rain
+Exec=silver-rain
+Icon=silver-rain
+Categories=AudioVideo;Audio;Network;GTK;
+Terminal=false
