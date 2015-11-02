@@ -15,6 +15,6 @@
 # Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 # Boston, MA 02110-1301 USA
 
-from silver.main import let_it_rain
+from silver.main import exec_main
 
-let_it_rain()
+exec_main()

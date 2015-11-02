@@ -44,6 +44,8 @@ import textwrap
 import threading
 import urllib.request
 
+import dbus, dbus.service, dbus.glib
+
 from collections import deque
 from datetime import datetime
 from datetime import timedelta
@@ -960,6 +962,21 @@ class SilverSchedule():
         # Save sched to file
         self._sched_write_to_file()
         return True
+
+########################################################################
+# DBus service
+class SilverService(dbus.service.Object):
+    """ DBus service """
+    def __init__(self, win):
+        self.window = win
+        bus_name = dbus.service.BusName('org.SilverRain.Silver',
+                                        bus = dbus.SessionBus())
+        dbus.service.Object.__init__(self, bus_name, '/org/SilverRain/Silver')
+
+    @dbus.service.method(dbus_interface='org.SilverRain.Silver')
+
+    def show_window(self):
+        self.window.present()
 
 ########################################################################
 # GUI
@@ -2622,6 +2639,7 @@ def let_it_rain():
     silver_player = SilverPlayer()
     silver_schedule = SilverSchedule()
     silver_window = SilverGUI(silver_player, silver_schedule)
+    service = SilverService(silver_window)
     # Run loop
     Gtk.main()
     # Cleanup
@@ -2629,5 +2647,16 @@ def let_it_rain():
     silver_window.clean()
     silver_player.clean()
 
+def exec_main():
+    # Check if already running
+    if (dbus.SessionBus().request_name("org.SilverRain.Silver") !=
+                                    dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER):
+        object = dbus.SessionBus().get_object("org.SilverRain.Silver",
+                                              "/org/SilverRain/Silver")
+        method = object.get_dbus_method("show_window")
+        method()
+    else:
+        let_it_rain()
+
 if __name__ == '__main__':
-    let_it_rain()
+    exec_main()
