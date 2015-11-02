@@ -1,18 +1,14 @@
 Silver Rain
 ===========
 
-Introduction
-------------
-
 Silver Rain radio application for Linux
-* Website: http://silver.ru
+* Official website: http://silver.ru
 
 ### Features
 * TBD
 
 License
 -------
-
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU
 General Public License as published by the Free Software Foundation; either version 2 of the
 License, or (at your option) any later version.
@@ -34,10 +30,10 @@ Dependencies
 
 Installation
 ------------
+### Ubuntu
+TBD
 
 ### Compiling from source using autotools
-
-Requires gnome-autogen.sh
 
 Get the code:
 
@@ -45,9 +41,6 @@ Get the code:
 
 Compile and install:
 
-    ./autogen.sh
+    ./autogen.sh --prefix=/usr
     make
     sudo make install
-
-### Ubuntu
-TBD
