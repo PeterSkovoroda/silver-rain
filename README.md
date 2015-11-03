@@ -25,7 +25,9 @@ Dependencies
 ------------
 * Python 3
 * GStreamer 1.0
+* GStreamer 1.0 plugins base
 * GStreamer 1.0 plugins good
+* GStreamer 1.0 plugins ugly
 * GTK+3
 
 Installation

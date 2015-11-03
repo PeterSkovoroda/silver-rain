@@ -185,7 +185,7 @@ def font_probe():
 
 DEFAULT_AUTOPLAY            = False
 DEFAULT_START_HIDDEN        = False
-DEFAULT_RECS_DIR            = os.getenv("HOME") + "/SilverRain"
+DEFAULT_RECS_DIR            = os.getenv("HOME") + "/Recordings"
 DEFAULT_RECS_PREFIX         = "%m-%d-%y-%H:%M-"
 DEFAULT_USE_CSS             = True
 DEFAULT_CSS_PATH            = ""
@@ -2548,10 +2548,8 @@ def let_it_rain():
 
     if not os.path.exists(RECS_DIR):
         os.makedirs(RECS_DIR)
-
     # Load css
     css_load()
-
     # Init translation
     set_translation()
     # Init
