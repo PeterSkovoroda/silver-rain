@@ -1,0 +1,255 @@
+# Silver Rain translation
+# Copyright (C) 2015 Petr Skovoroda
+# This file is distributed under the same license as the silver-rain package.
+#
+# Translators:
+# Petr Skovoroda <petrskovoroda@gmail.com>, 2015.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: silver-rain 1.0.0\n"
+"Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
+"POT-Creation-Date: 2015-11-03 12:12+0300\n"
+"PO-Revision-Date: 2015-11-03 12:17+0300\n"
+"Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/silver/main.py:113
+msgid "Monday"
+msgstr "Понедельник"
+
+#: src/silver/main.py:113
+msgid "Tuesday"
+msgstr "Вторник"
+
+#: src/silver/main.py:113
+msgid "Wednesday"
+msgstr "Среда"
+
+#: src/silver/main.py:113
+msgid "Thursday"
+msgstr "Четверг"
+
+#: src/silver/main.py:114
+msgid "Friday"
+msgstr "Пятница"
+
+#: src/silver/main.py:114
+msgid "Saturday"
+msgstr "Суббота"
+
+#: src/silver/main.py:114
+msgid "Sunday"
+msgstr "Воскресенье"
+
+#: src/silver/main.py:985
+msgid "Music"
+msgstr "Музыка"
+
+#: src/silver/main.py:988 src/silver/main.py:1126 src/silver/main.py:2408
+msgid "Play"
+msgstr "Играть"
+
+#: src/silver/main.py:996 src/silver/main.py:2411
+msgid "Stop"
+msgstr "Стоп"
+
+#: src/silver/main.py:1004 src/silver/main.py:1232 src/silver/main.py:1410
+#: src/silver/main.py:2418
+msgid "Record program"
+msgstr "Записать программу"
+
+#: src/silver/main.py:1011 src/silver/main.py:2421
+msgid "Stop recording"
+msgstr "Остановить запись"
+
+#: src/silver/main.py:1019 src/silver/main.py:1237
+msgid "Mute"
+msgstr "Выключить звук"
+
+#: src/silver/main.py:1026 src/silver/main.py:1136
+msgid "Update schedule"
+msgstr "Обновить расписание"
+
+#: src/silver/main.py:1032 src/silver/main.py:1130 src/silver/main.py:1241
+msgid "Send message"
+msgstr "Отправить сообщение"
+
+#: src/silver/main.py:1038 src/silver/main.py:1244 src/silver/main.py:1868
+msgid "Preferences"
+msgstr "Настройки"
+
+#: src/silver/main.py:1044 src/silver/main.py:1247
+msgid "Quit"
+msgstr "Выход"
+
+#: src/silver/main.py:1071
+msgid "Help"
+msgstr "Помощь"
+
+#: src/silver/main.py:1263 src/silver/main.py:2435 src/silver/main.py:2452
+msgid "Silver Rain"
+msgstr "Серебряный Дождь"
+
+#: src/silver/main.py:1369
+msgid "Time"
+msgstr "Время"
+
+#: src/silver/main.py:1378
+msgid "Title"
+msgstr "Название"
+
+#: src/silver/main.py:1385
+msgid "Host"
+msgstr "Ведущие"
+
+#: src/silver/main.py:1402
+msgid "Program page"
+msgstr "Страница программы"
+
+#: src/silver/main.py:1413
+msgid "Don't record"
+msgstr "Не записывать"
+
+#: src/silver/main.py:1529
+msgid "Updating schedule..."
+msgstr "Обновление расписания..."
+
+#: src/silver/main.py:1545
+msgid "Couldn't update schedule"
+msgstr "Не удалось обновить расписание"
+
+#: src/silver/main.py:1637
+msgid "Send message to the studio"
+msgstr "Отправить сообщение в студию"
+
+#: src/silver/main.py:1647 src/silver/main.py:1971
+msgid "Name e-mail/phone number"
+msgstr "Имя, e-mail/номер телефона"
+
+#: src/silver/main.py:1685 src/silver/main.py:1759 src/silver/main.py:1761
+msgid "Send"
+msgstr "Отправить"
+
+#: src/silver/main.py:1732
+msgid "Couldn't send message"
+msgstr "Не удалось отправить сообщение"
+
+#: src/silver/main.py:1736
+msgid "Message sent"
+msgstr "Сообщение отправлено"
+
+#: src/silver/main.py:1907
+msgid "Autoplay on start up"
+msgstr "Начинать воспроизведение при старте"
+
+#: src/silver/main.py:1912
+msgid "Start hidden"
+msgstr "Сворачивать в трей при запуске"
+
+#: src/silver/main.py:1917
+msgid "Language:"
+msgstr "Язык:"
+
+#: src/silver/main.py:1935
+msgid "Requires restart"
+msgstr "Требуется перезапуск приложения"
+
+#: src/silver/main.py:1939 src/silver/main.py:2112
+msgid "General"
+msgstr "Основные"
+
+#: src/silver/main.py:1942
+msgid "Recordings directory path:"
+msgstr "Путь для сохранения:"
+
+#: src/silver/main.py:1951
+msgid "Recordings prefix:"
+msgstr "Префикс:"
+
+#: src/silver/main.py:1960
+msgid "Recordings"
+msgstr "Записи"
+
+#: src/silver/main.py:1963
+msgid "Default message sender:"
+msgstr "Подпись:"
+
+#: src/silver/main.py:1974
+msgid "Messenger"
+msgstr "SMS-портал"
+
+#: src/silver/main.py:1981
+msgid "Background color:"
+msgstr "Цвет фона:"
+
+#: src/silver/main.py:1991
+msgid "Alternate background color:"
+msgstr "Альтернативный цвет фона:"
+
+#: src/silver/main.py:2000
+msgid "Selection color:"
+msgstr "Цвет выделенной области:"
+
+#: src/silver/main.py:2008
+msgid "Colors"
+msgstr "Цвета"
+
+#: src/silver/main.py:2011
+msgid "Font:"
+msgstr "Шрифт:"
+
+#: src/silver/main.py:2024
+msgid "Selection font:"
+msgstr "Шрифт выделенной области:"
+
+#: src/silver/main.py:2037
+msgid "Fonts"
+msgstr "Шрифты"
+
+#: src/silver/main.py:2039
+msgid "Reset default settings"
+msgstr "Восстановить стандартные настройки"
+
+#: src/silver/main.py:2048
+msgid "Stream url:"
+msgstr "Адрес стрима:"
+
+#: src/silver/main.py:2064 src/silver/main.py:2114
+msgid "Network"
+msgstr "Соединение"
+
+#: src/silver/main.py:2068
+msgid "Use proxy"
+msgstr "Использовать прокси"
+
+#: src/silver/main.py:2073
+msgid "URI:"
+msgstr "URI:"
+
+#: src/silver/main.py:2084
+msgid "Username:"
+msgstr "Username:"
+
+#: src/silver/main.py:2095
+msgid "Password:"
+msgstr "Password:"
+
+#: src/silver/main.py:2106
+msgid "Proxy"
+msgstr "Proxy"
+
+#: src/silver/main.py:2113
+msgid "Appearance"
+msgstr "Внешний вид"
+
+#: src/silver/main.py:2443
+msgid "Playing"
+msgstr "Играет"
+
+#: src/silver/main.py:2453
+msgid "Stopped"
+msgstr "Остановлено"

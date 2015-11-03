@@ -19,12 +19,15 @@ AC_INIT([silver], [1.0.0])
 AM_INIT_AUTOMAKE([foreign])
 AM_PATH_PYTHON(3.3)
 
-AC_CONFIG_FILES([
-                 Makefile
-		 data/Makefile
-		 data/silver-rain.desktop
-		 data/icons/Makefile
-                 src/silver/Makefile
-                 src/silver/globals.py
+AM_GNU_GETTEXT([external])
+AM_GNU_GETTEXT_VERSION(0.19)
+
+AC_CONFIG_FILES([ po/Makefile.in
+                  Makefile
+		  data/Makefile
+		  data/silver-rain.desktop
+		  data/icons/Makefile
+                  src/silver/Makefile
+                  src/silver/globals.py
 ])
 AC_OUTPUT
