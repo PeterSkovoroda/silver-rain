@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-11-03 12:12+0300\n"
+"POT-Creation-Date: 2015-11-03 13:29+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -45,211 +45,215 @@ msgstr "Суббота"
 msgid "Sunday"
 msgstr "Воскресенье"
 
-#: src/silver/main.py:985
+#: src/silver/main.py:1029
 msgid "Music"
 msgstr "Музыка"
 
-#: src/silver/main.py:988 src/silver/main.py:1126 src/silver/main.py:2408
+#: src/silver/main.py:1032 src/silver/main.py:1170 src/silver/main.py:2452
 msgid "Play"
 msgstr "Играть"
 
-#: src/silver/main.py:996 src/silver/main.py:2411
+#: src/silver/main.py:1040 src/silver/main.py:2455
 msgid "Stop"
 msgstr "Стоп"
 
-#: src/silver/main.py:1004 src/silver/main.py:1232 src/silver/main.py:1410
-#: src/silver/main.py:2418
+#: src/silver/main.py:1048 src/silver/main.py:1276 src/silver/main.py:1454
+#: src/silver/main.py:2462
 msgid "Record program"
 msgstr "Записать программу"
 
-#: src/silver/main.py:1011 src/silver/main.py:2421
+#: src/silver/main.py:1055 src/silver/main.py:2465
 msgid "Stop recording"
 msgstr "Остановить запись"
 
-#: src/silver/main.py:1019 src/silver/main.py:1237
+#: src/silver/main.py:1063 src/silver/main.py:1281
 msgid "Mute"
 msgstr "Выключить звук"
 
-#: src/silver/main.py:1026 src/silver/main.py:1136
+#: src/silver/main.py:1070 src/silver/main.py:1180
 msgid "Update schedule"
 msgstr "Обновить расписание"
 
-#: src/silver/main.py:1032 src/silver/main.py:1130 src/silver/main.py:1241
+#: src/silver/main.py:1076 src/silver/main.py:1174 src/silver/main.py:1285
 msgid "Send message"
 msgstr "Отправить сообщение"
 
-#: src/silver/main.py:1038 src/silver/main.py:1244 src/silver/main.py:1868
+#: src/silver/main.py:1082 src/silver/main.py:1288 src/silver/main.py:1912
 msgid "Preferences"
 msgstr "Настройки"
 
-#: src/silver/main.py:1044 src/silver/main.py:1247
+#: src/silver/main.py:1088 src/silver/main.py:1291
 msgid "Quit"
 msgstr "Выход"
 
-#: src/silver/main.py:1071
+#: src/silver/main.py:1115
 msgid "Help"
 msgstr "Помощь"
 
-#: src/silver/main.py:1263 src/silver/main.py:2435 src/silver/main.py:2452
+#: src/silver/main.py:1263
+msgid "Activate"
+msgstr "Активировать"
+
+#: src/silver/main.py:1307 src/silver/main.py:2479 src/silver/main.py:2496
 msgid "Silver Rain"
 msgstr "Серебряный Дождь"
 
-#: src/silver/main.py:1369
+#: src/silver/main.py:1413
 msgid "Time"
 msgstr "Время"
 
-#: src/silver/main.py:1378
+#: src/silver/main.py:1422
 msgid "Title"
 msgstr "Название"
 
-#: src/silver/main.py:1385
+#: src/silver/main.py:1429
 msgid "Host"
 msgstr "Ведущие"
 
-#: src/silver/main.py:1402
+#: src/silver/main.py:1446
 msgid "Program page"
 msgstr "Страница программы"
 
-#: src/silver/main.py:1413
+#: src/silver/main.py:1457
 msgid "Don't record"
 msgstr "Не записывать"
 
-#: src/silver/main.py:1529
+#: src/silver/main.py:1573
 msgid "Updating schedule..."
 msgstr "Обновление расписания..."
 
-#: src/silver/main.py:1545
+#: src/silver/main.py:1589
 msgid "Couldn't update schedule"
 msgstr "Не удалось обновить расписание"
 
-#: src/silver/main.py:1637
+#: src/silver/main.py:1681
 msgid "Send message to the studio"
 msgstr "Отправить сообщение в студию"
 
-#: src/silver/main.py:1647 src/silver/main.py:1971
+#: src/silver/main.py:1691 src/silver/main.py:2015
 msgid "Name e-mail/phone number"
 msgstr "Имя, e-mail/номер телефона"
 
-#: src/silver/main.py:1685 src/silver/main.py:1759 src/silver/main.py:1761
+#: src/silver/main.py:1729 src/silver/main.py:1803 src/silver/main.py:1805
 msgid "Send"
 msgstr "Отправить"
 
-#: src/silver/main.py:1732
+#: src/silver/main.py:1776
 msgid "Couldn't send message"
 msgstr "Не удалось отправить сообщение"
 
-#: src/silver/main.py:1736
+#: src/silver/main.py:1780
 msgid "Message sent"
 msgstr "Сообщение отправлено"
 
-#: src/silver/main.py:1907
+#: src/silver/main.py:1951
 msgid "Autoplay on start up"
 msgstr "Начинать воспроизведение при старте"
 
-#: src/silver/main.py:1912
+#: src/silver/main.py:1956
 msgid "Start hidden"
 msgstr "Сворачивать в трей при запуске"
 
-#: src/silver/main.py:1917
+#: src/silver/main.py:1961
 msgid "Language:"
 msgstr "Язык:"
 
-#: src/silver/main.py:1935
+#: src/silver/main.py:1979
 msgid "Requires restart"
 msgstr "Требуется перезапуск приложения"
 
-#: src/silver/main.py:1939 src/silver/main.py:2112
+#: src/silver/main.py:1983 src/silver/main.py:2156
 msgid "General"
 msgstr "Основные"
 
-#: src/silver/main.py:1942
+#: src/silver/main.py:1986
 msgid "Recordings directory path:"
 msgstr "Путь для сохранения:"
 
-#: src/silver/main.py:1951
+#: src/silver/main.py:1995
 msgid "Recordings prefix:"
 msgstr "Префикс:"
 
-#: src/silver/main.py:1960
+#: src/silver/main.py:2004
 msgid "Recordings"
 msgstr "Записи"
 
-#: src/silver/main.py:1963
+#: src/silver/main.py:2007
 msgid "Default message sender:"
 msgstr "Подпись:"
 
-#: src/silver/main.py:1974
+#: src/silver/main.py:2018
 msgid "Messenger"
 msgstr "SMS-портал"
 
-#: src/silver/main.py:1981
+#: src/silver/main.py:2025
 msgid "Background color:"
 msgstr "Цвет фона:"
 
-#: src/silver/main.py:1991
+#: src/silver/main.py:2035
 msgid "Alternate background color:"
 msgstr "Альтернативный цвет фона:"
 
-#: src/silver/main.py:2000
+#: src/silver/main.py:2044
 msgid "Selection color:"
 msgstr "Цвет выделенной области:"
 
-#: src/silver/main.py:2008
+#: src/silver/main.py:2052
 msgid "Colors"
 msgstr "Цвета"
 
-#: src/silver/main.py:2011
+#: src/silver/main.py:2055
 msgid "Font:"
 msgstr "Шрифт:"
 
-#: src/silver/main.py:2024
+#: src/silver/main.py:2068
 msgid "Selection font:"
 msgstr "Шрифт выделенной области:"
 
-#: src/silver/main.py:2037
+#: src/silver/main.py:2081
 msgid "Fonts"
 msgstr "Шрифты"
 
-#: src/silver/main.py:2039
+#: src/silver/main.py:2083
 msgid "Reset default settings"
 msgstr "Восстановить стандартные настройки"
 
-#: src/silver/main.py:2048
+#: src/silver/main.py:2092
 msgid "Stream url:"
 msgstr "Адрес стрима:"
 
-#: src/silver/main.py:2064 src/silver/main.py:2114
+#: src/silver/main.py:2108 src/silver/main.py:2158
 msgid "Network"
 msgstr "Соединение"
 
-#: src/silver/main.py:2068
+#: src/silver/main.py:2112
 msgid "Use proxy"
 msgstr "Использовать прокси"
 
-#: src/silver/main.py:2073
+#: src/silver/main.py:2117
 msgid "URI:"
 msgstr "URI:"
 
-#: src/silver/main.py:2084
+#: src/silver/main.py:2128
 msgid "Username:"
 msgstr "Username:"
 
-#: src/silver/main.py:2095
+#: src/silver/main.py:2139
 msgid "Password:"
 msgstr "Password:"
 
-#: src/silver/main.py:2106
+#: src/silver/main.py:2150
 msgid "Proxy"
 msgstr "Proxy"
 
-#: src/silver/main.py:2113
+#: src/silver/main.py:2157
 msgid "Appearance"
 msgstr "Внешний вид"
 
-#: src/silver/main.py:2443
+#: src/silver/main.py:2487
 msgid "Playing"
 msgstr "Играет"
 
-#: src/silver/main.py:2453
+#: src/silver/main.py:2497
 msgid "Stopped"
 msgstr "Остановлено"

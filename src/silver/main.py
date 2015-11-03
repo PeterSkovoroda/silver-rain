@@ -119,11 +119,55 @@ SCHED_WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
 
 ########################################################################
 # Style sheet
+silver_style = b"""
+@define-color silver_rain_red #FF4545;
+/*************************
+ *      Scale color  *
+ *************************/
+GtkScale.slider:hover {
+    background-image: -gtk-gradient(linear, left top, left bottom,
+    from (shade(mix(@theme_bg_color, shade(@silver_rain_red, 0.9), 0.4), 1.2)),
+    to (shade(mix(@theme_bg_color, shade(@silver_rain_red, 0.9), 0.4),0.97)));
+}
+
+.menubar .menuitem .scale.highlight.left,
+.scale.highlight.left {
+    background-image: -gtk-gradient(linear, left top, left bottom,
+    from (shade(shade(@silver_rain_red, 0.9), 1.1)),
+    to (shade(shade(@silver_rain_red, 0.9), 0.9)));
+    border-color: transparent;
+}
+
+.scale.highlight.bottom {
+    background-image: -gtk-gradient(linear, left top, right top,
+    from (shade(shade(@silver_rain_red, 0.9), 1.1)),
+    to (shade(shade(@silver_rain_red, 0.9), 0.9)));
+    border-color: transparent;
+}
+/**************************
+ * Selected button color  *
+ **************************/
+.button:focus,
+.button:hover:focus,
+.button:active:focus,
+.button:active:hover:focus,
+.button:checked:focus,
+.button:checked:hover:focus {
+    border-color: shade(@silver_rain_red, 0.8);
+}
+"""
+
 def css_load():
+    if not USE_CSS:
+        return
     style_provider = Gtk.CssProvider()
-    css = open(CSS_PATH, 'rb')
-    css_data = css.read()
-    css.close()
+    if CSS_PATH:
+        css = open(CSS_PATH, 'rb')
+        css_data = css.read()
+        css.close()
+    else:
+        css_data = silver_style
+
     style_provider.load_from_data(css_data)
     Gtk.StyleContext.add_provider_for_screen(
             Gdk.Screen.get_default(),
@@ -143,7 +187,7 @@ DEFAULT_AUTOPLAY            = False
 DEFAULT_START_HIDDEN        = False
 DEFAULT_RECS_DIR            = os.getenv("HOME") + "/SilverRain"
 DEFAULT_RECS_PREFIX         = "%m-%d-%y-%H:%M-"
-DEFAULT_USE_CSS             = False
+DEFAULT_USE_CSS             = True
 DEFAULT_CSS_PATH            = ""
 DEFAULT_STREAM_URL          = STREAM_URL_LIST[0]
 DEFAULT_BG_COLORS           = ["white", "gray95"]
@@ -1216,7 +1260,7 @@ class SilverGUI(Gtk.Window):
         popup_menu = Gtk.Menu()
         if APP_INDICATOR:
             # Since appindicator doesn't support left click event
-            activate = Gtk.MenuItem("Activate")
+            activate = Gtk.MenuItem(_("Activate"))
             activate.connect("activate", self.status_icon_on_activate)
             popup_menu.append(activate)
             separator = Gtk.SeparatorMenuItem()
@@ -2506,8 +2550,7 @@ def let_it_rain():
         os.makedirs(RECS_DIR)
 
     # Load css
-    if USE_CSS and CSS_PATH:
-        css_load()
+    css_load()
 
     # Init translation
     set_translation()
