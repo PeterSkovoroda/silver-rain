@@ -39,7 +39,7 @@ TBD
 
 Get the code:
 
-    git clone https://github.com/PetrSkovoroda/silver-rain.git && cd silver-rain
+    git clone https://github.com/petrskovoroda/silver-rain.git && cd silver-rain
 
 Compile and install:
 

@@ -2306,7 +2306,7 @@ class SilverGUI(Gtk.Window):
                 "by Silver Rain Radio or anybody else.\n" +
                 "\n" +
                 "Check for the latest version " +
-                "<a href='https://github.com/PetrSkovoroda/silver-rain'>" +
+                "<a href='https://github.com/petrskovoroda/silver-rain'>" +
                 "here" + "</a>\n" +
                 "Copyright \xa9 2015 Petr Skovoroda"
                 )
