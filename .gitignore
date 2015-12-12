@@ -58,3 +58,6 @@ target/
 tags
 tags.sh
 .silver/
+
+# Automake
+src/silver/globals.py
