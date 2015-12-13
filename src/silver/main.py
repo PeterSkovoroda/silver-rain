@@ -30,7 +30,6 @@ try:
 except ImportError:
     APP_INDICATOR = False
 
-import configparser
 import gettext
 import json
 import logging
@@ -52,23 +51,15 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import tzinfo
 
+from . import config
+from .globals import CONFIG_FILE, APP_DIR, IMG_DIR, ICON, SCHED_FILE, STREAM_URL_LIST, VERSION
+
 try:
     from lxml import etree
 except ImportError as err:
     import xml.etree.ElementTree as etree
 
-########################################################################
-# System files and variables
-from silver.globals import VERSION
-APP_DIR = os.getenv("HOME") + "/.silver/"
-IMG_DIR = APP_DIR + "imgs/"
-SCHED_FILE = APP_DIR + "sched.dump"
-CONFIG_FILE = APP_DIR + "config.ini"
-ICON = "silver-rain"
 # Network
-STREAM_URL_LIST = [ 'http://radiosilver.corbina.net:8000/silver128a.mp3',
-                    'http://radiosilver.corbina.net:8000/silver48a.mp3',
-                    'http://icecast.silver.cdnvideo.ru/silver' ]
 SILVER_RAIN_URL = "http://silver.ru"
 SCHED_URL       = "http://silver.ru/programms/"
 MESSENGER_URL   = "http://silver.ru/ajax/send_message_in_studio.php"
@@ -79,6 +70,9 @@ USER_AGENT      = 'Mozilla/5.0 (X11; Linux x86_64) ' + \
                   'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
                   'Chrome/41.0.2227.0 Safari/537.36'
 BITRIX_SERVER   = "http://bitrix.info/ba.js"
+
+COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
+COLOR_INVALID               = "#FF4545"
 
 ########################################################################
 # Timezone
@@ -101,9 +95,9 @@ TRANSLATIONS_LIST   = ["en", "ru"]
 WEEKDAY_LIST = []
 
 def set_translation():
-    if LANGUAGE:
+    if config.language:
         lang = gettext.translation("silver-rain",
-                                   languages=[TRANSLATIONS_LIST[LANGUAGE]])
+                                   languages=[TRANSLATIONS_LIST[config.language]])
         lang.install()
     else:
         global _
@@ -158,11 +152,11 @@ GtkScale.slider:hover {
 """
 
 def css_load():
-    if not USE_CSS:
+    if not config.use_css:
         return
     style_provider = Gtk.CssProvider()
-    if CSS_PATH:
-        css = open(CSS_PATH, 'rb')
+    if config.css_path:
+        css = open(config.css_path, 'rb')
         css_data = css.read()
         css.close()
     else:
@@ -173,175 +167,6 @@ def css_load():
             Gdk.Screen.get_default(),
             style_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-########################################################################
-# Default settings
-def font_probe():
-    """ Get system default font family """
-    t = Gtk.Label("")
-    s = t.get_style()
-    font = s.font_desc.get_family()
-    return font
-
-DEFAULT_AUTOPLAY            = False
-DEFAULT_START_HIDDEN        = False
-DEFAULT_RECS_DIR            = os.getenv("HOME") + "/Recordings"
-DEFAULT_RECS_PREFIX         = "%m-%d-%y-%H:%M-"
-DEFAULT_USE_CSS             = True
-DEFAULT_CSS_PATH            = ""
-DEFAULT_STREAM_URL          = STREAM_URL_LIST[0]
-DEFAULT_BG_COLORS           = ["white", "gray95"]
-DEFAULT_FONT_COLOR          = "black"
-DEFAULT_SELECTED_BG_COLOR   = "#FF4545"
-DEFAULT_SELECTED_FONT_COLOR = "white"
-DEFAULT_FONT_FAMILY         = font_probe()
-DEFAULT_FONT_SIZE           = "11"
-DEFAULT_FONT                = "{0} {1}".format(DEFAULT_FONT_FAMILY,
-                                               DEFAULT_FONT_SIZE)
-DEFAULT_SELECTED_FONT       = "{0} Bold {1}".format(DEFAULT_FONT_FAMILY,
-                                                    DEFAULT_FONT_SIZE)
-DEFAULT_LANGUAGE            = 0
-DEFAULT_MESSAGE_SENDER      = ""
-DEFAULT_PROXY_REQUIRED      = False
-DEFAULT_PROXY_URI           = ""
-DEFAULT_PROXY_ID            = ""
-DEFAULT_PROXY_PW            = ""
-
-COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
-COLOR_INVALID               = "#FF4545"
-
-def config_init_default():
-    global AUTOPLAY
-    AUTOPLAY = DEFAULT_AUTOPLAY
-    global START_HIDDEN
-    START_HIDDEN = DEFAULT_START_HIDDEN
-    global RECS_DIR
-    RECS_DIR = DEFAULT_RECS_DIR
-    global RECS_PREFIX
-    RECS_PREFIX = DEFAULT_RECS_PREFIX
-    global USE_CSS
-    USE_CSS = DEFAULT_USE_CSS
-    global CSS_PATH
-    CSS_PATH = DEFAULT_CSS_PATH
-    global STREAM_URL
-    STREAM_URL = DEFAULT_STREAM_URL
-    global BG_COLORS
-    BG_COLORS = DEFAULT_BG_COLORS
-    global FONT_COLOR
-    FONT_COLOR = DEFAULT_FONT_COLOR
-    global SELECTED_BG_COLOR
-    SELECTED_BG_COLOR = DEFAULT_SELECTED_BG_COLOR
-    global SELECTED_FONT_COLOR
-    SELECTED_FONT_COLOR = DEFAULT_SELECTED_FONT_COLOR
-    global FONT
-    FONT = DEFAULT_FONT
-    global SELECTED_FONT
-    SELECTED_FONT = DEFAULT_SELECTED_FONT
-    global LANGUAGE
-    LANGUAGE = DEFAULT_LANGUAGE
-    global MESSAGE_SENDER
-    MESSAGE_SENDER = DEFAULT_MESSAGE_SENDER
-    global PROXY_REQUIRED
-    PROXY_REQUIRED = DEFAULT_PROXY_REQUIRED
-    global PROXY_URI
-    PROXY_URI = DEFAULT_PROXY_URI
-    global PROXY_ID
-    PROXY_ID = DEFAULT_PROXY_ID
-    global PROXY_PW
-    PROXY_PW = DEFAULT_PROXY_PW
-
-########################################################################
-# Settings
-def config_save():
-    """ Create configuration file with default values """
-    config = configparser.ConfigParser()
-    config['GENERAL'] = {
-            'Autoplay'          : AUTOPLAY,
-            'StartHidden'       : START_HIDDEN,
-            'RecordsDirectory'  : RECS_DIR,
-            'RecordsPrefix'     : re.sub('%', '%%', RECS_PREFIX),
-            'UseCSS'            : USE_CSS,
-            'CSSPath'           : CSS_PATH,
-            'StreamURL'         : STREAM_URL,
-            'BgColor0'          : BG_COLORS[0],
-            'BgColor1'          : BG_COLORS[1],
-            'FontColor'         : FONT_COLOR,
-            'SelectedBgColor'   : SELECTED_BG_COLOR,
-            'SelectedFontColor' : SELECTED_FONT_COLOR,
-            'Font'              : FONT,
-            'SelectedFont'      : SELECTED_FONT,
-            'Language'          : LANGUAGE,
-            'MessageSender'     : MESSAGE_SENDER,
-            'ProxyRequired'     : PROXY_REQUIRED,
-            'ProxyUri'          : PROXY_URI,
-            'ProxyId'           : PROXY_ID,
-            'ProxyPw'           : PROXY_PW
-            }
-    with open(CONFIG_FILE, 'w') as configfile:
-        config.write(configfile)
-
-def config_load():
-    config = configparser.ConfigParser()
-    config.read(CONFIG_FILE)
-    global AUTOPLAY
-    AUTOPLAY = config.getboolean('GENERAL', 'Autoplay',
-                                fallback=DEFAULT_AUTOPLAY)
-    global START_HIDDEN
-    START_HIDDEN = config.getboolean('GENERAL', 'StartHidden',
-                                fallback=DEFAULT_START_HIDDEN)
-    global RECS_DIR
-    RECS_DIR = config.get('GENERAL', 'RecordsDirectory',
-                                fallback=DEFAULT_RECS_DIR)
-    global RECS_PREFIX
-    RECS_PREFIX = config.get('GENERAL', 'RecordsPrefix',
-                                fallback=DEFAULT_RECS_PREFIX)
-    global USE_CSS
-    USE_CSS = config.getboolean('GENERAL', 'UseCSS',
-                                fallback=DEFAULT_USE_CSS)
-    global CSS_PATH
-    CSS_PATH = config.get('GENERAL', 'CSSPath',
-                                fallback=DEFAULT_CSS_PATH)
-    global STREAM_URL
-    STREAM_URL = config.get('GENERAL', 'StreamURL',
-                                fallback=DEFAULT_STREAM_URL)
-    global BG_COLORS
-    BG_COLORS = []
-    BG_COLORS.append(config.get('GENERAL', 'BgColor0',
-                                fallback=DEFAULT_BG_COLORS[0]))
-    BG_COLORS.append(config.get('GENERAL', 'BgColor1',
-                                fallback=DEFAULT_BG_COLORS[1]))
-    global FONT_COLOR
-    FONT_COLOR = config.get('GENERAL', 'FontColor',
-                                fallback=DEFAULT_FONT_COLOR)
-    global SELECTED_BG_COLOR
-    SELECTED_BG_COLOR = config.get('GENERAL', 'SelectedBgColor',
-                                fallback=DEFAULT_SELECTED_BG_COLOR)
-    global SELECTED_FONT_COLOR
-    SELECTED_FONT_COLOR = config.get('GENERAL', 'SelectedFontColor',
-                                fallback=DEFAULT_SELECTED_FONT_COLOR)
-    global FONT
-    FONT = config.get('GENERAL', 'Font', fallback=DEFAULT_FONT)
-    global SELECTED_FONT
-    SELECTED_FONT = config.get('GENERAL', 'SelectedFont',
-                                fallback=DEFAULT_SELECTED_FONT)
-    global LANGUAGE
-    LANGUAGE = int(config.get('GENERAL', 'Language',
-                                fallback=DEFAULT_LANGUAGE))
-    global MESSAGE_SENDER
-    MESSAGE_SENDER = config.get('GENERAL', 'MessageSender',
-                                fallback=DEFAULT_MESSAGE_SENDER)
-    global PROXY_REQUIRED
-    PROXY_REQUIRED = config.getboolean('GENERAL', 'ProxyRequired',
-                                fallback=DEFAULT_PROXY_REQUIRED)
-    global PROXY_URI
-    PROXY_URI = config.get('GENERAL', 'ProxyUri',
-                                fallback=DEFAULT_PROXY_URI)
-    global PROXY_ID
-    PROXY_ID = config.get('GENERAL', 'ProxyId',
-                                fallback=DEFAULT_PROXY_ID)
-    global PROXY_PW
-    PROXY_PW = config.get('GENERAL', 'ProxyPw',
-                                fallback=DEFAULT_PROXY_PW)
 
 ########################################################################
 # GStreamer
@@ -365,22 +190,22 @@ class SilverPlayer():
     def reset_network_settings(self):
         """ Set new network settings """
         self.__pipeline__.get_by_name('source').set_property('location',
-                                                    STREAM_URL)
+                                                    config.stream_url)
         self.__recorder__.get_by_name('source').set_property('location',
-                                                    STREAM_URL)
-        if PROXY_REQUIRED:
+                                                    config.stream_url)
+        if config.proxy_required:
             self.__pipeline__.get_by_name('source').set_property('proxy',
-                                                    PROXY_URI)
+                                                    config.proxy_uri)
             self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-id', PROXY_ID)
+                                                    'proxy-id', config.proxy_id)
             self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-pw', PROXY_PW)
+                                                    'proxy-pw', config.proxy_pw)
             self.__recorder__.get_by_name('source').set_property('proxy',
-                                                    PROXY_URI)
+                                                    config.proxy_uri)
             self.__recorder__.get_by_name('source').set_property(
-                                                    'proxy-id', PROXY_ID)
+                                                    'proxy-id', config.proxy_id)
             self.__recorder__.get_by_name('source').set_property(
-                                                    'proxy-pw', PROXY_PW)
+                                                    'proxy-pw', config.proxy_pw)
         else:
             self.__pipeline__.get_by_name('source').set_property('proxy',
                                                     '')
@@ -413,8 +238,8 @@ class SilverPlayer():
         """ Record trigger """
         self.__recording__ = not self.__recording__
         if self.__recording__:
-            file = RECS_DIR + "/" + \
-                   datetime.now(MSK()).strftime(RECS_PREFIX) + name + ".mp3"
+            file = config.recs_dir + "/" + \
+                   datetime.now(MSK()).strftime(config.recs_prefix) + name + ".mp3"
             self.__recorder__.get_by_name('filesink').set_property('location',
                                                                    file)
             ret = self.__recorder__.set_state(Gst.State.PLAYING)
@@ -473,13 +298,13 @@ class SilverPlayer():
             else:
                 self.__pipeline__.add(self.elements[key])
 
-        self.elements["source"].set_property('location', STREAM_URL)
+        self.elements["source"].set_property('location', config.stream_url)
         self.elements["source"].set_property('is-live', True)
         self.elements["source"].set_property('compress', True)
-        if PROXY_REQUIRED:
-            self.elements["source"].set_property('proxy', PROXY_URI)
-            self.elements["source"].set_property('proxy-id', PROXY_ID)
-            self.elements["source"].set_property('proxy-pw', PROXY_PW)
+        if config.proxy_required:
+            self.elements["source"].set_property('proxy', config.proxy_uri)
+            self.elements["source"].set_property('proxy-id', config.proxy_id)
+            self.elements["source"].set_property('proxy-pw', config.proxy_pw)
         self.elements["volume"].set_property('volume', 1.)
 
         # Link elements
@@ -536,13 +361,13 @@ class SilverPlayer():
             else:
                 self.__recorder__.add(self.relements[key])
 
-        self.relements["source"].set_property('location', STREAM_URL)
+        self.relements["source"].set_property('location', config.stream_url)
         self.relements["source"].set_property('is-live', True)
         self.relements["source"].set_property('compress', True)
-        if PROXY_REQUIRED:
-            self.relements["source"].set_property('proxy', PROXY_URI)
-            self.relements["source"].set_property('proxy-id', PROXY_ID)
-            self.relements["source"].set_property('proxy-pw', PROXY_PW)
+        if config.proxy_required:
+            self.relements["source"].set_property('proxy', config.proxy_uri)
+            self.relements["source"].set_property('proxy-id', config.proxy_id)
+            self.relements["source"].set_property('proxy-pw', config.proxy_pw)
         self.relements["filesink"].set_property('location', "file.mp3")
 
         # Link relements
@@ -674,7 +499,7 @@ class SilverSchedule():
             for item in self.__sched_week__[x]:
                 ICON_EXIST = True
                 host = ' и '.join(item["host"])
-                font = FONT
+                font = config.font
                 icon = None
                 # Download icon if it doesn't exist
                 if not os.path.exists(item["icon"]):
@@ -688,8 +513,8 @@ class SilverSchedule():
                 # Insert program
                 if item["is_main"]:
                     # Main event
-                    bg_color = BG_COLORS[bg_dark]
-                    fg_color = FONT_COLOR
+                    bg_color = config.bg_colors[bg_dark]
+                    fg_color = config.font_color
                     # Get pixbuf
                     if ICON_EXIST:
                         icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
@@ -704,8 +529,8 @@ class SilverSchedule():
                     ch_dark = bg_dark
                 else:
                     # Child event
-                    bg_color = BG_COLORS[ch_dark]
-                    fg_color = FONT_COLOR
+                    bg_color = config.bg_colors[ch_dark]
+                    fg_color = config.font_color
                     # Get pixbuf
                     if ICON_EXIST:
                         icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(
@@ -972,7 +797,7 @@ class SilverGUI(Gtk.Window):
         self.status_icon_create()
         # Create treeview
         self.schedule_update()
-        if AUTOPLAY:
+        if config.autoplay:
             self.playback_toggle(None)
 
 ### Cleanup
@@ -1009,7 +834,7 @@ class SilverGUI(Gtk.Window):
         vbox.show_all()
         self.add(vbox)
         # Don't show if should stay hidden
-        if not START_HIDDEN:
+        if not config.start_hidden:
             self.show()
 
     def main_window_on_delete_event(self, window, event):
@@ -1606,7 +1431,7 @@ class SilverGUI(Gtk.Window):
         iter = self.sched_tree_model.get_iter(path)
         self.sched_tree_model[iter][7] = self.__cell_bg_old__
         self.sched_tree_model[iter][8] = self.__cell_fg_old__
-        self.sched_tree_model[iter][9] = FONT
+        self.sched_tree_model[iter][9] = config.font
         self.cell_bg_old = ''
         self.cell_fg_old = ''
 
@@ -1623,9 +1448,9 @@ class SilverGUI(Gtk.Window):
         self.__cell_bg_old__ = self.sched_tree_model[iter][7]
         self.__cell_fg_old__ = self.sched_tree_model[iter][8]
         # Set current row color
-        self.sched_tree_model[iter][7] = SELECTED_BG_COLOR
-        self.sched_tree_model[iter][8] = SELECTED_FONT_COLOR
-        self.sched_tree_model[iter][9] = SELECTED_FONT
+        self.sched_tree_model[iter][7] = config.selected_bg_color
+        self.sched_tree_model[iter][8] = config.selected_font_color
+        self.sched_tree_model[iter][9] = config.selected_font
         # Scroll to current cell
         self.sched_tree.scroll_to_cell(path, use_align=True, row_align=0.5)
 
@@ -1686,7 +1511,7 @@ class SilverGUI(Gtk.Window):
         eventbox.add(header)
         # Sender
         self.im_sender = Gtk.Entry()
-        self.im_sender.set_text(MESSAGE_SENDER)
+        self.im_sender.set_text(config.message_sender)
         self.im_sender.set_max_length(40)
         self.im_sender.set_placeholder_text(_("Name e-mail/phone number"))
         # Message
@@ -1949,12 +1774,12 @@ class SilverGUI(Gtk.Window):
         # Autoplay
         self.prefs_autoplay = Gtk.CheckButton()
         self.prefs_autoplay.set_label(_("Autoplay on start up"))
-        self.prefs_autoplay.set_active(AUTOPLAY)
+        self.prefs_autoplay.set_active(config.autoplay)
         general.attach(self.prefs_autoplay, 0, 0, 2, 1)
         # Start Hidden
         self.prefs_start_hidden = Gtk.CheckButton()
         self.prefs_start_hidden.set_label(_("Start hidden"))
-        self.prefs_start_hidden.set_active(START_HIDDEN)
+        self.prefs_start_hidden.set_active(config.start_hidden)
         general.attach_next_to(self.prefs_start_hidden, self.prefs_autoplay,
                                Gtk.PositionType.BOTTOM, 2, 1)
         # Languages
@@ -1970,7 +1795,7 @@ class SilverGUI(Gtk.Window):
         renderer_text = Gtk.CellRendererText()
         self.prefs_language.pack_start(renderer_text, True)
         self.prefs_language.add_attribute(renderer_text, "text", 0)
-        self.prefs_language.set_active(LANGUAGE)
+        self.prefs_language.set_active(config.language)
         self.prefs_language.connect("changed", self.prefs_on_language_changed)
         general.attach_next_to(self.prefs_language, text,
                                Gtk.PositionType.RIGHT, 1, 1)
@@ -1988,7 +1813,7 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         recordings.attach(text, 0, 0, 1, 1)
         self.prefs_recs_dir = Gtk.FileChooserButton()
-        self.prefs_recs_dir.set_filename(RECS_DIR)
+        self.prefs_recs_dir.set_filename(config.recs_dir)
         self.prefs_recs_dir.set_action(Gtk.FileChooserAction.SELECT_FOLDER)
         recordings.attach_next_to(self.prefs_recs_dir, text,
                                   Gtk.PositionType.RIGHT, 1, 1)
@@ -1997,7 +1822,7 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         recordings.attach(text, 0, 1, 1, 1)
         self.prefs_recs_prefix = Gtk.Entry()
-        self.prefs_recs_prefix.set_text(RECS_PREFIX)
+        self.prefs_recs_prefix.set_text(config.recs_prefix)
         self.prefs_recs_prefix.set_editable(True)
         recordings.attach_next_to(self.prefs_recs_prefix, text,
                                   Gtk.PositionType.RIGHT, 1, 1)
@@ -2010,7 +1835,7 @@ class SilverGUI(Gtk.Window):
         im.attach(text, 0, 0, 1, 1)
         self.prefs_message_header = Gtk.Entry()
         self.prefs_message_header.set_editable(True)
-        self.prefs_message_header.set_text(MESSAGE_SENDER)
+        self.prefs_message_header.set_text(config.message_sender)
         self.prefs_message_header.set_placeholder_text(
                                   _("Name e-mail/phone number"))
         im.attach_next_to(self.prefs_message_header, text,
@@ -2027,7 +1852,7 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         colors.attach(text, 0, 0, 1, 1)
         color = Gdk.RGBA()
-        color.parse(BG_COLORS[0])
+        color.parse(config.bg_colors[0])
         self.prefs_bg_color_light = Gtk.ColorButton.new_with_rgba(color)
         colors.attach_next_to(self.prefs_bg_color_light, text,
                               Gtk.PositionType.RIGHT, 1, 1)
@@ -2036,7 +1861,7 @@ class SilverGUI(Gtk.Window):
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         colors.attach(text, 0, 1, 1, 1)
-        color.parse(BG_COLORS[1])
+        color.parse(config.bg_colors[1])
         self.prefs_bg_color_dark = Gtk.ColorButton.new_with_rgba(color)
         colors.attach_next_to(self.prefs_bg_color_dark, text,
                               Gtk.PositionType.RIGHT, 1, 1)
@@ -2045,7 +1870,7 @@ class SilverGUI(Gtk.Window):
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         colors.attach(text, 0, 2, 1, 1)
-        color.parse(SELECTED_BG_COLOR)
+        color.parse(config.selected_bg_color)
         self.prefs_selection_color = Gtk.ColorButton.new_with_rgba(color)
         colors.attach_next_to(self.prefs_selection_color, text,
                               Gtk.PositionType.RIGHT, 1, 1)
@@ -2057,10 +1882,10 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         fonts.attach(text, 0, 0, 1, 1)
         self.prefs_font = Gtk.FontButton()
-        self.prefs_font.set_font_name(FONT)
+        self.prefs_font.set_font_name(config.font)
         fonts.attach_next_to(self.prefs_font, text,
                              Gtk.PositionType.RIGHT, 1, 1)
-        color.parse(FONT_COLOR)
+        color.parse(config.font_color)
         self.prefs_font_color = Gtk.ColorButton.new_with_rgba(color)
         fonts.attach_next_to(self.prefs_font_color, self.prefs_font,
                              Gtk.PositionType.RIGHT, 1, 1)
@@ -2070,10 +1895,10 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         fonts.attach(text, 0, 1, 1, 1)
         self.prefs_selection_font = Gtk.FontButton()
-        self.prefs_selection_font.set_font_name(SELECTED_FONT)
+        self.prefs_selection_font.set_font_name(config.selected_font)
         fonts.attach_next_to(self.prefs_selection_font, text,
                              Gtk.PositionType.RIGHT, 1, 1)
-        color.parse(SELECTED_FONT_COLOR)
+        color.parse(config.selected_font_color)
         self.prefs_selection_font_color = Gtk.ColorButton.new_with_rgba(color)
         fonts.attach_next_to(self.prefs_selection_font_color,
                              self.prefs_selection_font,
@@ -2095,14 +1920,14 @@ class SilverGUI(Gtk.Window):
         network.attach(text, 0, 0, 1, 1)
         stream_url_store = Gtk.ListStore(str)
         # If stream address defined by user
-        if STREAM_URL not in STREAM_URL_LIST:
-            STREAM_URL_LIST.append(STREAM_URL)
+        if config.stream_url not in STREAM_URL_LIST:
+            STREAM_URL_LIST.append(config.stream_url)
         for url in STREAM_URL_LIST:
             stream_url_store.append([url])
         self.prefs_stream_url = Gtk.ComboBox.new_with_model_and_entry(
                                                               stream_url_store)
         self.prefs_stream_url.set_entry_text_column(0)
-        self.prefs_stream_url.set_active(STREAM_URL_LIST.index(STREAM_URL))
+        self.prefs_stream_url.set_active(STREAM_URL_LIST.index(config.stream_url))
         network.attach_next_to(self.prefs_stream_url, text,
                                Gtk.PositionType.RIGHT, 1, 1)
         pack_prefs_box(page_network, _("Network"), network)
@@ -2110,7 +1935,7 @@ class SilverGUI(Gtk.Window):
         proxy = create_prefs_grid()
         self.prefs_use_proxy = Gtk.CheckButton()
         self.prefs_use_proxy.set_label(_("Use proxy"))
-        self.prefs_use_proxy.set_active(PROXY_REQUIRED)
+        self.prefs_use_proxy.set_active(config.proxy_required)
         self.prefs_use_proxy.connect("toggled", self.prefs_on_use_proxy)
         proxy.attach(self.prefs_use_proxy, 0, 0, 2, 1)
 
@@ -2119,9 +1944,9 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         proxy.attach(text, 0, 1, 1, 1)
         self.prefs_proxy_uri = Gtk.Entry()
-        self.prefs_proxy_uri.set_text(PROXY_URI)
+        self.prefs_proxy_uri.set_text(config.proxy_uri)
         self.prefs_proxy_uri.set_editable(True)
-        self.prefs_proxy_uri.set_sensitive(PROXY_REQUIRED)
+        self.prefs_proxy_uri.set_sensitive(config.proxy_required)
         proxy.attach_next_to(self.prefs_proxy_uri, text,
                              Gtk.PositionType.RIGHT, 1, 1)
 
@@ -2130,9 +1955,9 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         proxy.attach(text, 0, 2, 1, 1)
         self.prefs_proxy_username = Gtk.Entry()
-        self.prefs_proxy_username.set_text(PROXY_ID)
+        self.prefs_proxy_username.set_text(config.proxy_id)
         self.prefs_proxy_username.set_editable(True)
-        self.prefs_proxy_username.set_sensitive(PROXY_REQUIRED)
+        self.prefs_proxy_username.set_sensitive(config.proxy_required)
         proxy.attach_next_to(self.prefs_proxy_username, text,
                              Gtk.PositionType.RIGHT, 1, 1)
 
@@ -2141,9 +1966,9 @@ class SilverGUI(Gtk.Window):
         text.set_size_request(180, -1)
         proxy.attach(text, 0, 3, 1, 1)
         self.prefs_proxy_password = Gtk.Entry()
-        self.prefs_proxy_password.set_text(PROXY_PW)
+        self.prefs_proxy_password.set_text(config.proxy_pw)
         self.prefs_proxy_password.set_editable(True)
-        self.prefs_proxy_password.set_sensitive(PROXY_REQUIRED)
+        self.prefs_proxy_password.set_sensitive(config.proxy_required)
         proxy.attach_next_to(self.prefs_proxy_password, text,
                              Gtk.PositionType.RIGHT, 1, 1)
 
@@ -2177,7 +2002,7 @@ class SilverGUI(Gtk.Window):
                 break
             else:
                 self.error_show("Invalid recordings storage location")
-                self.prefs_recs_dir.set_filename(RECS_DIR)
+                self.prefs_recs_dir.set_filename(config.recs_dir)
                 Gtk.Widget.grab_focus(self.prefs_recs_dir)
 
         prefs.destroy()
@@ -2194,65 +2019,48 @@ class SilverGUI(Gtk.Window):
     def prefs_apply_settings(self):
         """ Apply settings and save config file """
         # General
-        global AUTOPLAY
-        AUTOPLAY = self.prefs_autoplay.get_active()
-        global START_HIDDEN
-        START_HIDDEN = self.prefs_start_hidden.get_active()
-        global LANGUAGE
-        LANG_OLD = LANGUAGE
+        config.autoplay = self.prefs_autoplay.get_active()
+        config.start_hidden = self.prefs_start_hidden.get_active()
+        LANG_OLD = config.language
         iter = self.prefs_language.get_active_iter()
         if iter:
             model = self.prefs_language.get_model()
             lang = model[iter][0]
-            LANGUAGE = LANGUAGES_LIST.index(lang)
-        global RECS_DIR
-        RECS_DIR = self.prefs_recs_dir.get_filename()
-        global RECS_PREFIX
-        RECS_PREFIX = self.prefs_recs_prefix.get_text()
-        global MESSAGE_SENDER
-        MESSAGE_SENDER = self.prefs_message_header.get_text()
+            config.language = LANGUAGES_LIST.index(lang)
+        config.recs_dir = self.prefs_recs_dir.get_filename()
+        config.recs_prefix = self.prefs_recs_prefix.get_text()
+        config.message_sender = self.prefs_message_header.get_text()
         # Appearance
-        global SELECTED_BG_COLOR
-        SELECTED_BG_COLOR = rgba_to_hex(self.prefs_selection_color.get_rgba())
-        global BG_COLORS
-        BG_COLORS[0] = rgba_to_hex(self.prefs_bg_color_light.get_rgba())
-        BG_COLORS[1] = rgba_to_hex(self.prefs_bg_color_dark.get_rgba())
-        global FONT
-        FONT = self.prefs_font.get_font_name()
-        global FONT_COLOR
-        FONT_COLOR = rgba_to_hex(self.prefs_font_color.get_rgba())
-        global SELECTED_FONT
-        SELECTED_FONT = self.prefs_selection_font.get_font_name()
-        global SELECTED_FONT_COLOR
-        SELECTED_FONT_COLOR = rgba_to_hex(
+        config.selected_bg_color = rgba_to_hex(self.prefs_selection_color.get_rgba())
+        config.bg_colors[0] = rgba_to_hex(self.prefs_bg_color_light.get_rgba())
+        config.bg_colors[1] = rgba_to_hex(self.prefs_bg_color_dark.get_rgba())
+        config.font = self.prefs_font.get_font_name()
+        config.font_color = rgba_to_hex(self.prefs_font_color.get_rgba())
+        config.selected_font = self.prefs_selection_font.get_font_name()
+        config.selected_font_color = rgba_to_hex(
                                    self.prefs_selection_font_color.get_rgba())
         # Network
-        global STREAM_URL
         iter = self.prefs_stream_url.get_active_iter()
         if iter:
             model = self.prefs_stream_url.get_model()
-            STREAM_URL = model[iter][0]
+            config.stream_url = model[iter][0]
         else:
-            STREAM_URL = self.prefs_stream_url.get_child().get_text()
-        global PROXY_REQUIRED
-        PROXY_REQUIRED = self.prefs_use_proxy.get_active()
-        global PROXY_URI
-        PROXY_URI = self.prefs_proxy_uri.get_text()
-        global PROXY_ID
-        PROXY_ID = self.prefs_proxy_username.get_text()
-        global PROXY_PW
-        PROXY_PW = self.prefs_proxy_password.get_text()
+            config.stream_url = self.prefs_stream_url.get_child().get_text()
+        config.proxy_required = self.prefs_use_proxy.get_active()
+        config.proxy_uri = self.prefs_proxy_uri.get_text()
+        config.proxy_id = self.prefs_proxy_username.get_text()
+        config.proxy_pw = self.prefs_proxy_password.get_text()
         # Save config file
-        config_save()
+        config.save()
         # Restore language
-        LANGUAGE = LANG_OLD
+        config.language = LANG_OLD
         # Update schedule
         self.selection_update()
         self.sched_tree_model_create()
         self.sched_tree.set_model(self.sched_tree_model)
         self.sched_tree_mark_current()
         # Update messenger
-        self.im_sender.set_text(MESSAGE_SENDER)
+        self.im_sender.set_text(config.message_sender)
         # Update player
         self._player.reset_network_settings()
 
@@ -2260,20 +2068,20 @@ class SilverGUI(Gtk.Window):
         """ Reset default settings """
         color = Gdk.RGBA()
         # BG colors
-        color.parse(DEFAULT_BG_COLORS[0])
+        color.parse(config.Default.bg_colors[0])
         self.prefs_bg_color_light.set_rgba(color)
-        color.parse(DEFAULT_BG_COLORS[1])
+        color.parse(config.Default.bg_colors[1])
         self.prefs_bg_color_dark.set_rgba(color)
         # Selection color
-        color.parse(DEFAULT_SELECTED_BG_COLOR)
+        color.parse(config.Default.config.selected_bg_color)
         self.prefs_selection_color.set_rgba(color)
         # Font
-        self.prefs_font.set_font_name(DEFAULT_FONT)
-        color.parse(DEFAULT_FONT_COLOR)
+        self.prefs_font.set_font_name(config.Default.font)
+        color.parse(config.Default.font_color)
         self.prefs_font_color.set_rgba(color)
         # Selection font
-        self.prefs_selection_font.set_font_name(DEFAULT_SELECTED_FONT)
-        color.parse(DEFAULT_SELECTED_FONT_COLOR)
+        self.prefs_selection_font.set_font_name(config.Default.selected_font)
+        color.parse(config.Default.selected_font_color)
         self.prefs_selection_font_color.set_rgba(color)
 
 ### About dialog
@@ -2540,14 +2348,14 @@ def let_it_rain():
     # Read config
     if not os.path.exists(CONFIG_FILE):
         # Initialize default settings
-        config_init_default()
+        config.init()
         # Create configuration file
-        config_save()
+        config.save()
     else:
-        config_load()
+        config.load()
 
-    if not os.path.exists(RECS_DIR):
-        os.makedirs(RECS_DIR)
+    if not os.path.exists(config.recs_dir):
+        os.makedirs(config.recs_dir)
     # Load css
     css_load()
     # Init translation
