@@ -25,6 +25,7 @@ gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Notify
 
 import dbus
+import dbus.glib
 import dbus.service
 import os
 import signal
@@ -81,7 +82,7 @@ def let_it_rain():
     translations.set_translation()
     # Init
     silver_window = application.SilverApplication()
-    #service = SilverService(silver_window)
+    service = SilverService(silver_window)
     # Run loop
     Gtk.main()
     # Cleanup
@@ -90,14 +91,14 @@ def let_it_rain():
 
 def exec_main():
     # Check if already running
-    #if (dbus.SessionBus().request_name("org.SilverRain.Silver") !=
-                                    #dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER):
-        #object = dbus.SessionBus().get_object("org.SilverRain.Silver",
-                                    #"/org/SilverRain/Silver")
-        #method = object.get_dbus_method("show_window")
-        #method()
-    #else:
-    let_it_rain()
+    if (dbus.SessionBus().request_name("org.SilverRain.Silver") !=
+                                    dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER):
+        object = dbus.SessionBus().get_object("org.SilverRain.Silver",
+                                    "/org/SilverRain/Silver")
+        method = object.get_dbus_method("show_window")
+        method()
+    else:
+        let_it_rain()
 
 if __name__ == '__main__':
     exec_main()
