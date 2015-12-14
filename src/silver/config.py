@@ -24,7 +24,7 @@ import re
 
 from gi.repository import Gtk
 
-from .globals import CONFIG_FILE, STREAM_URL_LIST
+from .constants import CONFIG_FILE, STREAM_URL_LIST
 
 def font_probe():
     """ Get system default font family """

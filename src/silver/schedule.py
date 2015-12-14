@@ -35,7 +35,7 @@ except ImportError as err:
     import xml.etree.ElementTree as etree
 
 from . import config
-from .globals import IMG_DIR, SCHED_FILE
+from .constants import IMG_DIR, SCHED_FILE
 from .msktz import MSK
 
 SCHED_URL       = "http://silver.ru/programms/"

@@ -33,7 +33,7 @@ import signal
 from . import application
 from . import config
 from . import css
-from . import globals
+from . import constants
 from . import translations
 
 ########################################################################
@@ -59,12 +59,12 @@ def let_it_rain():
     Notify.init("Silver Rain")
 
     # Create directories if they don't exist
-    for dir in [globals.APP_DIR, globals.IMG_DIR]:
+    for dir in [constants.APP_DIR, constants.IMG_DIR]:
         if not os.path.exists(dir):
             os.makedirs(dir)
 
     # Read config
-    if not os.path.exists(globals.CONFIG_FILE):
+    if not os.path.exists(constants.CONFIG_FILE):
         # Initialize default settings
         config.init()
         # Create configuration file

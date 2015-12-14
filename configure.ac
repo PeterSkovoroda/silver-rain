@@ -24,10 +24,10 @@ AM_GNU_GETTEXT_VERSION(0.19)
 
 AC_CONFIG_FILES([ po/Makefile.in
                   Makefile
-		  data/Makefile
-		  data/silver-rain.desktop
-		  data/icons/Makefile
+                  data/Makefile
+                  data/silver-rain.desktop
+                  data/icons/Makefile
                   src/silver/Makefile
-                  src/silver/globals.py
+                  src/silver/constants.py
 ])
 AC_OUTPUT

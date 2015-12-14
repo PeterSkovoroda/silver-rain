@@ -60,4 +60,4 @@ tags.sh
 .silver/
 
 # Automake
-src/silver/globals.py
+src/silver/constants.py

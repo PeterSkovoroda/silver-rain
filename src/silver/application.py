@@ -56,7 +56,7 @@ from .msktz import MSK
 from .translations import LANGUAGES_LIST, WEEKDAY_LIST
 from .schedule import SCHED_WEEKDAY_LIST
 from . import config
-from . import globals
+from . import constants
 
 ########################################################################
 # GUI
@@ -114,7 +114,7 @@ class SilverApplication(Gtk.Window):
         """ Init parent window """
         Gtk.Window.__init__(self, title="Silver Rain")
         self.set_border_width(0)
-        self.set_icon_name(globals.ICON)
+        self.set_icon_name(constants.ICON)
         self.set_default_size(650, 450)
         self.connect("delete-event", self.main_window_on_delete_event)
         # Container
@@ -356,7 +356,7 @@ class SilverApplication(Gtk.Window):
         """ Ubuntu appindicator """
         self.status_icon = appindicator.Indicator.new(
                                 "SilverRain",
-                                globals.ICON,
+                                constants.ICON,
                                 appindicator.IndicatorCategory.SYSTEM_SERVICES)
         self.status_icon.set_status(appindicator.IndicatorStatus.ACTIVE)
         self.status_icon.connect("scroll-event", self.appindicator_on_scroll)
@@ -375,7 +375,7 @@ class SilverApplication(Gtk.Window):
             # Ubuntu workaround
             return self.appindicator_create()
         self.status_icon = Gtk.StatusIcon()
-        self.status_icon.set_from_icon_name(globals.ICON)
+        self.status_icon.set_from_icon_name(constants.ICON)
         # Default events
         self.status_icon.connect("activate", self.status_icon_on_activate)
         self.status_icon.connect("scroll-event", self.status_icon_on_scroll)
@@ -802,7 +802,7 @@ class SilverApplication(Gtk.Window):
         # Header
         header = Gtk.HBox(spacing=5)
         header.set_border_width(10)
-        img = Gtk.Image.new_from_icon_name(globals.ICON, 64)
+        img = Gtk.Image.new_from_icon_name(constants.ICON, 64)
         img.set_pixel_size(50)
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>" +
@@ -1031,7 +1031,7 @@ class SilverApplication(Gtk.Window):
         prefs.set_resizable(False)
         ## Header
         # Image
-        img = Gtk.Image.new_from_icon_name(globals.ICON, 64)
+        img = Gtk.Image.new_from_icon_name(constants.ICON, 64)
         img.set_pixel_size(50)
         # Title
         title = Gtk.Label()
@@ -1225,14 +1225,14 @@ class SilverApplication(Gtk.Window):
         network.attach(text, 0, 0, 1, 1)
         stream_url_store = Gtk.ListStore(str)
         # If stream address defined by user
-        if config.stream_url not in globals.STREAM_URL_LIST:
-            globals.STREAM_URL_LIST.append(config.stream_url)
-        for url in globals.STREAM_URL_LIST:
+        if config.stream_url not in constants.STREAM_URL_LIST:
+            constants.STREAM_URL_LIST.append(config.stream_url)
+        for url in constants.STREAM_URL_LIST:
             stream_url_store.append([url])
         self.prefs_stream_url = Gtk.ComboBox.new_with_model_and_entry(
                                                               stream_url_store)
         self.prefs_stream_url.set_entry_text_column(0)
-        self.prefs_stream_url.set_active(globals.STREAM_URL_LIST.index(config.stream_url))
+        self.prefs_stream_url.set_active(constants.STREAM_URL_LIST.index(config.stream_url))
         network.attach_next_to(self.prefs_stream_url, text,
                                Gtk.PositionType.RIGHT, 1, 1)
         pack_prefs_box(page_network, _("Network"), network)
@@ -1400,11 +1400,11 @@ class SilverApplication(Gtk.Window):
         eventbox = Gtk.EventBox()
         header = Gtk.HBox(spacing=5)
         header.set_border_width(0)
-        img = Gtk.Image.new_from_icon_name(globals.ICON, 64)
+        img = Gtk.Image.new_from_icon_name(constants.ICON, 64)
         img.set_pixel_size(50)
         title = Gtk.Label()
         title.set_markup("<span size='18000'><b>Silver Rain</b></span>\n" +
-                         "<span size='11000'>Version " + globals.VERSION + "</span>")
+                         "<span size='11000'>Version " + constants.VERSION + "</span>")
         title.set_alignment(0, 0)
         title.set_selectable(True)
         header.pack_start(img, False, False, 0)
