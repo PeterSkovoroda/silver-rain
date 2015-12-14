@@ -36,8 +36,6 @@ from . import css
 from . import constants
 from . import translations
 
-########################################################################
-# DBus service
 class SilverService(dbus.service.Object):
     """ DBus service """
     def __init__(self, win):
@@ -56,38 +54,29 @@ def let_it_rain():
     GObject.threads_init()
     Gst.init(None)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    Notify.init("Silver Rain")
-
-    # Create directories if they don't exist
+    Notify.init("silver-rain")
+    # Create system directories if do not exist
     for dir in [constants.APP_DIR, constants.IMG_DIR]:
         if not os.path.exists(dir):
             os.makedirs(dir)
-
-    # Read config
-    if not os.path.exists(constants.CONFIG_FILE):
-        # Initialize default settings
-        config.init()
-        # Create configuration file
-        config.save()
-    else:
-        config.load()
-
+    # Initialize config
+    config.setup()
     # Create directory for recordings
     if not os.path.exists(config.recs_dir):
         os.makedirs(config.recs_dir)
-
     # Load css
     css.css_load()
     # Init translation
     translations.set_translation()
-    # Init
+    # Init application
     silver_window = application.SilverApplication()
+    # Setup dbus service
     service = SilverService(silver_window)
     # Run loop
     Gtk.main()
     # Cleanup
-    Notify.uninit()
     silver_window.clean()
+    Notify.uninit()
 
 def exec_main():
     # Check if already running

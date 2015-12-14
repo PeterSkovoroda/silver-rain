@@ -44,7 +44,9 @@ BITRIX_SERVER   = "http://bitrix.info/ba.js"
 COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
 COLOR_INVALID               = "#FF4545"
 
+import os
 import threading
+import textwrap
 
 from datetime import datetime
 from datetime import timedelta
@@ -53,7 +55,7 @@ from datetime import date
 from .player import SilverPlayer, SilverRecorder
 from .schedule import SilverSchedule
 from .msktz import MSK
-from .translations import LANGUAGES_LIST, WEEKDAY_LIST
+from .translations import _, LANGUAGES_LIST, WEEKDAY_LIST
 from .schedule import SCHED_WEEKDAY_LIST
 from . import config
 from . import constants

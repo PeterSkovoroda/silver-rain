@@ -24,7 +24,7 @@ import re
 
 from gi.repository import Gtk
 
-from .constants import CONFIG_FILE, STREAM_URL_LIST
+from . import constants
 
 def font_probe():
     """ Get system default font family """
@@ -42,7 +42,7 @@ class Default():
     recs_prefix         = "%m-%d-%y-%H:%M-"
     use_css             = True
     css_path            = ""
-    stream_url          = STREAM_URL_LIST[0]
+    stream_url          = constants.STREAM_URL_LIST[0]
     bg_colors           = ["white", "gray95"]
     font_color          = "black"
     selected_bg_color   = "#FF4545"
@@ -104,8 +104,8 @@ def init():
 def load():
     """ Read configuration file """
     cfg = configparser.ConfigParser()
-    cfg.read(CONFIG_FILE)
-    print(CONFIG_FILE)
+    cfg.read(constants.CONFIG_FILE)
+    print(constants.CONFIG_FILE)
     # General
     global autoplay
     autoplay = cfg.getboolean('GENERAL', 'autoplay',
@@ -168,7 +168,7 @@ def load():
                     fallback=Default.proxy_pw)
 
 def save():
-    """ Create configuration file """
+    """ Save configuration file """
     cfg = configparser.ConfigParser()
     cfg['GENERAL'] = {
             'autoplay'          : autoplay,
@@ -195,5 +195,14 @@ def save():
             'proxyuri'          : proxy_uri,
             'streamurl'         : stream_url,
             }
-    with open(CONFIG_FILE, 'w') as configfile:
+    with open(constants.CONFIG_FILE, 'w') as configfile:
         cfg.write(configfile)
+
+def setup():
+    """ Setup configuration.
+        Create config file if does not exist """
+    if not os.path.exists(constants.CONFIG_FILE):
+        init()
+        save()
+    else:
+        load()
