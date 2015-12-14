@@ -21,10 +21,10 @@ Boston, MA 02110-1301 USA
 import configparser
 import os
 import re
+
 from gi.repository import Gtk
 
-from .globals import CONFIG_FILE
-from .globals import STREAM_URL_LIST
+from .globals import CONFIG_FILE, STREAM_URL_LIST
 
 def font_probe():
     """ Get system default font family """
