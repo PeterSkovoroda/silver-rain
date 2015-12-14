@@ -20,10 +20,11 @@ Boston, MA 02110-1301 USA
 
 from gi.repository import Gst
 
-import datetime
+from datetime import datetime
 import sys
 
 from . import config
+from .msktz import MSK
 
 class Player():
     """ Base class for player instances """
@@ -35,17 +36,15 @@ class Player():
 
     def reset_connection_settings(self):
         if self.playing:
-            self._stop()
+            self.stop()
         self._on_config_changed()
-        if self.playing:
-            self._play()
 
     def clean(self):
         self.playing = False
         self._clean()
 
 # Playback control API
-    def play(self, arg):
+    def play(self, arg=None):
         if not self.playing:
             self._play(arg)
             self.playing = True
@@ -97,16 +96,16 @@ class SilverPlayer(Player):
             sys.exit(-1)
         self._el = dict()
         try:
-            self._el["source"] = Gst.ElementFactory.make('souphttpsrc',
-                                                            'source')
-            self._el["decode"] = Gst.ElementFactory.make('decodebin',
-                                                            'decode')
-            self._el["convert"] = Gst.ElementFactory.make('audioconvert',
-                                                            'convert')
-            self._el["convert"] = Gst.ElementFactory.make('volume',
-                                                            'volume')
-            self._el["sink"] = Gst.ElementFactory.make('autoaudiosink',
-                                                            'sink')
+            self._el["source"] = Gst.ElementFactory.make("souphttpsrc",
+                                                            "source")
+            self._el["decode"] = Gst.ElementFactory.make("decodebin",
+                                                            "decode")
+            self._el["convert"] = Gst.ElementFactory.make("audioconvert",
+                                                            "convert")
+            self._el["volume"] = Gst.ElementFactory.make("volume",
+                                                            "volume")
+            self._el["sink"] = Gst.ElementFactory.make("autoaudiosink",
+                                                            "sink")
         except Gst.ElementNotFoundError:
             self._error_callback("Couldn't find GStreamer element")
             sys.exit(-1)
@@ -130,7 +129,7 @@ class SilverPlayer(Player):
         def on_pad_added(decode, pad):
             if not pad.is_linked():
                 return pad.link(self._el["convert"].get_static_pad("sink"))
-        self._el["decode"].connect("pad-added", pad_added_callback)
+        self._el["decode"].connect("pad-added", on_pad_added)
         if (not Gst.Element.link(self._el["source"], self._el["decode"]) or
             not Gst.Element.link(self._el["convert"], self._el["volume"]) or
             not Gst.Element.link(self._el["volume"], self._el["sink"])):
@@ -147,8 +146,9 @@ class SilverPlayer(Player):
         """ Set player volume [0-100] """
         self._pipe.get_by_name("volume").set_property("volume", value / 100.)
     
-    def _play(self, stream=config.stream_url):
-        self._pipe.get_by_name("source").set_property("location", stream)
+    def _play(self, stream=None):
+        if stream:
+            self._pipe.get_by_name("source").set_property("location", stream)
         ret = self._pipe.set_state(Gst.State.PLAYING)
         if ret == Gst.StateChangeReturn.FAILURE:
             self._error_callback("Couldn't change state on pipeline")

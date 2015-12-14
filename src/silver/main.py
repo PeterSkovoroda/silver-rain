@@ -30,7 +30,6 @@ try:
 except ImportError:
     APP_INDICATOR = False
 
-import gettext
 import json
 import logging
 import os
@@ -38,7 +37,6 @@ import random
 import re
 import requests
 import signal
-import string
 import subprocess
 import textwrap
 import threading
@@ -51,7 +49,14 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import tzinfo
 
+#XXX
 from . import config
+from .msktz import MSK
+from .player import SilverPlayer, SilverRecorder
+from . import translations
+from gettext import gettext as _
+from .translations import LANGUAGES_LIST, WEEKDAY_LIST
+
 from .globals import CONFIG_FILE, APP_DIR, IMG_DIR, ICON, SCHED_FILE, STREAM_URL_LIST, VERSION
 
 try:
@@ -73,39 +78,6 @@ BITRIX_SERVER   = "http://bitrix.info/ba.js"
 
 COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
 COLOR_INVALID               = "#FF4545"
-
-########################################################################
-# Timezone
-# It's hard to work with utc, since schedule defined for MSK zone,
-# so use timezone synchronization, which is actually a bad idea
-class MSK(tzinfo):
-    def utcoffset(self, dt):
-        return timedelta(hours=3)
-
-    def dst(self, dt):
-        return timedelta(hours=0)
-
-    def tzname(self, dt):
-        return "MSK"
-
-########################################################################
-# Translations
-LANGUAGES_LIST      = ["English", "Русский"]
-TRANSLATIONS_LIST   = ["en", "ru"]
-WEEKDAY_LIST = []
-
-def set_translation():
-    if config.language:
-        lang = gettext.translation("silver-rain",
-                                   languages=[TRANSLATIONS_LIST[config.language]])
-        lang.install()
-    else:
-        global _
-        _ = lambda s: s
-
-    global WEEKDAY_LIST
-    WEEKDAY_LIST = [_("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
-                    _("Friday"), _("Saturday"), _("Sunday")]
 
 # Use this list to operate with schedule
 SCHED_WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
@@ -167,251 +139,6 @@ def css_load():
             Gdk.Screen.get_default(),
             style_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-########################################################################
-# GStreamer
-class SilverPlayer():
-    """ Gstreamer container for playing and recording network audio stream
-        Player:
-            souphttpsrc -> decodebin -> audioconvert -> volume -> autoaudiosink
-        Recorder:
-            souphttpsrc -> icydemux -> filesink """
-    def __init__(self):
-        self.__playing__ = False
-        self.__recording__ = False
-
-    def clean(self):
-        """ Unref pipeline """
-        self.__playing__ = False
-        self.__recording__ = False
-        self.__pipeline__.set_state(Gst.State.NULL)
-        self.__recorder__.set_state(Gst.State.NULL)
-
-    def reset_network_settings(self):
-        """ Set new network settings """
-        self.__pipeline__.get_by_name('source').set_property('location',
-                                                    config.stream_url)
-        self.__recorder__.get_by_name('source').set_property('location',
-                                                    config.stream_url)
-        if config.proxy_required:
-            self.__pipeline__.get_by_name('source').set_property('proxy',
-                                                    config.proxy_uri)
-            self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-id', config.proxy_id)
-            self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-pw', config.proxy_pw)
-            self.__recorder__.get_by_name('source').set_property('proxy',
-                                                    config.proxy_uri)
-            self.__recorder__.get_by_name('source').set_property(
-                                                    'proxy-id', config.proxy_id)
-            self.__recorder__.get_by_name('source').set_property(
-                                                    'proxy-pw', config.proxy_pw)
-        else:
-            self.__pipeline__.get_by_name('source').set_property('proxy',
-                                                    '')
-            self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-id', '')
-            self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-pw', '')
-            self.__pipeline__.get_by_name('source').set_property('proxy',
-                                                    '')
-            self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-id', '')
-            self.__pipeline__.get_by_name('source').set_property(
-                                                    'proxy-pw', '')
-
-    def playback_toggle(self):
-        """ Playback trigger """
-        self.__playing__ = not self.__playing__
-        if self.__playing__:
-            ret = self.__pipeline__.set_state(Gst.State.PLAYING)
-        else:
-            # Switch state to READY instead of STOP to prevent EOS
-            ret = self.__pipeline__.set_state(Gst.State.READY)
-
-        if ret == Gst.StateChangeReturn.FAILURE:
-            self.error_func("Couldn't change state")
-            self.clean()
-            exit(-1)
-
-    def recorder_toggle(self, name):
-        """ Record trigger """
-        self.__recording__ = not self.__recording__
-        if self.__recording__:
-            file = config.recs_dir + "/" + \
-                   datetime.now(MSK()).strftime(config.recs_prefix) + name + ".mp3"
-            self.__recorder__.get_by_name('filesink').set_property('location',
-                                                                   file)
-            ret = self.__recorder__.set_state(Gst.State.PLAYING)
-        else:
-            ret = self.__recorder__.set_state(Gst.State.READY)
-
-        if ret == Gst.StateChangeReturn.FAILURE:
-            self.error_func("Couldn't change state")
-            self.clean()
-            exit(-1)
-
-    def set_error_function(self, er_func, warn_func,
-                           playback_stop_func, rec_stop_func):
-        """ Set callback to show error messages """
-        self.error_func = er_func
-        self.warning_func = warn_func
-        self.playback_stop_callback = playback_stop_func
-        self.recorder_stop_callback = rec_stop_func
-
-    def volume_set(self, value):
-        """ Set player volume [0-100] """
-        self.__pipeline__.get_by_name('volume').set_property('volume',
-                                                             value / 100.)
-
-    def create_pipeline(self):
-        self.elements = dict()
-        self.__pipeline__ = Gst.Pipeline.new("SilverPlayer")
-        if not self.__pipeline__:
-            self.error_func("Couldn't create pipeline")
-            exit(-1)
-        # Create GStream elements
-        try:
-            self.elements["source"] = Gst.ElementFactory.make('souphttpsrc',
-                                                              'source')
-            self.elements["decode"] = Gst.ElementFactory.make('decodebin',
-                                                              'decode')
-            self.elements["convert"] = Gst.ElementFactory.make('audioconvert',
-                                                               'convert')
-            self.elements["volume"] = Gst.ElementFactory.make('volume',
-                                                              'volume')
-            self.elements["sink"] = Gst.ElementFactory.make('autoaudiosink',
-                                                            'sink')
-        except Gst.ElementNotFoundError:
-            str = "Couldn't find GStreamer element" + \
-                  "Check if packages" + \
-                  "'GStreamer Good Plugins 1.0'" + \
-                  "'GStreamer Base Plugins 1.0'" + \
-                  "are installed"
-            self.error_func(str)
-            exit(-1)
-
-        for key in self.elements:
-            if not self.elements[key]:
-                self.error_func("Couldn't create element: " + key)
-                exit(-1)
-            else:
-                self.__pipeline__.add(self.elements[key])
-
-        self.elements["source"].set_property('location', config.stream_url)
-        self.elements["source"].set_property('is-live', True)
-        self.elements["source"].set_property('compress', True)
-        if config.proxy_required:
-            self.elements["source"].set_property('proxy', config.proxy_uri)
-            self.elements["source"].set_property('proxy-id', config.proxy_id)
-            self.elements["source"].set_property('proxy-pw', config.proxy_pw)
-        self.elements["volume"].set_property('volume', 1.)
-
-        # Link elements
-        def pad_added_callback(decode, pad):
-            if pad.is_linked():
-                # Already linked. Skip
-                return
-            return pad.link(self.elements["convert"].get_static_pad('sink'))
-
-        self.elements["decode"].connect('pad-added', pad_added_callback)
-
-        if (not Gst.Element.link(self.elements["source"],
-                                 self.elements["decode"]) or
-            not Gst.Element.link(self.elements["convert"],
-                                 self.elements["volume"]) or
-            not Gst.Element.link(self.elements["volume"],
-                                 self.elements["sink"])):
-            self.error_func("Elements could not be linked")
-            exit(-1)
-
-        # Create message bus
-        msg_bus = self.__pipeline__.get_bus()
-        msg_bus.add_signal_watch()
-        msg_bus.connect('message', self._message_handler)
-
-    def create_recorder(self):
-        self.relements = dict()
-        self.__recorder__ = Gst.Pipeline.new("SilverRecorder")
-        if not self.__recorder__:
-            self.error_func("Couldn't create pipeline")
-            exit(-1)
-
-        # Create GStreamer elements
-        try:
-            self.relements["source"] = Gst.ElementFactory.make('souphttpsrc',
-                                                               'source')
-            self.relements["demux"] = Gst.ElementFactory.make('icydemux',
-                                                              'demux')
-            self.relements["filesink"] = Gst.ElementFactory.make('filesink',
-                                                                 'filesink')
-        except Gst.ElementNotFoundError:
-            str = "Couldn't find GStreamer element " + \
-                  "Check if packages " + \
-                  "'GStreamer Good Plugins 1.0' " + \
-                  "'GStreamer Base Plugins 1.0' " + \
-                  "are installed"
-            self.error_func(str)
-            exit(-1)
-
-        for key in self.relements:
-            if not self.relements[key]:
-                self.error_func("Couldn't create element: " + key)
-                exit(-1)
-            else:
-                self.__recorder__.add(self.relements[key])
-
-        self.relements["source"].set_property('location', config.stream_url)
-        self.relements["source"].set_property('is-live', True)
-        self.relements["source"].set_property('compress', True)
-        if config.proxy_required:
-            self.relements["source"].set_property('proxy', config.proxy_uri)
-            self.relements["source"].set_property('proxy-id', config.proxy_id)
-            self.relements["source"].set_property('proxy-pw', config.proxy_pw)
-        self.relements["filesink"].set_property('location', "file.mp3")
-
-        # Link relements
-        def pad_added_callback(demux, pad):
-            if pad.is_linked():
-                # Already linked. Skip
-                return
-            return pad.link(self.relements["filesink"].get_static_pad('sink'))
-
-        self.relements["demux"].connect('pad-added', pad_added_callback)
-
-        if not Gst.Element.link(self.relements["source"],
-                                self.relements["demux"]):
-            self.error_func("Elements could not be linked")
-            exit(-1)
-        # Create message bus
-        msg_bus = self.__recorder__.get_bus()
-        msg_bus.add_signal_watch()
-        msg_bus.connect('message', self._rec_message_handler)
-
-    def _message_handler(self, bus, msg):
-        """ Player message bus """
-        struct = msg.get_structure()
-        if msg.type == Gst.MessageType.ERROR:
-            err, dbg = msg.parse_error()
-            self.error_func("Error from element %s: %s" % (msg.src.get_name(),
-                                                         err))
-            self.playback_stop_callback()
-        elif msg.type == Gst.MessageType.EOS:
-            self.warning_func("End of stream")
-            self.playback_stop_callback()
-
-    def _rec_message_handler(self, bus, msg):
-        """ Recorder message bus """
-        struct = msg.get_structure()
-        if msg.type == Gst.MessageType.ERROR:
-            err, dbg = msg.parse_error()
-            self.error_func("Error from element %s: %s" % (msg.src.get_name(),
-                                                         err))
-            self.recorder_stop_callback()
-        elif msg.type == Gst.MessageType.EOS:
-            # Stop recorder timers
-            self.warning_func("End of stream")
-            self.recorder_stop_callback()
 
 ########################################################################
 # Schedule
@@ -756,15 +483,14 @@ class SilverService(dbus.service.Object):
 # GUI
 class SilverGUI(Gtk.Window):
     """ GUI """
-    def __init__(self, player, sched):
-        ## GStreamer
-        self._player = player
+    def __init__(self):
         self.__muted__ = 0
-        self.__playing__ = False
-        self.__recording__ = False
         self.__volume__ = 100
+        # Initialize GStreamer
+        self._player = SilverPlayer(self.error_show, self.warning_show)
+        self._recorder = SilverRecorder(self.error_show, self.warning_show)
         ## Schedule
-        self._schedule = sched
+        self._schedule = SilverSchedule()
         self.__SCHEDULE_ERROR__ = False
         ## Timers
         # On event timer
@@ -783,26 +509,27 @@ class SilverGUI(Gtk.Window):
         self.__today__ = datetime.now(MSK())
         self.__cell_bg_old__ = ''
         self.__cell_fg_old__ = ''
+
         # Create main window
         self.main_window_create()
+
         # Create messenger
         self.im_create()
-        # Initialize GStreamer
-        self._player.set_error_function(self.error_show, self.warning_show,
-                                        self.playback_emergency_stop,
-                                        self.recorder_emergency_stop)
-        self._player.create_pipeline()
-        self._player.create_recorder()
+
+
         # Create status icon
         self.status_icon_create()
         # Create treeview
         self.schedule_update()
+
         if config.autoplay:
             self.playback_toggle(None)
 
 ### Cleanup
     def clean(self):
         self.timers_clean()
+        self._player.clean()
+        self._recorder.clean()
 
 ### Main Window
     def main_window_create(self):
@@ -1044,7 +771,7 @@ class SilverGUI(Gtk.Window):
         elif self.__muted__ and self.__volume__ > 0:
             self.__muted__ = self.__volume__
             self.menubar_mute_toggle()
-        self._player.volume_set(self.__volume__)
+        self._player.set_volume(self.__volume__)
 
 ### App Indicator
     def appindicator_create(self):
@@ -1477,7 +1204,7 @@ class SilverGUI(Gtk.Window):
         iter = self.sched_tree_model.get_iter(path)
         if self.sched_tree_model[iter][10]:
             self.sched_tree_model[iter][10] = False
-            if self.__recording__:
+            if self._recorder.playing:
                 # Recorder was started manually
                 return
             # Toggle recorder
@@ -2062,7 +1789,7 @@ class SilverGUI(Gtk.Window):
         # Update messenger
         self.im_sender.set_text(config.message_sender)
         # Update player
-        self._player.reset_network_settings()
+        self._player.reset_connection_settings()
 
     def prefs_reset_appearance(self, widget):
         """ Reset default settings """
@@ -2196,27 +1923,31 @@ class SilverGUI(Gtk.Window):
 
     def playback_toggle(self, button):
         """ Update interface, toggle player """
-        self.__playing__ = not self.__playing__
+        playing = self._player.playing
+
         self.playback_button.set_icon_name(self.get_playback_label()[1])
         # Menubar
-        self.menubar_play.set_sensitive(not self.__playing__)
-        self.menubar_stop.set_sensitive(self.__playing__)
+        self.menubar_play.set_sensitive(playing)
+        self.menubar_stop.set_sensitive(not playing)
         # Control panel
         self.playback_button.set_tooltip_text(self.get_playback_label()[0])
         # Appindicator
         self.appindicator_update_menu()
-        self._player.playback_toggle()
+        if playing:
+            self._player.stop()
+        else:
+            self._player.play()
         self.show_notification_on_playback()
 
     def recorder_toggle(self, button):
         """ Change status, toggle recorder, set timer """
-        self.__recording__ = not self.__recording__
+        recording = self._recorder.playing
         # Menubar
-        self.menubar_record.set_sensitive(not self.__recording__)
-        self.menubar_stop_recording.set_sensitive(self.__recording__)
+        self.menubar_record.set_sensitive(recording)
+        self.menubar_stop_recording.set_sensitive(not recording)
         # Appindicator
         self.appindicator_update_menu()
-        if self.__recording__:
+        if not recording:
             # Set timer
             today = datetime.now(MSK())
             now = timedelta(hours=today.hour,
@@ -2232,7 +1963,10 @@ class SilverGUI(Gtk.Window):
         else:
             name = "SilverRain"
         # Start recorder
-        self._player.recorder_toggle(name)
+        if not recording:
+            self._recorder.play(name)
+        else:
+            self._recorder.stop()
 
     def recorder_stop(self, button):
         """ Cancel timer, toggle recorder """
@@ -2256,7 +1990,7 @@ class SilverGUI(Gtk.Window):
 
     def get_playback_label(self):
         """ Return label and icon for Playback menu/button """
-        if not self.__playing__:
+        if not self._player.playing:
             label = _("Play")
             icon = "media-playback-start"
         else:
@@ -2266,7 +2000,7 @@ class SilverGUI(Gtk.Window):
 
     def get_record_label(self):
         """ Return label and icon for Playback menu/button """
-        if not self.__recording__:
+        if not self._recorder.playing:
             label = _("Record program")
             icon = "media-record"
         else:
@@ -2298,7 +2032,7 @@ class SilverGUI(Gtk.Window):
         self.notification.show()
 
     def show_notification_on_playback(self):
-        if self.__playing__:
+        if self._player.playing:
             self.show_notification_on_event()
         else:
             text = _("Silver Rain")
@@ -2359,29 +2093,26 @@ def let_it_rain():
     # Load css
     css_load()
     # Init translation
-    set_translation()
+    translations.set_translation()
     # Init
-    silver_player = SilverPlayer()
-    silver_schedule = SilverSchedule()
-    silver_window = SilverGUI(silver_player, silver_schedule)
-    service = SilverService(silver_window)
+    silver_window = SilverGUI()
+    #service = SilverService(silver_window)
     # Run loop
     Gtk.main()
     # Cleanup
     Notify.uninit()
     silver_window.clean()
-    silver_player.clean()
 
 def exec_main():
     # Check if already running
-    if (dbus.SessionBus().request_name("org.SilverRain.Silver") !=
-                                    dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER):
-        object = dbus.SessionBus().get_object("org.SilverRain.Silver",
-                                              "/org/SilverRain/Silver")
-        method = object.get_dbus_method("show_window")
-        method()
-    else:
-        let_it_rain()
+    #if (dbus.SessionBus().request_name("org.SilverRain.Silver") !=
+                                    #dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER):
+        #object = dbus.SessionBus().get_object("org.SilverRain.Silver",
+                                              #"/org/SilverRain/Silver")
+        #method = object.get_dbus_method("show_window")
+        #method()
+    #else:
+    let_it_rain()
 
 if __name__ == '__main__':
     exec_main()
