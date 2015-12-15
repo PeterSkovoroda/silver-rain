@@ -23,7 +23,7 @@ from silver.notifications import Notifications
 from silver.player import SilverPlayer
 from silver.player import SilverRecorder
 from silver.statusicon import StatusIcon
-from silver.timer import SilverTimer
+from silver.timer import Timer
 
 from silver.gui.controlpanel import ControlPanel
 from silver.gui.menubar import Menubar
@@ -37,13 +37,13 @@ class SilverApp():
     def __init__(self):
         ## Initialize GStreamer
         self._player = SilverPlayer(self._on_player_error)
-        self._recorder = SilverRecorder(self._on_player_error)
+        self._recorder = SilverRecorder(self._on_recorder_error)
         ## Schedule
         self._schedule = SilverSchedule()
         ## On event timer
-        self._t_event = SilverTimer()
+        self._t_event = Timer(self.update_now_playing)
         ## Record timer
-        self._t_recorder = SilverTimer()
+        self._t_recorder = Timer(self.stop_record)
         ## Window
         # Menubar
         self._menubar = Menubar(self)
@@ -254,6 +254,7 @@ from .schedule import SCHED_WEEKDAY_LIST
 
 ### Updater
     def update_now_playing(self):
+        #XXX START TIMER
         """ Update label, bg of current event, show notifications """
         # Show agenda for today if not shown
         if not (self.__weekday_filter__ == self.__today__.strftime("%A")):
