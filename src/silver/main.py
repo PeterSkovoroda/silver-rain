@@ -33,8 +33,10 @@ import signal
 from . import application
 from . import config
 from . import css
-from . import constants
 from . import translations
+
+from silver.globals import APP_DIR
+from silver.globals import IMG_DIR
 
 class SilverService(dbus.service.Object):
     """ DBus service """
@@ -56,7 +58,7 @@ def let_it_rain():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     Notify.init("silver-rain")
     # Create system directories if do not exist
-    for dir in [constants.APP_DIR, constants.IMG_DIR]:
+    for dir in [APP_DIR, IMG_DIR]:
         if not os.path.exists(dir):
             os.makedirs(dir)
     # Initialize config

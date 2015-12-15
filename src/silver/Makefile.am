@@ -1,7 +1,7 @@
 silvermoduledir = $(pkgpythondir)
 silvermodule_PYTHON = __init__.py \
 		      __main__.py \
-		      constants.py \
+		      globals.py \
 		      main.py
 
 silverdir = $(bindir)

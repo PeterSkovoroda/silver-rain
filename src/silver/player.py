@@ -30,6 +30,8 @@ class Player():
     """ Base class for player instances """
     def __init__(self, err_func, warn_func):
         self.playing = False
+        self.muted = 0
+        self.volume = 100
         # Set error callbacks
         self._error_callback = err_func
         self._warn_callback = warn_func

@@ -28,6 +28,6 @@ AC_CONFIG_FILES([ po/Makefile.in
                   data/silver-rain.desktop
                   data/icons/Makefile
                   src/silver/Makefile
-                  src/silver/constants.py
+                  src/silver/globals.py
 ])
 AC_OUTPUT

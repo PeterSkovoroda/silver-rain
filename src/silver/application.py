@@ -251,9 +251,6 @@ from .schedule import SilverSchedule
 from .msktz import MSK
 from .translations import _, LANGUAGES_LIST, WEEKDAY_LIST
 from .schedule import SCHED_WEEKDAY_LIST
-from . import config
-from . import constants
-
 
 ### Updater
     def update_now_playing(self):

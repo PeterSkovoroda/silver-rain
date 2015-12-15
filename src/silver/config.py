@@ -24,7 +24,8 @@ import re
 
 from gi.repository import Gtk
 
-from . import constants
+from silver.globals import CONFIG_FILE
+from silver.globals import STREAM_URL_LIST
 
 def font_probe():
     """ Get system default font family """
@@ -42,7 +43,7 @@ class Default():
     recs_prefix         = "%m-%d-%y-%H:%M-"
     use_css             = True
     css_path            = ""
-    stream_url          = constants.STREAM_URL_LIST[0]
+    stream_url          = STREAM_URL_LIST[0]
     bg_colors           = ["white", "gray95"]
     font_color          = "black"
     selected_bg_color   = "#FF4545"
@@ -104,8 +105,7 @@ def init():
 def load():
     """ Read configuration file """
     cfg = configparser.ConfigParser()
-    cfg.read(constants.CONFIG_FILE)
-    print(constants.CONFIG_FILE)
+    cfg.read(CONFIG_FILE)
     # General
     global autoplay
     autoplay = cfg.getboolean('GENERAL', 'autoplay',
@@ -195,13 +195,13 @@ def save():
             'proxyuri'          : proxy_uri,
             'streamurl'         : stream_url,
             }
-    with open(constants.CONFIG_FILE, 'w') as configfile:
+    with open(CONFIG_FILE, 'w') as configfile:
         cfg.write(configfile)
 
 def setup():
     """ Setup configuration.
         Create config file if does not exist """
-    if not os.path.exists(constants.CONFIG_FILE):
+    if not os.path.exists(CONFIG_FILE):
         init()
         save()
     else:

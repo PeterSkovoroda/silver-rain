@@ -35,8 +35,9 @@ except ImportError as err:
     import xml.etree.ElementTree as etree
 
 from . import config
-from .constants import IMG_DIR, SCHED_FILE
-from .msktz import MSK
+from silver.globals import IMG_DIR
+from silver.globals import SCHED_FILE
+from silver.msktz import MSK
 
 SCHED_URL       = "http://silver.ru/programms/"
 SILVER_RAIN_URL = "http://silver.ru"
@@ -89,6 +90,7 @@ class SilverSchedule():
         self.__sched_week__ = [ [] for x in range(7) ]
         self.__sched_day__ = deque()
         self.__event__ = {}
+        self.__SCHEDULE_ERROR__ = False
 
     # Get current event values
     def get_event_title(self): return self.__event__["title"]
