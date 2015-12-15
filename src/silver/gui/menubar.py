@@ -59,7 +59,8 @@ class Menubar(Gtk.MenuBar):
         self._menubar_stop_recording.set_sensitive(False)
         self._menubar_stop_recording.connect("activate", self._on_stop_record)
         key, mod = Gtk.accelerator_parse("F9")
-        self._menubar_stop_recording.add_accelerator("activate", self.accel_group,
+        self._menubar_stop_recording.add_accelerator("activate",
+                                          self.accel_group,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         # Mute
         self._menubar_mute = Gtk.CheckMenuItem(_("Mute"))
