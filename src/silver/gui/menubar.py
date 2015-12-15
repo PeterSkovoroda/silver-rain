@@ -137,6 +137,9 @@ class Menubar(Gtk.MenuBar):
         self._menubar_record.set_sensitive(not recording)
         self._menubar_stop_recording.set_sensitive(recording)
 
+    def raise_mute(self, mute):
+        self._menubar_mute.set_active(mute)
+
     def _on_play(self, button):
         self._app.play()
 
