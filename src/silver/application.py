@@ -25,6 +25,7 @@ from silver.player import SilverRecorder
 from silver.statusicon import StatusIcon
 from silver.timer import Timer
 
+from silver.gui.about import About
 from silver.gui.controlpanel import ControlPanel
 from silver.gui.menubar import Menubar
 from silver.gui.schedtree import SchedTree
@@ -35,14 +36,14 @@ from silver.gui.window import MainWindow
 class SilverApp():
     """ GUI """
     def __init__(self):
-        ## Initialize GStreamer
+        # Initialize GStreamer
         self._player = SilverPlayer(self._on_player_error)
         self._recorder = SilverRecorder(self._on_recorder_error)
-        ## Schedule
+        # Schedule
         self._schedule = SilverSchedule()
-        ## On event timer
+        # On event timer
         self._t_event = Timer(self.update_now_playing)
-        ## Record timer
+        # Record timer
         self._t_recorder = Timer(self.stop_record)
         ## Window
         # Menubar
@@ -50,24 +51,22 @@ class SilverApp():
         # Selection
         self._selection = Selection(self)
         # Controls
-        self._control_panel = ControlPanel(self)
+        self._panel = ControlPanel(self)
         # Main window
-        self._main_window = MainWindow(self._menubar, self._selection,
-                                       self._control_panel)
+        self._window = MainWindow(self._menubar, self._selection, self._panel)
         # Schedule tree
         self._sched_tree = SchedTree(self._schedule)
-        self._main_window.set_widget(self._sched_tree)
+        self._window.set_widget(self._sched_tree)
         # Don't show if should stay hidden
         if not config.start_hidden:
             self.show()
-        ## Messenger
-        self._messenger = Messenger()
-        ## Notifications
+        # Messenger
+        self._messenger = Messenger(self._window)
+        # Notifications
         self._notifications = Notifications()
-        ## Satus icon
+        # Satus icon
         self._status_icon = StatusIcon()
-
-        # Create TreeView
+        # Update schedule
         self.schedule_update()
         # Autoplay
         if config.autoplay():
@@ -83,48 +82,57 @@ class SilverApp():
 # Application API
     def show(self):
         """ Show main window """
-        self._main_window.show()
-        self._main_window.hidden = False
+        self._window.show()
+        self._window.hidden = False
 
     def hide(self):
         """ Hide main window """
-        self._main_window.hide()
-        self._main_window.hidden = True
+        self._window.hide()
+        self._window.hidden = True
 
     def about(self):
         """ Open about dialog """
-        pass
+        dialog = About(self._window)
+        dialog.run()
+        dialog.destroy()
 
     def im(self):
         """ Open messenger """
-        if self._messenger.hidden:
-            self._messenger.show()
+        self._messenger.show()
 
     def prefs(self):
         """ Open preferences window """
-        pass
+        dialog = Preferences(self._window)
+        dialog.run()
+        dialog.destroy()
 
     def play(self):
         """ Update interface, start player """
         # Update interface
         self._menubar.update_playback_menu(True)
-        self._control_panel.update_playback(True)
+        self._panel.update_playback_button(True)
         self._status_icon.update_playback(True)
         # Play
         self._player.play()
         # Show notification
-        self._notifications.show_on_play()
+        if not self._schedule.__SCHEDULE_ERROR__:
+            title = self._schedule.get_event_title()
+            host = self._schedule.get_event_host()
+            img = self._schedule.get_event_icon()
+            self._notifications.show_on_play(title=title, host=host, icon=img)
+        else:
+            self._notifications.show_playing()
 
     def stop(self):
         """ Update interface, stop player """
         # Update interface
         self._menubar.update_playback_menu(False)
-        self._control_panel.update_playback(False)
+        self._panel.update_playback(False)
         self._status_icon.update_playback(False)
         # Stop player
         self._player.stop()
         # Show notification
-        self._notifications.show_on_stop()
+        self._notifications.show_stopped()
 
     def set_volume(self):
         #XXX
@@ -135,12 +143,12 @@ class SilverApp():
             self.on_mute_toggled()
         self._player.set_volume(self._player.volume)
 
-    def on_mute_toggled(self, widget=None):
+    def on_mute_toggled(self):
         """ Since it's impossible to just set checkbox status
             without activating it (which is stupid, by the way),
             this function should toggle checkbox from menubar
             which will run actual mute method """
-        self._menubar.menubar_mute.set_active(not self._player.muted)
+        self._menubar.raise_mute(not self._player.muted)
 
     def mute(self):
         """ Mute player """
@@ -159,6 +167,10 @@ class SilverApp():
     def refilter(self, weekday):
         """ Refilter TreeView """
         self._sched_tree.refilter(weekday)
+
+    def status_set_error(self):
+        #XXX PUT SOMEWHERE
+        self._panel.status_set_text(_("Couldn't update schedule"))
 
     def update_schedule(self, refresh):
         # TODO
@@ -199,6 +211,8 @@ class SilverApp():
             t.join()
             # Show error status
             self.status_set_error()
+            GObject.timeout_add(10000, self._status_update)
+            self.status_set_playing()
 
         # Show updating status
         self.status_set_schedule_updating()
@@ -210,33 +224,9 @@ class SilverApp():
         """ Exit """
         Gtk.quit()
     
-# Internal
 ### GStreamer callbacks
     def _on_player_error(self, player, type, msg):
         pass
-
-#XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
-        # Notifications
-        self.notification = Notify.Notification.new("Header", "Body", "image")
-        # TreeView
-#XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX
-
-
-
-
-# Network
-SILVER_RAIN_URL = "http://silver.ru"
-MESSENGER_URL   = "http://silver.ru/ajax/send_message_in_studio.php"
-BX_USER_ID      = ""
-PHPSESSID       = ""
-SESSID          = ""
-USER_AGENT      = 'Mozilla/5.0 (X11; Linux x86_64) ' + \
-                  'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
-                  'Chrome/41.0.2227.0 Safari/537.36'
-BITRIX_SERVER   = "http://bitrix.info/ba.js"
-
-COLOR_TEXTVIEW_BORDER       = "#7C7C7C"
-COLOR_INVALID               = "#FF4545"
 
 import os
 import threading
@@ -384,3 +374,4 @@ class Dialog():
         #else:
             #self._player.play()
         #self.show_notification_on_playback()
+
