@@ -23,6 +23,7 @@ from gi.repository import Gtk
 from silver.gui.common import create_toolbutton
 from silver.gui.common import get_playback_label
 from silver.gui.common import get_volume_icon
+from silver.translations import _
 
 class ControlPanel(Gtk.Box):
     """ Playback control panel """
@@ -32,7 +33,7 @@ class ControlPanel(Gtk.Box):
         self.set_spacing(6)
         self.set_border_width(6)
         # Playback Button
-        text, icon = get_playback_label()
+        text, icon = get_playback_label(True)
         self._playback = create_toolbutton(icon)
         self._playback.connect("clicked", self._on_play)
         self._playback.set_tooltip_text(text)
@@ -79,6 +80,8 @@ class ControlPanel(Gtk.Box):
         self.pack_start(self._status, True, False, 0)
         self.pack_end(self._volume, False, False, 0)
         self.pack_end(self._mute, False, False, 0)
+        self.show_all()
+        self._spinner.hide()
 
     def update_playback_button(self, playing):
         """ Update Play/Stop button """

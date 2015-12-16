@@ -104,8 +104,7 @@ class Messenger():
         area = self._im.get_content_area()
         area.set_border_width(0)
         area.set_spacing(0)
-        area.pack_start(img, False, False, 0)
-        area.pack_start(title, False, False, 0)
+        area.pack_start(header, False, False, 0)
         area.pack_start(box, True, True, 0)
         # Button
         self._send_button = self._im.add_button("", Gtk.ResponseType.OK)
@@ -124,7 +123,7 @@ class Messenger():
 
     def show(self):
         """ Show messenger """
-        if not self._hidden
+        if not self._hidden:
             return
         self._hidden = False
         self._im.show()

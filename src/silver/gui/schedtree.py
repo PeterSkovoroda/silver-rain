@@ -18,9 +18,10 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
+from datetime import datetime
 import subprocess
 
-from gi.repository import Gtk
+from gi.repository import Gtk, GdkPixbuf
 
 import silver.config as config
 from silver.gui.common import create_menuitem
@@ -29,7 +30,7 @@ from silver.schedule import SCHED_WEEKDAY_LIST
 from silver.translations import _
 
 class SchedTree(Gtk.TreeView):
-    def __init__(self, sched)
+    def __init__(self, sched):
         Gtk.TreeView.__init__(self)
         self.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
         self.connect('button-release-event', self._on_button_release_event)

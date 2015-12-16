@@ -42,6 +42,7 @@ class MainWindow(Gtk.Window):
         self._scrolled_window.set_policy(Gtk.PolicyType.NEVER,
                                          Gtk.PolicyType.AUTOMATIC)
         self._scrolled_window.set_min_content_height(100)
+        self._scrolled_window.show()
         vbox.pack_start(self._scrolled_window, True, True, 0)
         # Selection
         vbox.pack_start(selection, False, False, 0)
@@ -50,7 +51,7 @@ class MainWindow(Gtk.Window):
         vbox.show()
         self.add(vbox)
 
-    def set_widget(widget):
+    def set_widget(self, widget):
         """ Add widget to sclrolled window """
         self._scrolled_window.add(widget)
 

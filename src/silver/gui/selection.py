@@ -37,6 +37,7 @@ class Selection(Gtk.Box):
             button.connect("clicked", self._on_clicked)
             self.pack_start(button, True, True, 0)
             self._selection_buttons.append(button)
+        self.show_all()
 
     def selection_update(self):
         """ Select today's section """

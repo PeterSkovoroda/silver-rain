@@ -29,6 +29,7 @@ from silver.globals import ICON
 from silver.gui.common import create_menuitem
 from silver.gui.common import get_playback_label
 from silver.gui.common import get_record_label
+from silver.translations import _
 
 class StatusIcon():
     def __init__(self, app):
@@ -89,12 +90,12 @@ class StatusIcon():
             separator = Gtk.SeparatorMenuItem()
             popup_menu.append(separator)
         # Playback
-        text, icon = get_playback_label(self._playing)
+        text, icon = get_playback_label(not self._playing)
         play = create_menuitem(text, icon)
         play.connect("activate", self._on_playback)
         play.set_size_request(100, -1)
         # Record
-        text, icon = get_record_label(self._recording)
+        text, icon = get_record_label(not self._recording)
         record = create_menuitem(text, icon)
         record.connect("activate", self._on_recorder)
         # Mute
@@ -108,7 +109,7 @@ class StatusIcon():
         preferences = create_menuitem(_("Preferences"), "gtk-preferences")
         preferences.connect("activate", self._on_prefs)
         # Quit
-        quit = self.create_menuitem(_("Quit"), "gtk-quit")
+        quit = create_menuitem(_("Quit"), "gtk-quit")
         quit.connect("activate", self._on_quit)
         # Separator
         sep = []

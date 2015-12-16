@@ -126,7 +126,7 @@ class Menubar(Gtk.MenuBar):
 
         self.append(music)
         self.append(help)
-        self.show()
+        self.show_all()
 
     def update_playback_menu(self, playing):
         """ Update playback menu sensitivity """

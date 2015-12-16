@@ -28,13 +28,12 @@ from .msktz import MSK
 
 class Player():
     """ Base class for player instances """
-    def __init__(self, err_func, warn_func):
+    def __init__(self, err_func):
         self.playing = False
         self.muted = 0
         self.volume = 100
         # Set error callbacks
         self._error_callback = err_func
-        self._warn_callback = warn_func
 
     def reset_connection_settings(self):
         if self.playing:
@@ -73,7 +72,7 @@ class Player():
         pass
 
     def _on_eos(self, bus, msg):
-        self._warn_callback("End of stream")
+        self._error_callback("End of stream")
         self.stop()
 
     def _on_error(self, bus, msg):
@@ -88,8 +87,8 @@ class SilverPlayer(Player):
 
     __name__ = "SilverPlayer"
 
-    def __init__(self, err_func, warn_func):
-        Player.__init__(self, err_func, warn_func)
+    def __init__(self, err_func):
+        Player.__init__(self, err_func)
 
         # Create GStream pipeline
         self._pipe = Gst.Pipeline.new(self.__name__)
@@ -185,8 +184,8 @@ class SilverRecorder(Player):
 
     __name__ = "SilverRecorder"
 
-    def __init__(self, err_func, warn_func):
-        Player.__init__(self, err_func, warn_func)
+    def __init__(self, err_func):
+        Player.__init__(self, err_func)
 
         # Create GStream pipeline
         self._pipe = Gst.Pipeline.new(self.__name__)

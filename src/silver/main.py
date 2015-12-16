@@ -71,7 +71,7 @@ def let_it_rain():
     # Init translation
     translations.set_translation()
     # Init application
-    silver_window = application.SilverApplication()
+    silver_window = application.SilverApp()
     # Setup dbus service
     service = SilverService(silver_window)
     # Run loop

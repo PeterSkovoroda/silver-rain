@@ -18,11 +18,15 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
+from gi.repository import Gtk
+
+import silver.config as config
+
 from silver.messenger import Messenger
 from silver.notifications import Notifications
 from silver.player import SilverPlayer
 from silver.player import SilverRecorder
-from silver.statusicon import StatusIcon
+from silver.schedule import SilverSchedule
 from silver.timer import Timer
 
 from silver.gui.about import About
@@ -30,6 +34,7 @@ from silver.gui.controlpanel import ControlPanel
 from silver.gui.menubar import Menubar
 from silver.gui.schedtree import SchedTree
 from silver.gui.selection import Selection
+from silver.gui.statusicon import StatusIcon
 from silver.gui.window import MainWindow
 
 ### Application
@@ -69,13 +74,13 @@ class SilverApp():
         # Update schedule
         self.schedule_update()
         # Autoplay
-        if config.autoplay():
+        if config.autoplay:
             self.play()
 
     def clean(self):
         """ Cleanup """
-        self._t_event.clean()
-        self._t_recorder.clean()
+        self._t_event.cancel()
+        self._t_recorder.cancel()
         self._player.clean()
         self._recorder.clean()
 
@@ -132,8 +137,8 @@ class SilverApp():
         """ Update interface, stop player """
         # Update interface
         self._menubar.update_playback_menu(False)
-        self._panel.update_playback(False)
-        self._status_icon.update_playback(False)
+        self._panel.update_playback_button(False)
+        self._status_icon.update_playback_menu(False)
         # Stop player
         self._player.stop()
         # Show notification
@@ -241,25 +246,13 @@ class SilverApp():
 
     def quit(self):
         """ Exit """
-        Gtk.quit()
+        Gtk.main_quit()
     
 ### GStreamer callbacks
     def _on_player_error(self, player, type, msg):
         pass
-
-import os
-import threading
-import textwrap
-
-from datetime import datetime
-from datetime import timedelta
-from datetime import date
-
-from .player import SilverPlayer, SilverRecorder
-from .schedule import SilverSchedule
-from .msktz import MSK
-from .translations import _, LANGUAGES_LIST, WEEKDAY_LIST
-from .schedule import SCHED_WEEKDAY_LIST
+    def _on_recorder_error(self, player, type, msg):
+        pass
 
 ### Updater
     def update_now_playing(self):

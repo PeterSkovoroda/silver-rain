@@ -21,7 +21,7 @@ from gi.repository import Gtk
 
 from silver.translations import _
 
-def create_menuitem(self, text, icon):
+def create_menuitem(text, icon):
     """ Create menu item with icon """
     icontheme = Gtk.IconTheme.get_default()
     icon = icontheme.load_icon(icon, 16, 0)
@@ -32,7 +32,7 @@ def create_menuitem(self, text, icon):
     menuitem.set_label(text)
     return menuitem
 
-def create_toolbutton(self, icon):
+def create_toolbutton(icon):
     """ Toolbar button """
     button = Gtk.ToolButton()
     button.set_icon_name(icon)
@@ -45,7 +45,7 @@ def rgba_to_hex(rgba):
     b = int(rgba.blue * 255)
     return "#{0:02x}{1:02x}{2:02x}".format(r, g, b)
 
-def get_playback_label(play=True):
+def get_playback_label(play):
     """ Return text and icon for playback menu/button """
     if play:
         text = _("Play")
@@ -55,7 +55,7 @@ def get_playback_label(play=True):
         icon = "media-playback-stop"
     return text, icon
 
-def get_record_label(play=True):
+def get_record_label(play):
     """ Return text and icon for record menu/button """
     if play:
         text = _("Record program")
