@@ -65,7 +65,7 @@ class SilverApp():
         # Notifications
         self._notifications = Notifications()
         # Satus icon
-        self._status_icon = StatusIcon()
+        self._status_icon = StatusIcon(self)
         # Update schedule
         self.schedule_update()
         # Autoplay
@@ -90,6 +90,13 @@ class SilverApp():
         self._window.hide()
         self._window.hidden = True
 
+    def toggle(self):
+        """ Show/hide window """
+        if self._window.hidden:
+            self.show()
+        else:
+            self.hide()
+
     def about(self):
         """ Open about dialog """
         dialog = About(self._window)
@@ -111,17 +118,15 @@ class SilverApp():
         # Update interface
         self._menubar.update_playback_menu(True)
         self._panel.update_playback_button(True)
-        self._status_icon.update_playback(True)
+        self._status_icon.update_playback_menu(True)
         # Play
         self._player.play()
+        # Get current event
+        title = self._schedule.get_event_title()
+        host = self._schedule.get_event_host()
+        img = self._schedule.get_event_icon()
         # Show notification
-        if not self._schedule.__SCHEDULE_ERROR__:
-            title = self._schedule.get_event_title()
-            host = self._schedule.get_event_host()
-            img = self._schedule.get_event_icon()
-            self._notifications.show_on_play(title=title, host=host, icon=img)
-        else:
-            self._notifications.show_playing()
+        self._notifications.show_playing(title=title, host=host, icon=img)
 
     def stop(self):
         """ Update interface, stop player """
@@ -142,6 +147,12 @@ class SilverApp():
             self._player.muted = self._player.volume
             self.on_mute_toggled()
         self._player.set_volume(self._player.volume)
+
+    def volume_increase(self, value):
+        pass
+
+    def volume_decrease(self, value):
+        pass
 
     def on_mute_toggled(self):
         """ Since it's impossible to just set checkbox status
@@ -174,6 +185,14 @@ class SilverApp():
 
     def update_schedule(self, refresh):
         # TODO
+        #
+        # TODO update statusicon tooltip
+        # Get current event
+        # title = self._schedule.get_event_title()
+        # host = self._schedule.get_event_host()
+        # time = self._schedule.get_event_time()
+        # img = self._schedule.get_event_icon()
+        # self._status_icon.update_event(title, host, time, img)
         """ Initialize schedule, create treeview and start timers
             This might take a while, so run in thread """
         def init_sched():
@@ -255,23 +274,11 @@ from .schedule import SCHED_WEEKDAY_LIST
             # Update selection
             self.__today__ = datetime.now(MSK())
             self.selection_update()
-        self.sched_tree_check_recorder()
+        if self._sched_tree.check_recorder():
+            self.record()
         self.sched_tree_mark_current()
         self.status_update()
         self.show_notification_on_event()
-
-    def sched_tree_check_recorder(self):
-        """ Start recording if set """
-        pos = self._schedule.get_event_position()
-        path = Gtk.TreePath(pos)
-        iter = self.sched_tree_model.get_iter(path)
-        if self.sched_tree_model[iter][10]:
-            self.sched_tree_model[iter][10] = False
-            if self._recorder.playing:
-                # Recorder was started manually
-                return
-            # Toggle recorder
-            self.recorder_toggle(None)
 
 ### Dialog
 class Dialog():
