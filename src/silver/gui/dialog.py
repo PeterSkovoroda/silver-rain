@@ -18,6 +18,7 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gtk
+import logging
 import textwrap
 
 class Dialog(Gtk.Dialog):
@@ -49,11 +50,13 @@ class Dialog(Gtk.Dialog):
         self.show_all()
 
 def warning_show(parent, msg):
+    logging.warning(msg)
     dialog = Dialog(parent, "Warning", "dialog-warning", msg)
     response = dialog.run()
     dialog.destroy()
 
-def error_show(self, msg):
+def error_show(parent, msg):
+    logging.error(msg)
     dialog = Dialog(parent, "Error", "dialog-error", msg)
     response = dialog.run()
     dialog.destroy()

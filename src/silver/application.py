@@ -23,14 +23,6 @@ import threading
 
 import silver.config as config
 
-from silver.messenger import Messenger
-from silver.notifications import Notifications
-from silver.player import SilverPlayer
-from silver.player import SilverRecorder
-from silver.schedule import SilverSchedule
-from silver.translations import _
-from silver.timer import Timer
-
 from silver.gui.about import About
 from silver.gui.controlpanel import ControlPanel
 from silver.gui.dialog import error_show
@@ -41,6 +33,14 @@ from silver.gui.schedtree import SchedTree
 from silver.gui.selection import Selection
 from silver.gui.statusicon import StatusIcon
 from silver.gui.window import MainWindow
+
+from silver.messenger import Messenger
+from silver.notifications import Notifications
+from silver.player import SilverPlayer
+from silver.player import SilverRecorder
+from silver.schedule import SilverSchedule
+from silver.timer import Timer
+from silver.translations import _
 
 ### Application
 class SilverApp():

@@ -72,13 +72,13 @@ class Player():
         pass
 
     def _on_eos(self, bus, msg):
-        self._error_callback("End of stream")
+        self._error_callback("warning", "End of stream")
         self.stop()
 
     def _on_error(self, bus, msg):
         err, dbg = msg.parse_error()
         str = "Error on element {0}: {1}".format(msg.src.get_name, err)
-        self._error_callback(str)
+        self._error_callback("error", str)
         self.stop()
 
 class SilverPlayer(Player):
@@ -93,7 +93,7 @@ class SilverPlayer(Player):
         # Create GStream pipeline
         self._pipe = Gst.Pipeline.new(self.__name__)
         if not self._pipe:
-            self._error_callback("Couldn't create pipeline")
+            self._error_callback("error", "Couldn't create pipeline")
             sys.exit(-1)
         self._el = dict()
         try:
@@ -108,12 +108,13 @@ class SilverPlayer(Player):
             self._el["sink"] = Gst.ElementFactory.make("autoaudiosink",
                                                             "sink")
         except Gst.ElementNotFoundError:
-            self._error_callback("Couldn't find GStreamer element")
+            self._error_callback("error", "Couldn't find GStreamer element")
             sys.exit(-1)
 
         for e in self._el:
             if not self._el[e]:
-                self._error_callback("Couldn't create GStreamer element: " + e)
+                self._error_callback("error",
+                                     "Couldn't create GStreamer element: " + e)
                 sys.exit(-1)
             self._pipe.add(self._el[e])
 
@@ -134,7 +135,7 @@ class SilverPlayer(Player):
         if (not Gst.Element.link(self._el["source"], self._el["decode"]) or
             not Gst.Element.link(self._el["convert"], self._el["volume"]) or
             not Gst.Element.link(self._el["volume"], self._el["sink"])):
-            self._error_callback("Elements could not be linked")
+            self._error_callback("error", "Elements could not be linked")
             sys.exit(-1)
 
         # Create message bus
@@ -146,20 +147,20 @@ class SilverPlayer(Player):
     def set_volume(self, value):
         """ Set player volume [0-100] """
         self._pipe.get_by_name("volume").set_property("volume", value / 100.)
-    
+
     def _play(self, stream=None):
         if stream:
             self._pipe.get_by_name("source").set_property("location", stream)
         ret = self._pipe.set_state(Gst.State.PLAYING)
         if ret == Gst.StateChangeReturn.FAILURE:
-            self._error_callback("Couldn't change state on pipeline")
+            self._error_callback("error", "Couldn't change state on pipeline")
             self.clean()
             sys.exit(-1)
 
     def _stop(self):
         ret = self._pipe.set_state(Gst.State.READY)
         if ret == Gst.StateChangeReturn.FAILURE:
-            self._error_callback("Couldn't change state on pipeline")
+            self._error_callback("error", "Couldn't change state on pipeline")
             self.clean()
             sys.exit(-1)
 
@@ -190,7 +191,7 @@ class SilverRecorder(Player):
         # Create GStream pipeline
         self._pipe = Gst.Pipeline.new(self.__name__)
         if not self._pipe:
-            self._error_callback("Couldn't create pipeline")
+            self._error_callback("error", "Couldn't create pipeline")
             sys.exit(-1)
         self._el = dict()
         try:
@@ -201,12 +202,13 @@ class SilverRecorder(Player):
             self._el["filesink"] = Gst.ElementFactory.make('filesink',
                                                             'filesink')
         except Gst.ElementNotFoundError:
-            self._error_callback("Couldn't find GStreamer element")
+            self._error_callback("error", "Couldn't find GStreamer element")
             sys.exit(-1)
 
         for e in self._el:
             if not self._el[e]:
-                self._error_callback("Couldn't create GStreamer element: " + e)
+                self._error_callback("error",
+                                     "Couldn't create GStreamer element: " + e)
                 sys.exit(-1)
             self._pipe.add(self._el[e])
 
@@ -226,7 +228,7 @@ class SilverRecorder(Player):
         self._el["demux"].connect('pad-added', on_pad_added)
 
         if not Gst.Element.link(self._el["source"], self._el["demux"]):
-            self._error_callback("Elements could not be linked")
+            self._error_callback("error", "Elements could not be linked")
             sys.exit(-1)
 
         # Create message bus
@@ -241,14 +243,14 @@ class SilverRecorder(Player):
         self._pipe.get_by_name("filesink").set_property("location", file)
         ret = self._pipe.set_state(Gst.State.PLAYING)
         if ret == Gst.StateChangeReturn.FAILURE:
-            self._error_callback("Couldn't change state on pipeline")
+            self._error_callback("error", "Couldn't change state on pipeline")
             self.clean()
             sys.exit(-1)
 
     def _stop(self):
         ret = self._pipe.set_state(Gst.State.READY)
         if ret == Gst.StateChangeReturn.FAILURE:
-            self._error_callback("Couldn't change state on pipeline")
+            self._error_callback("error", "Couldn't change state on pipeline")
             self.clean()
             sys.exit(-1)
 
