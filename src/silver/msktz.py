@@ -24,7 +24,7 @@ from datetime import tzinfo
 ########################################################################
 # Timezone
 # It's hard to work with utc, since schedule defined for MSK zone,
-# so use timezone synchronization, which is actually a bad idea
+# so use timezone synchronization
 class MSK(tzinfo):
     def utcoffset(self, dt):
         return timedelta(hours=3)
