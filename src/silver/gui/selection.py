@@ -19,6 +19,7 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gtk
+from datetime import datetime
 
 from silver.msktz import MSK
 from silver.translations import WEEKDAY_LIST
@@ -39,7 +40,7 @@ class Selection(Gtk.Box):
             self._selection_buttons.append(button)
         self.show_all()
 
-    def selection_update(self):
+    def update(self):
         """ Select today's section """
         wd = datetime.now(MSK()).weekday()
         self._selection_buttons[wd].clicked()

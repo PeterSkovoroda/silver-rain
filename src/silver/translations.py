@@ -31,7 +31,6 @@ WEEKDAY_LIST = [_("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
 
 def set_translation():
     if config.language:
-        print("INSTALL")
         lang = gettext.translation("silver-rain",
                 languages=[TRANSLATIONS_LIST[config.language]])
         lang.install()

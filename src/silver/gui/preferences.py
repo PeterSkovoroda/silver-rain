@@ -440,17 +440,23 @@ class Preferences(Gtk.Dialog):
         self._bg_color_light.set_rgba(color)
         color.parse(config.Default.bg_colors[1])
         self._bg_color_dark.set_rgba(color)
+        config.bg_colors = config.Default.bg_colors
         # Selection color
         color.parse(config.Default.selected_bg_color)
         self._selection_color.set_rgba(color)
+        config.selected_bg_color = config.Default.selected_bg_color
         # Font
         self._font.set_font_name(config.Default.font)
+        config.font = config.Default.font
         color.parse(config.Default.font_color)
         self._font_color.set_rgba(color)
+        config.font_color = config.Default.font_color
         # Selection font
         self._selection_font.set_font_name(config.Default.selected_font)
+        config.selected_font = config.Default.selected_font
         color.parse(config.Default.selected_font_color)
         self._selection_font_color.set_rgba(color)
+        config.selected_font_color = config.Default.selected_font_color
         self._appearance_changed = True
         self._changed = True
 

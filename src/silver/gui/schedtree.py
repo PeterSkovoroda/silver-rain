@@ -123,6 +123,9 @@ class SchedTree(Gtk.TreeView):
             return True
         return False
 
+    def update_model(self):
+        self._init_model()
+
     def _init_model(self):
         """ Initialize TreeView model filled with schedule events """
         store = Gtk.TreeStore(str,              #  0 Weekday

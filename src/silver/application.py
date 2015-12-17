@@ -18,7 +18,8 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import Gtk
+from gi.repository import GObject, Gtk
+import threading
 
 import silver.config as config
 
@@ -27,10 +28,13 @@ from silver.notifications import Notifications
 from silver.player import SilverPlayer
 from silver.player import SilverRecorder
 from silver.schedule import SilverSchedule
+from silver.translations import _
 from silver.timer import Timer
 
 from silver.gui.about import About
 from silver.gui.controlpanel import ControlPanel
+from silver.gui.dialog import error_show
+from silver.gui.dialog import warning_show
 from silver.gui.menubar import Menubar
 from silver.gui.preferences import Preferences
 from silver.gui.schedtree import SchedTree
@@ -40,7 +44,6 @@ from silver.gui.window import MainWindow
 
 ### Application
 class SilverApp():
-    """ GUI """
     def __init__(self):
         # Initialize GStreamer
         self._player = SilverPlayer(self._on_player_error)
@@ -51,7 +54,6 @@ class SilverApp():
         self._t_event = Timer(self.update_now_playing)
         # Record timer
         self._t_recorder = Timer(self.stop_record)
-        ## Window
         # Menubar
         self._menubar = Menubar(self)
         # Selection
@@ -60,9 +62,6 @@ class SilverApp():
         self._panel = ControlPanel(self)
         # Main window
         self._window = MainWindow(self._menubar, self._selection, self._panel)
-        # Schedule tree
-        self._sched_tree = SchedTree(self._schedule)
-        self._window.set_widget(self._sched_tree)
         # Don't show if should stay hidden
         if not config.start_hidden:
             self.show()
@@ -73,7 +72,7 @@ class SilverApp():
         # Satus icon
         self._status_icon = StatusIcon(self)
         # Update schedule
-        #self.schedule_update()
+        self.update_schedule(False)
         # Autoplay
         if config.autoplay:
             self.play()
@@ -130,12 +129,12 @@ class SilverApp():
             self._messenger.update_sender()
         if "APPEARANCE" in apply:
             # Update schedule
-            self.selection_update()
-            self.sched_tree_model_create()
-            self.sched_tree.set_model(self.sched_tree_model)
-            self.sched_tree_mark_current()
+            self._selection.update()
+            self._sched_tree.update_model()
+            self._sched_tree.mark_current()
         if "NETWORK" in apply:
             # Update player
+            self.stop()
             self._player.reset_connection_settings()
             self._recorder.reset_connection_settings()
 
@@ -205,20 +204,7 @@ class SilverApp():
         """ Refilter TreeView """
         self._sched_tree.refilter(weekday)
 
-    def status_set_error(self):
-        #XXX PUT SOMEWHERE
-        self._panel.status_set_text(_("Couldn't update schedule"))
-
     def update_schedule(self, refresh):
-        # TODO
-        #
-        # TODO update statusicon tooltip
-        # Get current event
-        # title = self._schedule.get_event_title()
-        # host = self._schedule.get_event_host()
-        # time = self._schedule.get_event_time()
-        # img = self._schedule.get_event_icon()
-        # self._status_icon.update_event(title, host, time, img)
         """ Initialize schedule, create treeview and start timers
             This might take a while, so run in thread """
         def init_sched():
@@ -228,108 +214,95 @@ class SilverApp():
                 GObject.idle_add(error)
             else:
                 if not refresh:
-                    # Initialization
-                    # Create treeview
-                    self._schedule.sched_tree_create()
-                    # Initialize timers
-                    self.timers_init_event_timer()
+                    # Create TreeView
+                    self._sched_tree = SchedTree(self._schedule)
+                    self._window.set_widget(self._sched_tree)
                 else:
-                    # Refresh treeview
-                    self.sched_tree_model_create()
-                    self.sched_tree.set_model(self.sched_tree_model)
-                    self.timers_reset()
+                    # Refresh TreeView
+                    self._sched_tree.update_model()
                 GObject.idle_add(cleanup)
 
         def cleanup():
-            t.join()
             # Draw sched tree if just created
+            t.join()
             if not refresh:
-                self.sched_tree.show()
+                self._sched_tree.show()
             # Show playing status
-            self.status_set_playing()
-            # Update selection
-            self.selection_update()
-            # Mark current row
-            self.sched_tree_mark_current()
+            self._panel.status_set_playing()
+            # Show agenda for today
+            self._selection.update()
+            # Update treeview
+            self._sched_tree.mark_current()
+            # Update statusicon tooltip
+            title = self._schedule.get_event_title()
+            host = self._schedule.get_event_host()
+            time = self._schedule.get_event_time()
+            img = self._schedule.get_event_icon()
+            self._status_icon.update_event(title, host, time, img)
+            # Update status
+            self._panel.status_set_text(title)
 
         def error():
             t.join()
             # Show error status
-            self.status_set_error()
-            GObject.timeout_add(10000, self._status_update)
-            self.status_set_playing()
+            self._panel.status_set_text(_("Couldn't update schedule"))
+            GObject.timeout_add(10000, self.update_status())
+            self._panel.status_set_playing()
 
         # Show updating status
-        self.status_set_schedule_updating()
+        self._panel.status_set_updating()
         # Show updating message
         t = threading.Thread(target=init_sched)
         t.start()
+
+    def update_status(self):
+        title = self._schedule.get_event_title()
+        self._panel.status_set_text(title)
+
+    def update_now_playing(self):
+        """ Update label, bg of current event, show notifications """
+        # Reset previous line
+        self.refilter(self._schedule.get_event_weekday())
+        self._sched_tree.reset_current()
+        # Update event
+        self._schedule.update_current_event()
+        # Update treeview
+        self._sched_tree.mark_current()
+        self._selection.update()
+        # Check if should be recorded
+        if self._sched_tree.check_recorder():
+            self.record()
+        # Update statusicon tooltip
+        title = self._schedule.get_event_title()
+        host = self._schedule.get_event_host()
+        time = self._schedule.get_event_time()
+        img = self._schedule.get_event_icon()
+        self._status_icon.update_event(title, host, time, img)
+        # Update status
+        self._panel.status_set_text(title)
+        # Show notification
+        self._notifications.show_playing(title, host, img)
+        # Start timer
+        self._t_event.reset(self._schedule.get_event_end())
 
     def quit(self):
         """ Exit """
         Gtk.main_quit()
     
 ### GStreamer callbacks
-    def _on_player_error(self, player, type, msg):
-        pass
-    def _on_recorder_error(self, player, type, msg):
-        pass
+    def _on_player_error(self, type, msg):
+        if type == "warning":
+            warning_show(msg)
+        elif type == "error":
+            error_show(msg)
+        self._player.stop()
 
-### Updater
-    def update_now_playing(self):
-        #XXX START TIMER
-        """ Update label, bg of current event, show notifications """
-        # Show agenda for today if not shown
-        if not (self.__weekday_filter__ == self.__today__.strftime("%A")):
-            self.selection_update()
-        # Reset previous line
-        self.sched_tree_reset_current()
-        if self._schedule.update_current_event():
-            # Update selection
-            self.__today__ = datetime.now(MSK())
-            self.selection_update()
-        if self._sched_tree.check_recorder():
-            self.record()
-        self.sched_tree_mark_current()
-        self.status_update()
-        self.show_notification_on_event()
-
-### Dialog
-class Dialog():
-    def dialog_create(self, title, icon_name, message):
-        dialog = Gtk.Dialog.new()
-        dialog.set_title("Silver Rain: " + title)
-        dialog.set_resizable(False)
-        dialog.set_transient_for(self)
-        # Image
-        icontheme = Gtk.IconTheme.get_default()
-        icon = icontheme.load_icon(icon_name, 48, 0)
-        img = Gtk.Image()
-        img.set_from_pixbuf(icon)
-        # Message
-        text = Gtk.Label("{0}: {1}".format(title,
-                         "\n".join(textwrap.wrap(message, 50))))
-        # Pack
-        grid = Gtk.Grid()
-        grid.set_column_spacing(10)
-        grid.set_border_width(10)
-        grid.attach(img, 0, 0, 1, 1)
-        grid.attach(text, 1, 0, 1, 1)
-        # Content
-        box = dialog.get_content_area()
-        box.set_spacing(10)
-        box.pack_start(grid, True, True, 0)
-        # Button
-        dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
-        dialog.show_all()
-        response = dialog.run()
-        dialog.destroy()
-
-    def warning_show(self, msg):
-        self.dialog_create("Warning", "dialog-warning", msg)
-
-    def error_show(self, msg):
-        self.dialog_create("Error", "dialog-error", msg)
+    def _on_recorder_error(self, type, msg):
+        if type == "warning":
+            warning_show(msg)
+        elif type == "error":
+            error_show(msg)
+        self._recorder.stop()
 
 ### Common
     #def recorder_toggle(self, button):
@@ -361,26 +334,25 @@ class Dialog():
         #else:
             #self._recorder.stop()
 
-    def recorder_stop(self, button):
-        """ Cancel timer, toggle recorder """
-        self._t_recorder.cancel()
-        self.recorder_toggle(None)
+    #def recorder_stop(self, button):
+        #""" Cancel timer, toggle recorder """
+        #self._t_recorder.cancel()
+        #self.recorder_toggle(None)
 
-    def mute_toggle(self, button, val=0):
-        """ Set volume, update interface """
-        if self.self._player.muted:
-            self._player.volume = self.self._player.muted
-            self.self._player.muted = 0
-        else:
-            self.self._player.muted = self._player.volume or 5
-            self._player.volume = 0
-        # Control panel
-        self.mute_button.set_icon_name(self.get_volume_icon())
-        # Appindicator
-        self.appindicator_update_menu()
-        # This actually gonna mute player
-        self.volume.set_value(self._player.volume)
-
+    #def mute_toggle(self, button, val=0):
+        #""" Set volume, update interface """
+        #if self.self._player.muted:
+            #self._player.volume = self.self._player.muted
+            #self.self._player.muted = 0
+        #else:
+            #self.self._player.muted = self._player.volume or 5
+            #self._player.volume = 0
+        ## Control panel
+        #self.mute_button.set_icon_name(self.get_volume_icon())
+        ## Appindicator
+        #self.appindicator_update_menu()
+        ## This actually gonna mute player
+        #self.volume.set_value(self._player.volume)
 
         #self.playback_button.set_icon_name(self.get_playback_label()[1])
         ## Menubar
@@ -395,4 +367,3 @@ class Dialog():
         #else:
             #self._player.play()
         #self.show_notification_on_playback()
-

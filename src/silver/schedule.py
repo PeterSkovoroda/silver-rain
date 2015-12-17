@@ -98,6 +98,7 @@ class SilverSchedule():
     def get_event_url(self): return self.__event__["url"]
     def get_event_end(self): return self.__event__["end"]
     def get_event_position(self): return self.__event__["position"]
+    def get_event_weekday(self): return self.__event__["weekday"]
     def get_event_icon(self):
         """ Return pixbuf """
         # Download icon if it doesn't exist
