@@ -32,6 +32,7 @@ from silver.timer import Timer
 from silver.gui.about import About
 from silver.gui.controlpanel import ControlPanel
 from silver.gui.menubar import Menubar
+from silver.gui.preferences import Preferences
 from silver.gui.schedtree import SchedTree
 from silver.gui.selection import Selection
 from silver.gui.statusicon import StatusIcon
@@ -72,7 +73,7 @@ class SilverApp():
         # Satus icon
         self._status_icon = StatusIcon(self)
         # Update schedule
-        self.schedule_update()
+        #self.schedule_update()
         # Autoplay
         if config.autoplay:
             self.play()
@@ -115,8 +116,28 @@ class SilverApp():
     def prefs(self):
         """ Open preferences window """
         dialog = Preferences(self._window)
-        dialog.run()
+        # Apply settings
+        apply = []
+        while dialog.run() == Gtk.ResponseType.APPLY:
+            if dialog.validate():
+                apply = dialog.apply_settings()
+                break
+            else:
+                self.error_show("Invalid recordings storage location")
         dialog.destroy()
+        if "IM" in apply:
+            # Update messenger
+            self._messenger.update_sender()
+        if "APPEARANCE" in apply:
+            # Update schedule
+            self.selection_update()
+            self.sched_tree_model_create()
+            self.sched_tree.set_model(self.sched_tree_model)
+            self.sched_tree_mark_current()
+        if "NETWORK" in apply:
+            # Update player
+            self._player.reset_connection_settings()
+            self._recorder.reset_connection_settings()
 
     def play(self):
         """ Update interface, start player """

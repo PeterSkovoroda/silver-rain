@@ -129,6 +129,9 @@ class Messenger():
         self._im.show()
         self._msg.grab_focus()
 
+    def update_sender(self):
+        self._sender.set_text(config.message_sender)
+
     def _on_delete_event(self, window, event):
         """ Hide messenger """
         self._hidden = True
