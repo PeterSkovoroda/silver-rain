@@ -24,6 +24,7 @@ from silver.gui.common import create_menuitem
 from silver.translations import _
 
 class Menubar(Gtk.MenuBar):
+    """ Simple menubar with hotkeys """
     def __init__(self, app):
         Gtk.MenuBar.__init__(self)
         self._app = app
@@ -43,8 +44,7 @@ class Menubar(Gtk.MenuBar):
         self._stop.add_accelerator("activate", self.accel_group,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         # Record
-        self._record = create_menuitem(_("Record program"),
-                                          "media-record")
+        self._record = create_menuitem(_("Record program"), "media-record")
         self._record.connect("activate", self._on_record)
         key, mod = Gtk.accelerator_parse("F8")
         self._record.add_accelerator("activate", self.accel_group,
@@ -60,7 +60,7 @@ class Menubar(Gtk.MenuBar):
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         # Mute
         self._mute = Gtk.CheckMenuItem(_("Mute"))
-        self._mute_handler_id = self._mute.connect("toggled", self._on_mute)
+        self._mute_handler = self._mute.connect("toggled", self._on_mute)
         key, mod = Gtk.accelerator_parse("<Control>M")
         self._mute.add_accelerator("activate", self.accel_group,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
@@ -92,39 +92,29 @@ class Menubar(Gtk.MenuBar):
         sep = []
         for i in range(5):
             sep.append(Gtk.SeparatorMenuItem())
-        # Music Menu
-        music_menu = Gtk.Menu()
-        music = Gtk.MenuItem(_("Music"))
-        music.set_submenu(music_menu)
-        for item in [ self._play,
-                      self._stop,
-                      self._record,
-                      self._stop_recording,
-                      sep[0],
-                      self._mute,
-                      sep[1],
-                      refresh,
-                      sep[2],
-                      msg,
-                      sep[3],
-                      prefs,
-                      sep[4],
-                      quit ]:
-            music_menu.append(item)
+        # Radio Menu
+        radio_menu = Gtk.Menu()
+        radio = Gtk.MenuItem(_("Radio"))
+        radio.set_submenu(radio_menu)
+        for item in [ self._play, self._stop, self._record,
+                      self._stop_recording, sep[0], self._mute,
+                      sep[1], refresh, sep[2], msg,
+                      sep[3], prefs, sep[4], quit ]:
+            radio_menu.append(item)
         # About
         about = create_menuitem("About", "gtk-about")
         about.set_size_request(90, -1)
         about.connect("activate", self._on_about)
         key, mod = Gtk.accelerator_parse("F1")
-        about.add_accelerator("activate", self.accel_group, key,
-                              mod, Gtk.AccelFlags.VISIBLE)
+        about.add_accelerator("activate", self.accel_group,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         # Help Menu
         help_menu = Gtk.Menu()
         help = Gtk.MenuItem(_("Help"))
         help.set_submenu(help_menu)
         help_menu.append(about)
 
-        self.append(music)
+        self.append(radio)
         self.append(help)
         self.show_all()
 
@@ -140,9 +130,9 @@ class Menubar(Gtk.MenuBar):
 
     def update_mute_menu(self, muted):
         """ Update mute menu """
-        self._mute.handler_block(self._mute_handler_id)
+        self._mute.handler_block(self._mute_handler)
         self._mute.set_active(muted)
-        self._mute.handler_unblock(self._mute_handler_id)
+        self._mute.handler_unblock(self._mute_handler)
 
     def _on_play(self, button):
         self._app.play()

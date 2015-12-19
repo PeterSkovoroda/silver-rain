@@ -19,7 +19,6 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import GObject
-
 from datetime import datetime
 from datetime import timedelta
 import threading
@@ -27,11 +26,13 @@ import threading
 from silver.msktz import MSK
 
 class Timer():
+    """ Timer """
     def __init__(self, callback):
         self._t = threading.Timer(0, None)
         self._callback = callback
 
     def start(self, time):
+        self.cancel()
         today = datetime.now(MSK())
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
@@ -41,10 +42,6 @@ class Timer():
 
     def cancel(self):
         self._t.cancel()
-
-    def reset(self, time):
-        self.cancel()
-        self.start(time)
 
     def _on_timeout(self):
         GObject.idle_add(self._callback)

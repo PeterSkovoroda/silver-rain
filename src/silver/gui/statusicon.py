@@ -3,7 +3,8 @@
 Copyright (C) 2015 Petr Skovoroda <petrskovoroda@gmail.com>
 
 This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the
 License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -19,8 +20,10 @@ Boston, MA 02110-1301 USA
 
 from gi.repository import Gdk, Gtk
 import textwrap
+
 try:
     from gi.repository import AppIndicator3 as appindicator
+    import appindicator.IndicatorCategory.SYSTEM_SERVICES as APP_CATEGORY
     APP_INDICATOR = True
 except ImportError:
     APP_INDICATOR = False
@@ -32,6 +35,7 @@ from silver.gui.common import get_record_label
 from silver.translations import _
 
 class StatusIcon():
+    """ Status icon """
     def __init__(self, app):
         self._app = app
         self._playing = False
@@ -115,7 +119,7 @@ class StatusIcon():
         sep = []
         for i in range(4):
             sep.append(Gtk.SeparatorMenuItem())
-
+        # Pack
         for item in [play, record, sep[0], mute, sep[1],
                      im, sep[2], preferences, sep[3], quit]:
             popup_menu.append(item)
@@ -123,6 +127,7 @@ class StatusIcon():
         return popup_menu
 
     def _tooltip(self, widget, x, y, keyboard_mode, tooltip):
+        """ Show current event in tooltip """
         # Silver Rain
         silver = Gtk.Label()
         silver.set_markup("<b>{0}</b>".format(_("Silver Rain")))
@@ -130,11 +135,11 @@ class StatusIcon():
         img = Gtk.Image.new_from_pixbuf(self._event_icon)
         # Program
         title = Gtk.Label()
-        str = '\n'.join(textwrap.wrap(self._event_title, 21))
+        str = textwrap.fill(self._event_title, 21)
         title.set_markup("<b>" + str + "</b>")
         title.set_alignment(0, 0.5)
         host = Gtk.Label()
-        str = '\n'.join(textwrap.wrap(self._event_host, 21))
+        str = textwrap.fill(self._event_host, 21)
         host.set_text(str)
         host.set_alignment(0, 0.5)
         time = Gtk.Label()
@@ -191,6 +196,7 @@ class StatusIcon():
         self._app.quit()
 
     def _on_popup(self, icon, button, time):
+        """ Show popup menu """
         self._popup_menu = self._popup_menu_create()
         def pos_func(menu, x, y, icon):
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
@@ -205,7 +211,7 @@ class StatusIcon():
     def _appindicator_init(self):
         """ Unity appindicator """
         self._status_icon = appindicator.Indicator.new("SilverRain", ICON,
-                                appindicator.IndicatorCategory.SYSTEM_SERVICES)
+                                                       APP_CATEGORY)
         self._status_icon.set_status(appindicator.IndicatorStatus.ACTIVE)
         self._status_icon.connect("scroll-event", self._appindicator_on_scroll)
         # Popup menu

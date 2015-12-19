@@ -23,20 +23,18 @@ gi.require_version("Gst", "1.0")
 gi.require_version("Gtk", "3.0")
 gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Notify
-
 import dbus
 import dbus.glib
 import dbus.service
 import os
 import signal
 
-from . import application
-from . import config
-from . import css
-from . import translations
-
+import silver.config as config
+from silver.application import SilverApp
 from silver.globals import APP_DIR
 from silver.globals import IMG_DIR
+from silver.gui.css import css_load
+from silver.translations import set_translation
 
 class SilverService(dbus.service.Object):
     """ DBus service """
@@ -57,7 +55,7 @@ def let_it_rain():
     Gst.init(None)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     Notify.init("silver-rain")
-    # Create system directories if not exist
+    # Create system directories
     for dir in [APP_DIR, IMG_DIR]:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -67,11 +65,11 @@ def let_it_rain():
     if not os.path.exists(config.recs_dir):
         os.makedirs(config.recs_dir)
     # Load css
-    css.css_load()
+    css_load()
     # Init translation
-    translations.set_translation()
+    set_translation()
     # Init application
-    silver_app = application.SilverApp()
+    silver_app = SilverApp()
     # Setup dbus service
     service = SilverService(silver_app)
     # Run loop

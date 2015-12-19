@@ -19,6 +19,7 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gtk, Gdk
+
 import silver.config as config
 
 __all__ = ["css_load"]

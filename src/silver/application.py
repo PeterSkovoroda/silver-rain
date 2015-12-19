@@ -19,31 +19,29 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import GObject, Gtk
+import logging
 import threading
 
 import silver.config as config
-
 from silver.gui.about import About
 from silver.gui.controlpanel import ControlPanel
-from silver.gui.dialog import error_show
-from silver.gui.dialog import warning_show
+from silver.gui.dialog import show_dialog
 from silver.gui.menubar import Menubar
+from silver.gui.messenger import Messenger
+from silver.gui.notifications import Notifications
 from silver.gui.preferences import Preferences
 from silver.gui.schedtree import SchedTree
 from silver.gui.selection import Selection
 from silver.gui.statusicon import StatusIcon
 from silver.gui.window import MainWindow
-
-from silver.messenger import Messenger
-from silver.notifications import Notifications
 from silver.player import SilverPlayer
 from silver.player import SilverRecorder
 from silver.schedule import SilverSchedule
 from silver.timer import Timer
 from silver.translations import _
 
-### Application
 class SilverApp():
+    """ Application """
     def __init__(self):
         # Initialize GStreamer
         self._player = SilverPlayer(self._on_player_error)
@@ -52,7 +50,7 @@ class SilverApp():
         self._schedule = SilverSchedule()
         # On event timer
         self._t_event = Timer(self.update_now_playing)
-        # Record timer
+        # Recorder timer
         self._t_recorder = Timer(self.stop_record)
         # Menubar
         self._menubar = Menubar(self)
@@ -72,13 +70,12 @@ class SilverApp():
         # Satus icon
         self._status_icon = StatusIcon(self)
         # Update schedule
-        self.update_schedule(False)
+        self.update_schedule()
         # Autoplay
         if config.autoplay:
             self.play()
 
     def clean(self):
-        """ Cleanup """
         self._t_event.cancel()
         self._t_recorder.cancel()
         self._player.clean()
@@ -118,15 +115,11 @@ class SilverApp():
     def prefs(self):
         """ Open preferences window """
         dialog = Preferences(self._window)
-        # Apply settings
         apply = []
-        while dialog.run() == Gtk.ResponseType.APPLY:
-            if dialog.validate():
-                apply = dialog.apply_settings()
-                break
-            else:
-                error_show(self._window, "Invalid recordings storage location")
+        if dialog.run() == Gtk.ResponseType.APPLY:
+            apply = dialog.apply_settings()
         dialog.destroy()
+        # Apply settings
         if "IM" in apply:
             # Update messenger
             self._messenger.update_sender()
@@ -152,13 +145,13 @@ class SilverApp():
         self._panel.update_playback_button(True)
         self._status_icon.update_playback_menu(True)
         # Play
-        self._player.play()
+        self._player.start()
         # Get current event
         title = self._schedule.get_event_title()
         host = self._schedule.get_event_host()
         img = self._schedule.get_event_icon()
         # Show notification
-        self._notifications.show_playing(title=title, host=host, icon=img)
+        self._notifications.show_playing(title, host, img)
 
     def stop(self):
         """ Update interface, stop player """
@@ -181,19 +174,21 @@ class SilverApp():
             self._player.set_volume(value)
 
     def volume_step(self, value):
-        vol = self._player.volume
-        vol += value
-        if vol > 100:
-            vol = 100
-        elif vol < 0:
-            vol = 0
-        self.set_volume(vol)
-        if vol:
-            self._panel.update_volume_scale(vol)
+        """ Increase player volume """
+        volume = self._player.volume
+        volume += value
+        if volume > 100:
+            volume = 100
+        elif volume < 0:
+            volume = 0
+        self.set_volume(volume)
+        if volume:
+            self._panel.update_volume_scale(volume)
 
     def mute(self):
         """ Mute player, update interface """
         self._player.mute()
+        # Update interface
         self._menubar.update_mute_menu(True)
         self._panel.update_mute_button(True)
         self._panel.update_volume_scale(0)
@@ -205,6 +200,7 @@ class SilverApp():
             self._player.unmute()
         else:
             self._player.set_volume(volume)
+        # Update interface
         self._menubar.update_mute_menu(False)
         self._panel.update_mute_button(False)
         self._panel.update_volume_scale(self._player.volume)
@@ -212,43 +208,44 @@ class SilverApp():
 
     def record(self):
         """ Update interface, start recorder """
-        # Set timer
-        self._t_recorder.reset(self._schedule.get_event_end())
         # Get name
         name = self._schedule.get_event_title()
         # Start recorder
-        self._recorder.play(name)
+        self._recorder.start(name)
+        # Set timer
+        self._t_recorder.start(self._schedule.get_event_end())
         # Update interface
         self._menubar.update_recorder_menu(True)
         self._status_icon.update_recorder_menu(True)
 
     def stop_record(self):
         """ Update interface, stop recorder """
+        # Stop recorder
         self._recorder.stop()
+        # Cancel timer
         self._t_recorder.cancel()
         # Update interface
         self._menubar.update_recorder_menu(False)
         self._status_icon.update_recorder_menu(False)
 
     def refilter(self, weekday):
-        """ Refilter TreeView """
+        """ Refilter schedule """
         self._sched_tree.refilter(weekday)
 
-    def update_schedule(self, refresh):
+    def update_schedule(self, refresh=False):
         """ Initialize schedule, create treeview and start timers
             This might take a while, so run in thread """
         def init_sched():
             # Initialize schedule
-            ret = self._schedule.update_schedule(refresh)
-            if not ret:
+            if not self._schedule.update_schedule(refresh):
                 GObject.idle_add(error)
             else:
                 if not refresh:
-                    # Create TreeView
+                    # Initialize TreeView
                     self._sched_tree = SchedTree(self._schedule)
                     self._window.set_widget(self._sched_tree)
                 else:
-                    # Refresh TreeView
+                    # Update TreeView
                     self._sched_tree.update_model()
                 GObject.idle_add(cleanup)
 
@@ -257,33 +254,32 @@ class SilverApp():
             # Draw sched tree if just created
             if not refresh:
                 self._sched_tree.show()
-            # Reset status
-            self._panel.status_set_playing()
-            # Start timer
-            self._t_event.reset(self._schedule.get_event_end())
-            # Show agenda for today
-            self._selection.update()
-            # Update treeview
-            self._sched_tree.mark_current()
-            # Update statusicon tooltip
+            # Update status icon tooltip
             title = self._schedule.get_event_title()
             host = self._schedule.get_event_host()
             time = self._schedule.get_event_time()
             img = self._schedule.get_event_icon()
             self._status_icon.update_event(title, host, time, img)
-            # Update status
+            # Reset status
+            self._panel.status_set_playing()
             self._panel.status_set_text(title)
+            # Start timer
+            self._t_event.start(self._schedule.get_event_end())
+            # Show agenda for today
+            self._selection.update()
+            # Update treeview
+            self._sched_tree.mark_current()
 
         def error():
             t.join()
             # Show error status
+            self._panel.status_set_playing()
             self._panel.status_set_text(_("Couldn't update schedule"))
             def f():
                 title = self._schedule.get_event_title()
                 self._panel.status_set_text(title)
             GObject.timeout_add(10000, f)
-            self._panel.status_set_playing()
-
+            # Update status icon tooltip
             title = self._schedule.get_event_title()
             host = self._schedule.get_event_host()
             time = self._schedule.get_event_time()
@@ -292,17 +288,16 @@ class SilverApp():
 
         # Show updating status
         self._panel.status_set_updating()
-        # Show updating message
         t = threading.Thread(target=init_sched)
         t.start()
 
     def update_now_playing(self):
         """ Update label, bg of current event, show notifications """
-        # Reset previous line
+        # Reset TreeView line
         self.refilter(self._schedule.get_event_weekday())
         self._sched_tree.reset_current()
         # Update event
-        self._schedule.update_current_event()
+        self._schedule.update_event()
         # Update treeview
         self._selection.update()
         self._sched_tree.mark_current()
@@ -320,23 +315,29 @@ class SilverApp():
         # Show notification
         self._notifications.show_playing(title, host, img)
         # Start timer
-        self._t_event.reset(self._schedule.get_event_end())
+        self._t_event.start(self._schedule.get_event_end())
 
     def quit(self):
         """ Exit """
         Gtk.main_quit()
-    
-### GStreamer callbacks
+
     def _on_player_error(self, type, msg):
-        if type == "warning":
-            warning_show(self._window, msg)
-        elif type == "error":
-            error_show(self._window, msg)
+        """ Player error callback """
+        self._gstreamer_error_show(type, msg)
         self.stop()
 
     def _on_recorder_error(self, type, msg):
-        if type == "warning":
-            warning_show(self._window, msg)
-        elif type == "error":
-            error_show(self._window, msg)
+        """ Recorder error callback """
+        self._gstreamer_error_show(type, msg)
         self.stop_record()
+
+    def _gstreamer_error_show(self, type, msg):
+        """ Show error dialog """
+        if type == "warning":
+            logging.warning(msg)
+            show_dialog(self._window, "GStreamer warning",
+                        "dialog-warning", msg)
+        elif type == "error":
+            logging.error(msg)
+            show_dialog(self._window, "GStreamer error",
+                        "dialog-error", msg)

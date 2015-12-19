@@ -29,5 +29,6 @@ AC_CONFIG_FILES([ po/Makefile.in
                   data/icons/Makefile
                   src/silver/Makefile
                   src/silver/globals.py
+                  src/silver/gui/Makefile
 ])
 AC_OUTPUT

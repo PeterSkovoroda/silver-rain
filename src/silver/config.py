@@ -19,7 +19,6 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gtk
-
 import configparser
 import os
 import re
@@ -34,9 +33,8 @@ def font_probe():
     font = s.font_desc.get_family()
     return font
 
-########################################################################
-# Default configuration
 class Default():
+    """ Default configuration """
     autoplay            = False
     start_hidden        = False
     recs_dir            = os.getenv("HOME") + "/Recordings"

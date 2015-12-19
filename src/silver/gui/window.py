@@ -30,13 +30,14 @@ class MainWindow(Gtk.Window):
         self.set_border_width(0)
         self.set_icon_name(ICON)
         self.set_default_size(650, 450)
-        self.add_accel_group(menubar.accel_group)
-        self.connect("delete-event", self.on_delete_event)
+        self.connect("delete-event", self._on_delete_event)
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         # Menubar
         vbox.pack_start(menubar, False, False, 0)
         sep = Gtk.Separator()
         vbox.pack_start(sep, False, False, 0)
+        # Set hotkeys
+        self.add_accel_group(menubar.accel_group)
         # Scrolled window
         self._scrolled_window = Gtk.ScrolledWindow()
         self._scrolled_window.set_policy(Gtk.PolicyType.NEVER,
@@ -55,7 +56,7 @@ class MainWindow(Gtk.Window):
         """ Add widget to sclrolled window """
         self._scrolled_window.add(widget)
 
-    def on_delete_event(self, window, event):
+    def _on_delete_event(self, window, event):
         """ Hide parent window instead of destroying it """
         self.hidden = True
         window.hide()

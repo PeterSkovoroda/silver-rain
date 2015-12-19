@@ -9,7 +9,8 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
 
 You should have received a copy of the GNU General Public
 License along with this program; if not, write to the
@@ -24,18 +25,19 @@ from silver.translations import _
 def create_menuitem(text, icon):
     """ Create menu item with icon """
     icontheme = Gtk.IconTheme.get_default()
-    icon = icontheme.load_icon(icon, 16, 0)
+    pb = icontheme.load_icon(icon, 16, 0)
     img = Gtk.Image()
-    img.set_from_pixbuf(icon)
+    img.set_from_pixbuf(pb)
     menuitem = Gtk.ImageMenuItem()
     menuitem.set_image(img)
     menuitem.set_label(text)
     return menuitem
 
-def create_toolbutton(icon):
+def create_toolbutton(text, icon):
     """ Toolbar button """
     button = Gtk.ToolButton()
     button.set_icon_name(icon)
+    button.set_tooltip_text(text)
     return button
 
 def rgba_to_hex(rgba):
@@ -45,7 +47,7 @@ def rgba_to_hex(rgba):
     b = int(rgba.blue * 255)
     return "#{0:02x}{1:02x}{2:02x}".format(r, g, b)
 
-def get_playback_label(play):
+def get_playback_label(play=True):
     """ Return text and icon for playback menu/button """
     if play:
         text = _("Play")
@@ -55,7 +57,7 @@ def get_playback_label(play):
         icon = "media-playback-stop"
     return text, icon
 
-def get_record_label(record):
+def get_record_label(record=True):
     """ Return text and icon for record menu/button """
     if record:
         text = _("Record program")
@@ -66,11 +68,11 @@ def get_record_label(record):
     return text, icon
 
 def get_volume_label(muted=False):
-    """ Return icon for mute button """
+    """ Return text and icon for volume button """
     if muted:
-        text = "Unmute"
+        text = _("Unmute")
         icon = "audio-volume-muted"
     else:
-        text = "Mute"
+        text = _("Mute")
         icon = "audio-volume-high"
     return text, icon

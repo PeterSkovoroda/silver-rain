@@ -25,7 +25,6 @@ import os
 import re
 import requests
 import urllib.request
-
 from collections import deque
 from datetime import datetime
 from datetime import timedelta
@@ -35,21 +34,21 @@ try:
 except ImportError as err:
     import xml.etree.ElementTree as etree
 
+import silver.config as config
 from silver.globals import ICON
 from silver.globals import IMG_DIR
 from silver.globals import SCHED_FILE
 from silver.msktz import MSK
-import silver.config as config
 
 SCHED_URL       = "http://silver.ru/programms/"
 SILVER_RAIN_URL = "http://silver.ru"
-USER_AGENT      = 'Mozilla/5.0 (X11; Linux x86_64) ' + \
-                  'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
-                  'Chrome/41.0.2227.0 Safari/537.36'
+USER_AGENT      = "Mozilla/5.0 (X11; Linux x86_64) " + \
+                  "AppleWebKit/537.36 (KHTML, like Gecko) " + \
+                  "Chrome/41.0.2227.0 Safari/537.36"
 
 # Use this list to operate with schedule
-SCHED_WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
-                      'Friday', 'Saturday', 'Sunday']
+SCHED_WEEKDAY_LIST = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                      "Friday", "Saturday", "Sunday"]
 MUSIC = "Музыка"
 MUSIC_URL = "http://silver.ru/programms/muzyka/"
 
@@ -155,7 +154,7 @@ class SilverSchedule():
             str = ""
         return str
 
-    def update_current_event(self):
+    def update_event(self):
         """ Update current event """
         if not len(self._sched_day):
             # It's a new day.
@@ -187,7 +186,7 @@ class SilverSchedule():
         # Generate schedule for today
         self._sched_gen_daily_agenda()
         # Update current event
-        self.update_current_event()
+        self.update_event()
         self._SCHEDULE_ERROR = False
         return True
 
@@ -207,7 +206,6 @@ class SilverSchedule():
                     icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
                 else:
                     # Load default icon instead
-                    # TODO Install default icon somewhere
                     icon = icontheme.load_icon(ICON, 256, 0)
                 # Scale
                 sz = 80
@@ -215,7 +213,7 @@ class SilverSchedule():
                     sz = 60
                 icon = icon.scale_simple(sz, sz, GdkPixbuf.InterpType.BILINEAR)
                 # Join hosts
-                host = ' и '.join(item["host"])
+                host = " и ".join(item["host"])
                 # Insert program
                 if item["is_main"]:
                     # Main event
@@ -253,7 +251,7 @@ class SilverSchedule():
                 item["position"] = position
                 position += 1
             if item["end"] <= now:
-                # Child or already ended. Skip
+                # Already ended. Skip
                 continue
             self._sched_day.append(item)
 

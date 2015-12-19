@@ -22,26 +22,22 @@ from gi.repository import Notify
 
 from silver.translations import _
 
-class Notifications():
+class Notifications(Notify.Notification):
+    """ Notifications """
     def __init__(self):
-        self._notification = Notify.Notification.new("Header", "Body", "image")
+        Notify.Notification.__init__(self)
         self._header = _("Silver Rain")
 
-    def show_playing(self, title="", host="", icon=None):
-        img = ""
-        if not title:
-            title = _("Playing")
+    def show_playing(self, title, host, icon):
+        """ Show notification on play """
         body = "<b>{0}</b>\n{1}".format(title, host)
-        if not icon:
-            img = "notification-audio-start"
-        else:
-            self._notification.set_icon_from_pixbuf(icon)
-
-        self._notification.update(self._header, body, img)
-        self._notification.show()
+        self.set_icon_from_pixbuf(icon)
+        self.update(self._header, body)
+        self.show()
 
     def show_stopped(self):
+        """ Show notification on stop """
         body = "<b>{0}</b>".format(_("Stopped"))
         img = "notification-audio-stop"
-        self._notification.update(self._header, body, img)
-        self._notification.show()
+        self.update(self._header, body, img)
+        self.show()

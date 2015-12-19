@@ -26,6 +26,7 @@ from datetime import tzinfo
 # It's hard to work with utc, since schedule defined for MSK zone,
 # so use timezone synchronization
 class MSK(tzinfo):
+    """ Moscow timezone """
     def utcoffset(self, dt):
         return timedelta(hours=3)
 

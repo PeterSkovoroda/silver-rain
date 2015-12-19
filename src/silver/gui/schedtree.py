@@ -18,10 +18,9 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
+from gi.repository import Gtk, GdkPixbuf
 from datetime import datetime
 import subprocess
-
-from gi.repository import Gtk, GdkPixbuf
 
 import silver.config as config
 from silver.gui.common import create_menuitem
@@ -30,14 +29,14 @@ from silver.schedule import SCHED_WEEKDAY_LIST
 from silver.translations import _
 
 class SchedTree(Gtk.TreeView):
+    """ Schedule TreeView """
     def __init__(self, sched):
         Gtk.TreeView.__init__(self)
         self.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
-        self.connect('button-release-event', self._on_button_release_event)
-
+        self.connect("button-release-event", self._on_button_release_event)
         self._weekday_filter = datetime.now(MSK()).strftime("%A")
-        self._cell_bg_old = ''
-        self._cell_fg_old = ''
+        self._cell_bg_old = ""
+        self._cell_fg_old = ""
         self._sched = sched
         # Init model
         self._init_model()
@@ -76,12 +75,12 @@ class SchedTree(Gtk.TreeView):
         self.append_column(column)
 
     def refilter(self, wd):
-        """ Refilter TreeView """
+        """ Refilter model """
         self._weekday_filter = SCHED_WEEKDAY_LIST[wd]
         self._model.refilter()
 
     def reset_current(self):
-        """ Reset currently marked row """
+        """ Reset marked row """
         if not self._cell_bg_old:
             # Nothing to reset
             return
@@ -94,11 +93,11 @@ class SchedTree(Gtk.TreeView):
         self._model[iter][8] = self._cell_fg_old
         self._model[iter][9] = config.font
         # Delete backup
-        self._cell_bg_old = ''
-        self._cell_fg_old = ''
+        self._cell_bg_old = ""
+        self._cell_fg_old = ""
 
     def mark_current(self):
-        """ Set current event colors """
+        """ Mark current event """
         # Get current position
         pos = self._sched.get_event_position()
         path = Gtk.TreePath(pos)
@@ -124,6 +123,7 @@ class SchedTree(Gtk.TreeView):
         return False
 
     def update_model(self):
+        """ Create new model """
         self._init_model()
 
     def _init_model(self):
@@ -142,8 +142,8 @@ class SchedTree(Gtk.TreeView):
         self._model = store.filter_new()
         self._model.set_visible_func(self._model_func)
         self._sched.fill_tree_strore(store)
-        self._cell_bg_old = ''
-        self._cell_fg_old = ''
+        self._cell_bg_old = ""
+        self._cell_fg_old = ""
         self.set_model(self._model)
 
     def _model_func(self, model, iter, data):
@@ -151,12 +151,11 @@ class SchedTree(Gtk.TreeView):
         return model[iter][0] == self._weekday_filter
 
     def _on_button_release_event(self, widget, event):
-        """ On right click """
+        """ Open menu on right click """
         if not event.button == 3:
             return
         selection = self.get_selection()
         model, iter = selection.get_selected()
-        # Create popup menu
         self._popup = Gtk.Menu()
         # Program url
         url = create_menuitem(_("Program page"), "web-browser")
@@ -166,7 +165,6 @@ class SchedTree(Gtk.TreeView):
         self._popup.append(url)
         # Record program
         if model.get_value(iter, 1):
-            # Record main events only
             if not model.get_value(iter, 10):
                 rec = create_menuitem(_("Record program"), "media-record")
                 rec.connect("activate", self._on_record_set, model, iter)
@@ -174,18 +172,14 @@ class SchedTree(Gtk.TreeView):
                 rec = create_menuitem(_("Don't record"), "gtk-cancel")
                 rec.connect("activate", self._on_record_cancel, model, iter)
             self._popup.append(rec)
-
         self._popup.show_all()
         self._popup.popup(None, None, None, None, event.button, event.time)
 
     def _on_record_set(self, button, model, iter):
-        """ Record program """
         model.set_value(iter, 10, True)
 
     def _on_record_cancel(self, button, model, iter):
-        """ Cancel recording """
         model.set_value(iter, 10, False)
 
     def _on_url(self, button, url):
-        """ Open browser """
-        subprocess.Popen(['xdg-open', url], stdout=subprocess.PIPE)
+        subprocess.Popen(["xdg-open", url], stdout=subprocess.PIPE)

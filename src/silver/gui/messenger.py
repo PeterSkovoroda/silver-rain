@@ -19,26 +19,27 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gdk, GObject, Gtk
+import logging
 import requests
 import urllib
 
 import silver.config as config
-
 from silver.globals import ICON
+from silver.globals import SILVER_RAIN_URL
+from silver.gui.dialog import show_dialog
 from silver.translations import _
 
 COLOR_TEXTVIEW_BORDER   = "#7C7C7C"
 COLOR_INVALID           = "#FF4545"
 
-USER_AGENT      = 'Mozilla/5.0 (X11; Linux x86_64) ' + \
-                  'AppleWebKit/537.36 (KHTML, like Gecko) ' + \
-                  'Chrome/41.0.2227.0 Safari/537.36'
+USER_AGENT      = "Mozilla/5.0 (X11; Linux x86_64) " + \
+                  "AppleWebKit/537.36 (KHTML, like Gecko) " + \
+                  "Chrome/41.0.2227.0 Safari/537.36"
 BITRIX_SERVER   = "http://bitrix.info/ba.js"
-SILVER_RAIN_URL = "http://silver.ru"
 MESSENGER_URL   = "http://silver.ru/ajax/send_message_in_studio.php"
 
 class Messenger():
-    """ Messenger dialog """
+    """ Messenger """
     def __init__(self, parent):
         # Create dialog
         self._im = Gtk.Dialog.new()
@@ -47,6 +48,7 @@ class Messenger():
         self._im.set_resizable(True)
         self._im.set_transient_for(parent)
         self._im.set_modal(False)
+        self._im.set_default_size(250, 250)
         self._hidden = True
         self._sessid = ""
         # Logo
@@ -54,7 +56,8 @@ class Messenger():
         img.set_pixel_size(50)
         # Title
         text = "<span size='18000'><b>Silver Rain</b></span>\n"
-        text += "<span size='11000'>" + _("Send message in studio") + "</span>"
+        text += "<span size='11000'>" + _("Send message to the studio")
+        text += "</span>"
         title = Gtk.Label()
         title.set_markup(text)
         title.set_alignment(0, 0)
@@ -78,8 +81,7 @@ class Messenger():
         self._msg.set_border_window_size(Gtk.TextWindowType.BOTTOM, 15)
         # Scrolled window
         win = Gtk.ScrolledWindow()
-        win.set_policy(Gtk.PolicyType.AUTOMATIC,
-                       Gtk.PolicyType.AUTOMATIC)
+        win.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         win.set_min_content_height(100)
         win.add(self._msg)
         # Scrolled window border
@@ -130,6 +132,7 @@ class Messenger():
         self._msg.grab_focus()
 
     def update_sender(self):
+        """ Update message header """
         self._sender.set_text(config.message_sender)
 
     def _on_delete_event(self, window, event):
@@ -172,13 +175,13 @@ class Messenger():
             msg_buf.delete(start, end)
             # Disable button for 120 seconds
             self._send_button.set_sensitive(False)
-            self._countdown(res["data"])
+            self._countdown(120)
             # Update status
             success = "<i>{0}</i>".format(_("Message sent"))
             self._status.set_markup(success)
             self._status.show()
         elif res["type"] == "time":
-            # Disable button
+            # This should never happen, but sometimes it does
             self._send_button.set_sensitive(False)
             self._countdown(res["data"])
             # Update status
@@ -187,7 +190,9 @@ class Messenger():
             self._status.show()
         else:
             # This should never happen
-            pass
+            show_dialog(self._im, "Error", "dialog-error",
+                        "Unexpected response")
+            logging.error("Unexpected response type: " + res)
         # Hide status
         GObject.timeout_add(10000, self._status.hide)
 
@@ -230,7 +235,6 @@ class Messenger():
             return err
         if resp.status_code != 200:
             logging.error("Connection error {0}".format(resp.status_code))
-            logging.error("Response:", resp)
             return err
         # Parse response
         resp_data = resp.json()
@@ -256,22 +260,20 @@ class Messenger():
             sessid = re.sub(r'^.*name="sessid" id="sessid_6" value="(.*?)".*$',
                             r'\1', resp.text)
             self._sessid = sessid
-        except requests.exceptions.RequestException as e:
-            logging.error(str(e))
-        except ValueError:
-            logging.error("Unexpected response")
-        if not self._sessid:
-            return False
-
-        # Get bx_user_id
-        self._session.headers["Accept"] = "*/*"
-        self._session.headers["Referer"] = "http://silver.ru/"
-        del self._session.headers["Upgrade-Insecure-Requests"]
-        try:
+            # Get bx_user_id
+            self._session.headers["Accept"] = "*/*"
+            self._session.headers["Referer"] = "http://silver.ru/"
+            del self._session.headers["Upgrade-Insecure-Requests"]
             resp = self._session.get(BITRIX_SERVER)
+
         except requests.exceptions.RequestException as e:
             logging.error(str(e))
             self._sessid = ""
+
+        except ValueError:
+            logging.error("Unexpected response")
+
+        if not self._sessid:
             return False
 
         # Setup session

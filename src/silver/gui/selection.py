@@ -27,10 +27,10 @@ from silver.translations import WEEKDAY_LIST
 class Selection(Gtk.Box):
     """ Selection buttons """
     def __init__(self, app):
+        Gtk.Box.__init__(self, orientation=Gtk.Orientation.HORIZONTAL)
+        self.set_spacing(0)
         self._app = app
         self._selection_buttons = []
-        Gtk.Box.__init__(self, orientation=Gtk.Orientation.HORIZONTAL,
-                         spacing=0)
         for day in WEEKDAY_LIST:
             button = Gtk.Button(day)
             button.set_focus_on_click(True)
@@ -44,7 +44,7 @@ class Selection(Gtk.Box):
         """ Select today's section """
         wd = datetime.now(MSK()).weekday()
         self._selection_buttons[wd].clicked()
-        Gtk.Widget.grab_focus(self._selection_buttons[wd])
+        self._selection_buttons[wd].grab_focus()
 
     def _on_clicked(self, button):
         """ Refilter treeview by selected weekday """

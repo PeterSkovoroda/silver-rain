@@ -19,18 +19,17 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gst
-
 from datetime import datetime
+import logging
 import sys
 
-from . import config
-from .msktz import MSK
+import silver.config as config
+from silver.msktz import MSK
 
 class Player():
     """ Base class for player instances """
     def __init__(self, err_func):
         self.playing = False
-        # Set error callbacks
         self._error_callback = err_func
 
     def reset_connection_settings(self):
@@ -43,9 +42,9 @@ class Player():
         self._clean()
 
 # Playback control API
-    def play(self, arg=None):
+    def start(self, arg=None):
         if not self.playing:
-            self._play(arg)
+            self._start(arg)
             self.playing = True
 
     def stop(self):
@@ -53,11 +52,8 @@ class Player():
             self._stop()
             self.playing = False
 
-    def set_volume(self, volume):
-        pass
-
 # Internal
-    def _play(self, arg):
+    def _start(self, arg):
         raise NotImplementedError
 
     def _stop(self):
@@ -75,8 +71,8 @@ class Player():
 
     def _on_error(self, bus, msg):
         err, dbg = msg.parse_error()
-        str = "Error on element {0}: {1}".format(msg.src.get_name, err)
-        self._error_callback("error", str)
+        self._error_callback("error", str(err))
+        logging.error(dbg)
         self.stop()
 
 class SilverPlayer(Player):
@@ -107,8 +103,9 @@ class SilverPlayer(Player):
                                                             "volume")
             self._el["sink"] = Gst.ElementFactory.make("autoaudiosink",
                                                             "sink")
-        except Gst.ElementNotFoundError:
+        except Gst.ElementNotFoundError as e:
             self._error_callback("error", "Couldn't find GStreamer element")
+            logging.error(str(e))
             sys.exit(-1)
 
         for e in self._el:
@@ -164,7 +161,7 @@ class SilverPlayer(Player):
             return
         self.set_volume(self.volume)
 
-    def _play(self, stream=None):
+    def _start(self, stream=None):
         if stream:
             self._pipe.get_by_name("source").set_property("location", stream)
         ret = self._pipe.set_state(Gst.State.PLAYING)
@@ -254,7 +251,7 @@ class SilverRecorder(Player):
         self._bus.connect("message::eos", self._on_eos)
         self._bus.connect("message::error", self._on_error)
 
-    def _play(self, name):
+    def _start(self, name):
         file = datetime.now(MSK()).strftime(config.recs_prefix) + name
         file = "{0}/{1}.mp3".format(config.recs_dir, file)
         self._pipe.get_by_name("filesink").set_property("location", file)
