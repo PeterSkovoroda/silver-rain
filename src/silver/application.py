@@ -84,6 +84,9 @@ class SilverApp():
         self._player.clean()
         self._recorder.clean()
 
+    def present(self):
+        self._window.present()
+
 # Application API
     def show(self):
         """ Show main window """
@@ -122,7 +125,7 @@ class SilverApp():
                 apply = dialog.apply_settings()
                 break
             else:
-                self.error_show("Invalid recordings storage location")
+                error_show(self._window, "Invalid recordings storage location")
         dialog.destroy()
         if "IM" in apply:
             # Update messenger
@@ -134,8 +137,12 @@ class SilverApp():
             self._sched_tree.mark_current()
         if "NETWORK" in apply:
             # Update player
-            self.stop()
+            if self._player.playing:
+                self.stop()
             self._player.reset_connection_settings()
+            # Update recorder
+            if self._recorder.playing:
+                self.stop_record()
             self._recorder.reset_connection_settings()
 
     def play(self):
@@ -164,41 +171,64 @@ class SilverApp():
         # Show notification
         self._notifications.show_stopped()
 
-    def set_volume(self):
-        #XXX
-        if not self._player.muted and self._player.volume == 0:
-            self.on_mute_toggled()
-        elif self._player.muted and self._player.volume > 0:
-            self._player.muted = self._player.volume
-            self.on_mute_toggled()
-        self._player.set_volume(self._player.volume)
+    def set_volume(self, value):
+        """ Set player volume """
+        if value == 0:
+            self.mute()
+        elif self._player.muted:
+            self.unmute(volume=value)
+        else:
+            self._player.set_volume(value)
 
-    def volume_increase(self, value):
-        pass
-
-    def volume_decrease(self, value):
-        pass
-
-    def on_mute_toggled(self):
-        """ Since it's impossible to just set checkbox status
-            without activating it (which is stupid, by the way),
-            this function should toggle checkbox from menubar
-            which will run actual mute method """
-        self._menubar.raise_mute(not self._player.muted)
+    def volume_step(self, value):
+        vol = self._player.volume
+        vol += value
+        if vol > 100:
+            vol = 100
+        elif vol < 0:
+            vol = 0
+        self.set_volume(vol)
+        if vol:
+            self._panel.update_volume_scale(vol)
 
     def mute(self):
-        """ Mute player """
-        pass
+        """ Mute player, update interface """
+        self._player.mute()
+        self._menubar.update_mute_menu(True)
+        self._panel.update_mute_button(True)
+        self._panel.update_volume_scale(0)
+        self._status_icon.update_mute_menu(True)
+
+    def unmute(self, volume=0):
+        """ Unmute player, update interface """
+        if not volume:
+            self._player.unmute()
+        else:
+            self._player.set_volume(volume)
+        self._menubar.update_mute_menu(False)
+        self._panel.update_mute_button(False)
+        self._panel.update_volume_scale(self._player.volume)
+        self._status_icon.update_mute_menu(False)
 
     def record(self):
-        """ Start recorder """
-        self._recorder.play()
-        pass
+        """ Update interface, start recorder """
+        # Set timer
+        self._t_recorder.reset(self._schedule.get_event_end())
+        # Get name
+        name = self._schedule.get_event_title()
+        # Start recorder
+        self._recorder.play(name)
+        # Update interface
+        self._menubar.update_recorder_menu(True)
+        self._status_icon.update_recorder_menu(True)
 
     def stop_record(self):
-        """ Stop recorder """
+        """ Update interface, stop recorder """
         self._recorder.stop()
-        pass
+        self._t_recorder.cancel()
+        # Update interface
+        self._menubar.update_recorder_menu(False)
+        self._status_icon.update_recorder_menu(False)
 
     def refilter(self, weekday):
         """ Refilter TreeView """
@@ -223,12 +253,14 @@ class SilverApp():
                 GObject.idle_add(cleanup)
 
         def cleanup():
-            # Draw sched tree if just created
             t.join()
+            # Draw sched tree if just created
             if not refresh:
                 self._sched_tree.show()
-            # Show playing status
+            # Reset status
             self._panel.status_set_playing()
+            # Start timer
+            self._t_event.reset(self._schedule.get_event_end())
             # Show agenda for today
             self._selection.update()
             # Update treeview
@@ -246,18 +278,23 @@ class SilverApp():
             t.join()
             # Show error status
             self._panel.status_set_text(_("Couldn't update schedule"))
-            GObject.timeout_add(10000, self.update_status())
+            def f():
+                title = self._schedule.get_event_title()
+                self._panel.status_set_text(title)
+            GObject.timeout_add(10000, f)
             self._panel.status_set_playing()
+
+            title = self._schedule.get_event_title()
+            host = self._schedule.get_event_host()
+            time = self._schedule.get_event_time()
+            img = self._schedule.get_event_icon()
+            self._status_icon.update_event(title, host, time, img)
 
         # Show updating status
         self._panel.status_set_updating()
         # Show updating message
         t = threading.Thread(target=init_sched)
         t.start()
-
-    def update_status(self):
-        title = self._schedule.get_event_title()
-        self._panel.status_set_text(title)
 
     def update_now_playing(self):
         """ Update label, bg of current event, show notifications """
@@ -267,8 +304,8 @@ class SilverApp():
         # Update event
         self._schedule.update_current_event()
         # Update treeview
-        self._sched_tree.mark_current()
         self._selection.update()
+        self._sched_tree.mark_current()
         # Check if should be recorded
         if self._sched_tree.check_recorder():
             self.record()
@@ -292,78 +329,14 @@ class SilverApp():
 ### GStreamer callbacks
     def _on_player_error(self, type, msg):
         if type == "warning":
-            warning_show(msg)
+            warning_show(self._window, msg)
         elif type == "error":
-            error_show(msg)
-        self._player.stop()
+            error_show(self._window, msg)
+        self.stop()
 
     def _on_recorder_error(self, type, msg):
         if type == "warning":
-            warning_show(msg)
+            warning_show(self._window, msg)
         elif type == "error":
-            error_show(msg)
-        self._recorder.stop()
-
-### Common
-    #def recorder_toggle(self, button):
-        #""" Change status, toggle recorder, set timer """
-        #recording = self._recorder.playing
-        ## Menubar
-        #self.menubar_record.set_sensitive(recording)
-        #self.menubar_stop_recording.set_sensitive(not recording)
-        ## Appindicator
-        #self.appindicator_update_menu()
-        #if not recording:
-            ## Set timer
-            #today = datetime.now(MSK())
-            #now = timedelta(hours=today.hour,
-                            #minutes=today.minute,
-                            #seconds=today.second).total_seconds()
-            #timeout = int(self._schedule.get_event_end() - now)
-            #self._t_recorder = threading.Timer(timeout,
-                            #self.timers_callback_recorder_stop)
-            #self._t_recorder.start()
-        ## Get name
-        #if not self.__SCHEDULE_ERROR__:
-            #name = self._schedule.get_event_title()
-        #else:
-            #name = "SilverRain"
-        ## Start recorder
-        #if not recording:
-            #self._recorder.play(name)
-        #else:
-            #self._recorder.stop()
-
-    #def recorder_stop(self, button):
-        #""" Cancel timer, toggle recorder """
-        #self._t_recorder.cancel()
-        #self.recorder_toggle(None)
-
-    #def mute_toggle(self, button, val=0):
-        #""" Set volume, update interface """
-        #if self.self._player.muted:
-            #self._player.volume = self.self._player.muted
-            #self.self._player.muted = 0
-        #else:
-            #self.self._player.muted = self._player.volume or 5
-            #self._player.volume = 0
-        ## Control panel
-        #self.mute_button.set_icon_name(self.get_volume_icon())
-        ## Appindicator
-        #self.appindicator_update_menu()
-        ## This actually gonna mute player
-        #self.volume.set_value(self._player.volume)
-
-        #self.playback_button.set_icon_name(self.get_playback_label()[1])
-        ## Menubar
-        #self.menubar_play.set_sensitive(playing)
-        #self.menubar_stop.set_sensitive(not playing)
-        ## Control panel
-        #self.playback_button.set_tooltip_text(self.get_playback_label()[0])
-        ## Appindicator
-        #self.appindicator_update_menu()
-        #if playing:
-            #self._player.stop()
-        #else:
-            #self._player.play()
-        #self.show_notification_on_playback()
+            error_show(self._window, msg)
+        self.stop_record()

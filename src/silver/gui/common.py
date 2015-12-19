@@ -55,9 +55,9 @@ def get_playback_label(play):
         icon = "media-playback-stop"
     return text, icon
 
-def get_record_label(play):
+def get_record_label(record):
     """ Return text and icon for record menu/button """
-    if play:
+    if record:
         text = _("Record program")
         icon = "media-record"
     else:
@@ -65,10 +65,12 @@ def get_record_label(play):
         icon = "media-playback-stop"
     return text, icon
 
-def get_volume_icon(muted=False):
+def get_volume_label(muted=False):
     """ Return icon for mute button """
     if muted:
+        text = "Unmute"
         icon = "audio-volume-muted"
     else:
+        text = "Mute"
         icon = "audio-volume-high"
-    return icon
+    return text, icon

@@ -60,7 +60,7 @@ class Menubar(Gtk.MenuBar):
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         # Mute
         self._mute = Gtk.CheckMenuItem(_("Mute"))
-        self._mute.connect("toggled", self._on_mute)
+        self._mute_handler_id = self._mute.connect("toggled", self._on_mute)
         key, mod = Gtk.accelerator_parse("<Control>M")
         self._mute.add_accelerator("activate", self.accel_group,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
@@ -138,9 +138,11 @@ class Menubar(Gtk.MenuBar):
         self._record.set_sensitive(not recording)
         self._stop_recording.set_sensitive(recording)
 
-    def raise_mute(self, mute):
-        """ Toggle mute checkbutton """
-        self._mute.set_active(mute)
+    def update_mute_menu(self, muted):
+        """ Update mute menu """
+        self._mute.handler_block(self._mute_handler_id)
+        self._mute.set_active(muted)
+        self._mute.handler_unblock(self._mute_handler_id)
 
     def _on_play(self, button):
         self._app.play()
@@ -155,7 +157,10 @@ class Menubar(Gtk.MenuBar):
         self._app.stop_record()
 
     def _on_mute(self, button):
-        self._app.mute()
+        if button.get_active():
+            self._app.mute()
+        else:
+            self._app.unmute()
 
     def _on_refresh(self, button):
         self._app.update_schedule(refresh=True)

@@ -18,7 +18,9 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
+from gi.repository import GdkPixbuf, Gtk
 import json
+import logging
 import os
 import re
 import requests
@@ -27,17 +29,17 @@ import urllib.request
 from collections import deque
 from datetime import datetime
 from datetime import timedelta
-from gi.repository import GdkPixbuf
 
 try:
     from lxml import etree
 except ImportError as err:
     import xml.etree.ElementTree as etree
 
-from . import config
+from silver.globals import ICON
 from silver.globals import IMG_DIR
 from silver.globals import SCHED_FILE
 from silver.msktz import MSK
+import silver.config as config
 
 SCHED_URL       = "http://silver.ru/programms/"
 SILVER_RAIN_URL = "http://silver.ru"
@@ -48,7 +50,8 @@ USER_AGENT      = 'Mozilla/5.0 (X11; Linux x86_64) ' + \
 # Use this list to operate with schedule
 SCHED_WEEKDAY_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
                       'Friday', 'Saturday', 'Sunday']
-
+MUSIC = "Музыка"
+MUSIC_URL = "http://silver.ru/programms/muzyka/"
 
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
@@ -70,9 +73,9 @@ def parse_time(str):
 
 class SilverSchedule():
     """
-        __sched_week__      - full schedule
-        __sched_day__       - daily agenda
-        __event__           - currently playing
+        _sched_week      - full schedule
+        _sched_day       - daily agenda
+        _event           - currently playing
 
         Schedule list[weekday(0-6)]:
             0   Weekday             str
@@ -87,92 +90,136 @@ class SilverSchedule():
             9   Icon URL            str
     """
     def __init__(self):
-        self.__sched_week__ = [ [] for x in range(7) ]
-        self.__sched_day__ = deque()
-        self.__event__ = {}
-        self.__SCHEDULE_ERROR__ = False
+        self._sched_week = [ [] for x in range(7) ]
+        self._sched_day = deque()
+        self._event = {}
+        self._SCHEDULE_ERROR = False
 
-    # Get current event values
-    def get_event_title(self): return self.__event__["title"]
-    def get_event_time(self): return self.__event__["time"]
-    def get_event_url(self): return self.__event__["url"]
-    def get_event_end(self): return self.__event__["end"]
-    def get_event_position(self): return self.__event__["position"]
-    def get_event_weekday(self): return self.__event__["weekday"]
+    def get_event_title(self):
+        """ Return event title """
+        if not self._SCHEDULE_ERROR:
+            return self._event["title"]
+        else:
+            return "Silver-Rain"
+
+    def get_event_time(self):
+        """ Return event time hh:mm-hh:mm """
+        if not self._SCHEDULE_ERROR:
+            return self._event["time"]
+        else:
+            return "00:00-24:00"
+
+    def get_event_url(self):
+        """ Return event url """
+        if not self._SCHEDULE_ERROR:
+            return self._event["url"]
+        else:
+            return "http://silver.ru/"
+
+    def get_event_end(self):
+        """ Return end time in seconds """
+        if not self._SCHEDULE_ERROR:
+            return self._event["end"]
+        else:
+            return 86400.0
+
+    def get_event_position(self):
+        """ Return event position """
+        if not self._SCHEDULE_ERROR:
+            return self._event["position"]
+        else:
+            return 0
+
+    def get_event_weekday(self):
+        """ Return weekday """
+        if not self._SCHEDULE_ERROR:
+            return SCHED_WEEKDAY_LIST.index(self._event["weekday"])
+        else:
+            return datetime.now(MSK()).weekday()
+
     def get_event_icon(self):
         """ Return pixbuf """
-        # Download icon if it doesn't exist
-        if not os.path.exists(self.__event__["icon"]):
-            urllib.request.urlretrieve(self.__event__["icon_url"],
-                                       self.__event__["icon"])
-        return GdkPixbuf.Pixbuf.new_from_file(self.__event__["icon"])
+        if not self._SCHEDULE_ERROR and self._event["icon"]:
+            pb = GdkPixbuf.Pixbuf.new_from_file(self._event["icon"])
+        else:
+            icontheme = Gtk.IconTheme.get_default()
+            pb = icontheme.load_icon(ICON, 256, 0)
+            pb = pb.scale_simple(80, 80, GdkPixbuf.InterpType.BILINEAR)
+        return pb
+
     def get_event_host(self):
-        str = ' и '.join(self.__event__["host"])
+        """ Return host """
+        if not self._SCHEDULE_ERROR:
+            str = " и ".join(self._event["host"])
+        else:
+            str = ""
         return str
 
     def update_current_event(self):
         """ Update current event """
-        newday = False
-        if not len(self.__sched_day__):
+        if not len(self._sched_day):
             # It's a new day.
             # It's so mundane. What exciting things will happen today?
             self._sched_gen_daily_agenda()
-            newday = True
-        self.__event__ = self.__sched_day__.popleft()
-        return newday
+        self._event = self._sched_day.popleft()
 
     def update_schedule(self, force_refresh=False):
         """ Retrieve schedule """
+        self._SCHEDULE_ERROR = True
         if not force_refresh and os.path.exists(SCHED_FILE):
             # Read from file
-            self._sched_get_from_file()
+            self._sched_load_from_file()
         else:
             # Backup
-            sched_week_bak = self.__sched_week__
-            sched_day_bak = self.__sched_day__
+            sched_week_bak = self._sched_week
+            sched_day_bak = self._sched_day
             # Clear
-            self.__sched_week__ = [ [] for x in range(7) ]
-            self.__sched_day__ = deque()
+            self._sched_week = [ [] for x in range(7) ]
+            self._sched_day = deque()
             # Load from website
-            if not self._sched_get_from_html():
-                self.__sched_week__ = sched_week_bak
-                self.__sched_day__ = sched_day_bak
+            if not self._sched_load_from_html():
+                if sched_week_bak[0]:
+                    # Got backup. Reset error status
+                    self._SCHEDULE_ERROR = False
+                self._sched_week = sched_week_bak
+                self._sched_day = sched_day_bak
                 return False
         # Generate schedule for today
         self._sched_gen_daily_agenda()
         # Update current event
         self.update_current_event()
+        self._SCHEDULE_ERROR = False
         return True
 
     def fill_tree_strore(self, store):
         """ Fill TreeStore object """
         it = None
-        for x in range(7):
-            bg_dark = False
-            ch_dark = bg_dark
+        font = config.font
+        fg_color = config.font_color
+        icontheme = Gtk.IconTheme.get_default()
 
-            for item in self.__sched_week__[x]:
-                ICON_EXIST = True
+        for wd in range(7):
+            bg_dark = False
+            ch_dark = False
+            for item in self._sched_week[wd]:
+                # Get pixbuf
+                if item["icon"]:
+                    icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
+                else:
+                    # Load default icon instead
+                    # TODO Install default icon somewhere
+                    icon = icontheme.load_icon(ICON, 256, 0)
+                # Scale
+                sz = 80
+                if not item["is_main"]:
+                    sz = 60
+                icon = icon.scale_simple(sz, sz, GdkPixbuf.InterpType.BILINEAR)
+                # Join hosts
                 host = ' и '.join(item["host"])
-                font = config.font
-                icon = None
-                # Download icon if it doesn't exist
-                if not os.path.exists(item["icon"]):
-                    try:
-                        urllib.request.urlretrieve(item["icon_url"],
-                                                   item["icon"])
-                    except urllib.error.URLError as e:
-                        logging.error("Couldn't download icon from url:" +
-                                      "{0}\n{1}".format(item["icon_url"], e))
-                        ICON_EXIST = False
                 # Insert program
                 if item["is_main"]:
                     # Main event
                     bg_color = config.bg_colors[bg_dark]
-                    fg_color = config.font_color
-                    # Get pixbuf
-                    if ICON_EXIST:
-                        icon = GdkPixbuf.Pixbuf.new_from_file(item["icon"])
                     # Insert item
                     it = store.append(None, [item["weekday"], item["is_main"],
                                              item["time"], item["title"],
@@ -185,11 +232,6 @@ class SilverSchedule():
                 else:
                     # Child event
                     bg_color = config.bg_colors[ch_dark]
-                    fg_color = config.font_color
-                    # Get pixbuf
-                    if ICON_EXIST:
-                        icon = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                                                    item["icon"], 60, 60, True)
                     # Insert item
                     store.append(it, [item["weekday"], item["is_main"],
                                  item["time"], item["title"], item["url"],
@@ -204,61 +246,67 @@ class SilverSchedule():
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
         position = 0
-        for item in self.__sched_week__[today.weekday()]:
+        for item in self._sched_week[today.weekday()]:
             if not item["is_main"]:
                 continue
             else:
                 item["position"] = position
-                position = position + 1
+                position += 1
             if item["end"] <= now:
                 # Child or already ended. Skip
                 continue
-            self.__sched_day__.append(item)
+            self._sched_day.append(item)
 
-    def _sched_get_from_file(self):
+    def _sched_load_from_file(self):
         """ Load schedule from file """
-        f = open(SCHED_FILE, "r")
-        self.__sched_week__ = json.load(f)
-        f.close()
+        with open(SCHED_FILE, "r") as f:
+            self._sched_week = json.load(f)
 
     def _sched_write_to_file(self):
         """ Save schedule on disk """
-        f = open(SCHED_FILE, 'w')
-        json.dump(self.__sched_week__, f)
-        f.close()
+        with open(SCHED_FILE, 'w') as f:
+            json.dump(self._sched_week, f)
 
-    def _sched_get_from_html(self):
+    def _sched_load_from_html(self):
         """ Load schedule from site """
         # Create session with fake user-agent
         session = requests.Session()
-        session.headers['User-Agent'] = USER_AGENT
+        session.headers["User-Agent"] = USER_AGENT
         # Default event icon
-        music_icon_src = ''
+        music_icon_name = ""
         # Weekdays parser
-        wd_name_list = {'Вс' : [6], 'Пн' : [0], 'Вт' : [1], 'Ср' : [2],
-                        'Чт' : [3], 'Пт' : [4], 'Сб' : [5],
-                        'По будням' : list(range(0,5)),
-                        'По выходным' : [5, 6]}
-        # Download schedule
+        wd_name_list = {"Вс" : [6], "Пн" : [0], "Вт" : [1], "Ср" : [2],
+                        "Чт" : [3], "Пт" : [4], "Сб" : [5],
+                        "По будням" : list(range(0,5)),
+                        "По выходным" : [5, 6]}
         try:
+            # Download schedule
             resp = session.get(SCHED_URL)
-            # Follow redirects
-            resp = session.get(resp.url)
+            if resp.status_code != 200:
+                logging.error("Couldn't reach server. Code:", resp.status_code)
+                return False
+            # Get table
+            r = r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$'
+            xhtml = re.sub(r, r'\1', resp.text)
+            # Handle unclosed img tags /* xhtml style */
+            xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
+            root = etree.fromstring(xhtml)
+
         except requests.exceptions.RequestException as e:
             logging.error(str(e))
             return False
-        xhtml = resp.text
-        # XXX XXX XXX
-        # This is wrong
-        # There must be another way
-        # XXX XXX XXX
-        xhtml = re.sub(
-                r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$',
-                r'\1', xhtml)
-        # Handle unclosed img tags /* xhtml style */
-        xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
+
+        except ValueError as e:
+            logging.error("Unexpected response")
+            logging.error(str(e))
+            return False
+
+        except etree.XMLSyntaxError as e:
+            logging.error("Syntax error")
+            logging.error(str(e))
+            return False
+
         # Parse xhtml text
-        root = etree.fromstring(xhtml)
         for obj in root:
             # If time not presented
             if not len(obj[3]):
@@ -266,35 +314,49 @@ class SilverSchedule():
                 continue
             # Get icon
             icon_src = obj[0][0][0].attrib['src'].split("?")[0]
-            if icon_src[:7] != "http://":
-                if icon_src[:2] == "//":
-                    # //url/name.png
-                    icon_src = "http:" + icon_src
-                elif icon_src[0] == "/":
-                    # /name.png
-                    icon_src = SILVER_RAIN_URL + icon_src
-                else:
-                    # url/name.png
-                    icon_src = "http://" + icon_src
-            icon_name = icon_src.split("/")[-1]
+            if icon_src.split(".")[-1] not in ["jpg", "jpeg", "png"]:
+                icon_name = ""
+            else:
+                if icon_src[:7] != "http://":
+                    if icon_src[:2] == "//":
+                        # //url/name.png
+                        icon_src = "http:" + icon_src
+                    elif icon_src[0] == "/":
+                        # /name.png
+                        icon_src = SILVER_RAIN_URL + icon_src
+                    else:
+                        # url/name.png
+                        icon_src = "http://" + icon_src
+                icon_name = IMG_DIR + icon_src.split("/")[-1]
+                # Download icon if it doesn't exist
+                if not os.path.exists(icon_name):
+                    try:
+                        urllib.request.urlretrieve(icon_src, icon_name)
+                    except urllib.error.URLError as e:
+                        err = "Couldn't download icon from url: " + icon_src
+                        logging.error(err)
+                        logging.error(str(e))
+                        icon_name = ""
             # Get title
             title = obj[1][0][0].text
             # Don't parse music. Just save icon location
-            if title == "Музыка":
-                music_icon_src = icon_src
+            if title == MUSIC:
+                music_icon_name = icon_name
                 continue
             # Get program url
-            url = SILVER_RAIN_URL + obj[1][0][0].attrib['href']
+            url = obj[1][0][0].attrib['href']
+            url = re.sub(r'^.*(/programms/.*?/).*$', r'\1', url)
+            url = SILVER_RAIN_URL + url
             # Get hosts
             host = []
             if len(obj[2]):
                 # If hosts presented
                 for it in obj[2][0]:
-                    host.append(it[0][0].text[1:-1])
+                    host.append(it[0][0].text.strip())
             # Get schedule
             sched = []
             for it in obj[3][0]:
-                # Expecting "WD, WD, WD : HH:MM" format
+                # Expecting "WD, WD, WD : HH:MM-HH:MM" format
                 weekday, time = it.text.split(' : ')
                 wd_list = weekday.split(', ')
                 start, end = time.split('-')
@@ -303,9 +365,10 @@ class SilverSchedule():
                     #  HH:MM,
                     #  start in seconds,
                     #  end in seconds
-                    sched.append([wd_name_list[wd], time,
-                                  parse_time(start),
-                                  parse_time(end)])
+                    sched.append([ wd_name_list[wd.strip()],
+                                   time,
+                                   parse_time(start),
+                                   parse_time(end) ])
             # Event type
             is_main = False
             if sched[0][3] - sched[0][2] >= 3600:
@@ -321,21 +384,20 @@ class SilverSchedule():
                     program["title"] = title
                     program["url"] = url
                     program["host"] = host
-                    program["icon"] = IMG_DIR + icon_name
+                    program["icon"] = icon_name
                     program["start"] = it[2]
                     program["end"] = it[3]
-                    program["icon_url"] = icon_src
-                    self.__sched_week__[weekday].append(program)
+                    self._sched_week[weekday].append(program)
 
         for wd in range(7):
             # Sort schedule by start/parent
-            self.__sched_week__[wd].sort(key = lambda x : \
+            self._sched_week[wd].sort(key = lambda x : \
                                          (x["start"], -x["is_main"]))
             # Remove duplicates
-            prev = []
-            for item in self.__sched_week__[wd]:
-                if prev and prev["title"] == item["title"] and \
-                        prev["end"] > item["start"]:
+            prev = {}
+            for item in self._sched_week[wd]:
+                if (prev and prev["title"] == item["title"]
+                         and prev["end"] >= item["start"]):
                     # If there are two identical programms in a row
                     # I can't resolve more complicated errors
                     # I just hope they will never happen
@@ -344,49 +406,47 @@ class SilverSchedule():
                     if prev["start"] < item["start"]:
                         item["start"] = prev["start"]
                     item["time"] = str_time(item["start"], item["end"])
-                    self.__sched_week__[wd].remove(prev)
+                    self._sched_week[wd].remove(prev)
                 prev = item
             # Fill spaces with music
             time = 0.0
             pos = 0
             last = {"end" : 0}
-            for item in self.__sched_week__[wd]:
+            for item in self._sched_week[wd]:
                 if not item["is_main"]:
                     continue
                 if item["start"] > time:
                     # If doesn't start right after the last one
                     program = {}
                     program["is_main"] = True
-                    program["title"] = "Музыка"
-                    program["url"] = "http://silver.ru/programms/muzyka/"
+                    program["title"] = MUSIC
+                    program["url"] = MUSIC_URL
                     program["host"] = []
-                    program["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
-                    program["icon_url"] = music_icon_src
+                    program["icon"] = music_icon_name
                     program["weekday"] = SCHED_WEEKDAY_LIST[wd]
                     program["time"] = str_time(time, item["start"])
                     program["start"] = time
                     program["end"] = item["start"]
-                    self.__sched_week__[wd].insert(pos, program)
-                    pos = pos + 1
+                    self._sched_week[wd].insert(pos, program)
+                    pos += 1
                 time = item["end"]
-                pos = pos + 1
+                pos += 1
                 last = item
             # Check if last event doesn't go till 24:00
             if last["end"] < 86400.0:
                 program = {}
                 program["is_main"] = True
-                program["title"] = "Музыка"
-                program["url"] = "http://silver.ru/programms/muzyka/"
+                program["title"] = MUSIC
+                program["url"] = MUSIC_URL
                 program["host"] = []
-                program["icon"] = IMG_DIR + music_icon_src.split("/")[-1]
-                program["icon_url"] = music_icon_src
+                program["icon"] = music_icon_name
                 program["weekday"] = SCHED_WEEKDAY_LIST[wd]
                 program["time"] = str_time(last["end"], 86400.0)
                 program["start"] = last["end"]
                 program["end"] = 86400.0
-                self.__sched_week__[wd].insert(pos, program)
+                self._sched_week[wd].insert(pos, program)
             # Sort again
-            self.__sched_week__[wd].sort(key = lambda x : \
+            self._sched_week[wd].sort(key = lambda x : \
                                          (x["start"], -x["is_main"]))
         # Save sched to file
         self._sched_write_to_file()

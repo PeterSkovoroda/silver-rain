@@ -19,11 +19,11 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gtk, Gdk
-from . import config
+import silver.config as config
 
 __all__ = ["css_load"]
 
-silver_style = b"""
+_silver_style = b"""
 @define-color silver_rain_red #FF4545;
 /*************************
  *      Scale color  *
@@ -62,15 +62,15 @@ GtkScale.slider:hover {
 """
 
 def css_load():
+    """ Load style """
     if not config.use_css:
         return
     style_provider = Gtk.CssProvider()
     if config.css_path:
-        css = open(config.css_path, 'rb')
-        css_data = css.read()
-        css.close()
+        with open(config.css_path, 'rb') as css:
+            css_data = css.read()
     else:
-        css_data = silver_style
+        css_data = _silver_style
 
     style_provider.load_from_data(css_data)
     Gtk.StyleContext.add_provider_for_screen(

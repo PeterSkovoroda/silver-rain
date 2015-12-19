@@ -34,7 +34,7 @@ class Dialog(Gtk.Dialog):
         img.set_from_pixbuf(icon)
         # Message
         text = Gtk.Label("{0}: {1}".format(title,
-                         "\n".join(textwrap.wrap(message, 50))))
+                         "\n".join(textwrap.wrap(msg, 50))))
         # Pack
         grid = Gtk.Grid()
         grid.set_column_spacing(10)

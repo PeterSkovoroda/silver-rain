@@ -17,7 +17,7 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import Gtk
+from gi.repository import Gdk, Gtk
 import textwrap
 try:
     from gi.repository import AppIndicator3 as appindicator
@@ -62,7 +62,7 @@ class StatusIcon():
         self._playing = playing
         self._update_menu()
 
-    def update_record_menu(self, recording):
+    def update_recorder_menu(self, recording):
         """ Set recording status """
         self._recording = recording
         self._update_menu()
@@ -162,20 +162,24 @@ class StatusIcon():
 
     def _on_playback(self, button):
         """ Start/stop player """
-        if self._playing:
-            self._app.stop()
-        else:
+        if not self._playing:
             self._app.play()
+        else:
+            self._app.stop()
 
     def _on_recorder(self, button):
         """ Start/stop recorder """
-        if self._recording:
-            self._app.stop_record()
-        else:
+        if not self._recording:
             self._app.record()
+        else:
+            self._app.stop_record()
 
     def _on_mute(self, button):
-        self._app.on_mute_toggled()
+        """ Mute/unmute player """
+        if button.get_active():
+            self._app.mute()
+        else:
+            self._app.unmute()
 
     def _on_im(self, button):
         self._app.im()
@@ -210,9 +214,9 @@ class StatusIcon():
     def _appindicator_on_scroll(self, indicator, steps, direction):
         """ Change volume by scrolling on indicator """
         if direction == Gdk.ScrollDirection.UP:
-            self._app.volume_increase(5)
+            self._app.volume_step(5)
         elif direction == Gdk.ScrollDirection.DOWN:
-            self._app.volume_decrease(5)
+            self._app.volume_step(-5)
 
     def _update_menu(self):
         """ Creates popup menu attached to appindicator """

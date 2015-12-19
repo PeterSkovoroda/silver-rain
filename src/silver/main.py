@@ -43,7 +43,7 @@ class SilverService(dbus.service.Object):
     def __init__(self, win):
         self.window = win
         bus_name = dbus.service.BusName('org.SilverRain.Silver',
-                                    bus = dbus.SessionBus())
+                                        bus = dbus.SessionBus())
         dbus.service.Object.__init__(self, bus_name,
                                     '/org/SilverRain/Silver')
 
@@ -57,7 +57,7 @@ def let_it_rain():
     Gst.init(None)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     Notify.init("silver-rain")
-    # Create system directories if do not exist
+    # Create system directories if not exist
     for dir in [APP_DIR, IMG_DIR]:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -71,21 +71,22 @@ def let_it_rain():
     # Init translation
     translations.set_translation()
     # Init application
-    silver_window = application.SilverApp()
+    silver_app = application.SilverApp()
     # Setup dbus service
-    service = SilverService(silver_window)
+    service = SilverService(silver_app)
     # Run loop
     Gtk.main()
     # Cleanup
-    silver_window.clean()
+    silver_app.clean()
     Notify.uninit()
 
 def exec_main():
     # Check if already running
-    if (dbus.SessionBus().request_name("org.SilverRain.Silver") !=
-                                    dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER):
-        object = dbus.SessionBus().get_object("org.SilverRain.Silver",
-                                    "/org/SilverRain/Silver")
+    bus = dbus.SessionBus()
+    reply = bus.request_name("org.SilverRain.Silver")
+    if reply != dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER:
+        object = bus.get_object("org.SilverRain.Silver",
+                                "/org/SilverRain/Silver")
         method = object.get_dbus_method("show_window")
         method()
     else:

@@ -18,11 +18,11 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
+from gi.repository import Gtk
+
 import configparser
 import os
 import re
-
-from gi.repository import Gtk
 
 from silver.globals import CONFIG_FILE
 from silver.globals import STREAM_URL_LIST
@@ -59,10 +59,9 @@ class Default():
     proxy_id            = ""
     proxy_pw            = ""
 
-def init():
+def _init():
     """ Declare set of globals
-        initialized with default configuration
-    """
+        initialized with default configuration """
     global autoplay
     autoplay = Default.autoplay
     global start_hidden
@@ -102,107 +101,107 @@ def init():
     global proxy_pw
     proxy_pw = Default.proxy_pw
 
-def load():
+def _load():
     """ Read configuration file """
     cfg = configparser.ConfigParser()
     cfg.read(CONFIG_FILE)
     # General
     global autoplay
-    autoplay = cfg.getboolean('GENERAL', 'autoplay',
+    autoplay = cfg.getboolean("GENERAL", "autoplay",
                     fallback=Default.autoplay)
     global start_hidden
-    start_hidden = cfg.getboolean('GENERAL', 'starthidden',
+    start_hidden = cfg.getboolean("GENERAL", "starthidden",
                     fallback=Default.start_hidden)
     global recs_dir
-    recs_dir = cfg.get('GENERAL', 'recordsdirectory',
+    recs_dir = cfg.get("GENERAL", "recordsdirectory",
                     fallback=Default.recs_dir)
     global recs_prefix
-    recs_prefix = cfg.get('GENERAL', 'recordsprefix',
+    recs_prefix = cfg.get("GENERAL", "recordsprefix",
                     fallback=Default.recs_prefix)
     global language
-    language = int(cfg.get('GENERAL', 'language',
+    language = int(cfg.get("GENERAL", "language",
                     fallback=Default.language))
     global message_sender
-    message_sender = cfg.get('GENERAL', 'messagesender',
+    message_sender = cfg.get("GENERAL", "messagesender",
                     fallback=Default.message_sender)
     # Appearance
     global use_css
-    use_css = cfg.getboolean('APPEARANCE', 'usecss',
+    use_css = cfg.getboolean("APPEARANCE", "usecss",
                     fallback=Default.use_css)
     global css_path
-    css_path = cfg.get('APPEARANCE', 'csspath',
+    css_path = cfg.get("APPEARANCE", "csspath",
                     fallback=Default.css_path)
     global bg_colors
-    bg_colors = cfg.get('APPEARANCE', 'bgcolors',
-                    fallback=':'.join(Default.bg_colors)).split(':')
+    bg_colors = cfg.get("APPEARANCE", "bgcolors",
+                    fallback=":".join(Default.bg_colors)).split(":")
     global font_color
-    font_color = cfg.get('APPEARANCE', 'fontcolor',
+    font_color = cfg.get("APPEARANCE", "fontcolor",
                     fallback=Default.font_color)
     global selected_bg_color
-    selected_bg_color = cfg.get('APPEARANCE', 'selectedbgcolor',
+    selected_bg_color = cfg.get("APPEARANCE", "selectedbgcolor",
                     fallback=Default.selected_bg_color)
     global selected_font_color
-    selected_font_color = cfg.get('APPEARANCE', 'selectedfontcolor',
+    selected_font_color = cfg.get("APPEARANCE", "selectedfontcolor",
                     fallback=Default.selected_font_color)
     global font
-    font = cfg.get('APPEARANCE', 'Font',
+    font = cfg.get("APPEARANCE", "Font",
                     fallback=Default.font)
     global selected_font
-    selected_font = cfg.get('APPEARANCE', 'selectedfont',
+    selected_font = cfg.get("APPEARANCE", "selectedfont",
                     fallback=Default.selected_font)
     # Network
     global stream_url
-    stream_url = cfg.get('NETWORK', 'streamurl',
+    stream_url = cfg.get("NETWORK", "streamurl",
                     fallback=Default.stream_url)
     global proxy_required
-    proxy_required = cfg.getboolean('NETWORK', 'proxyrequired',
+    proxy_required = cfg.getboolean("NETWORK", "proxyrequired",
                     fallback=Default.proxy_required)
     global proxy_uri
-    proxy_uri = cfg.get('NETWORK', 'proxyuri',
+    proxy_uri = cfg.get("NETWORK", "proxyuri",
                     fallback=Default.proxy_uri)
     global proxy_id
-    proxy_id = cfg.get('NETWORK', 'proxyid',
+    proxy_id = cfg.get("NETWORK", "proxyid",
                     fallback=Default.proxy_id)
     global proxy_pw
-    proxy_pw = cfg.get('NETWORK', 'proxypw',
+    proxy_pw = cfg.get("NETWORK", "proxypw",
                     fallback=Default.proxy_pw)
 
 def save():
     """ Save configuration file """
     cfg = configparser.ConfigParser()
-    cfg['GENERAL'] = {
-            'autoplay'          : autoplay,
-            'language'          : language,
-            'messagesender'     : message_sender,
-            'recordsdirectory'  : recs_dir,
-            'recordsprefix'     : re.sub('%', '%%', recs_prefix),
-            'starthidden'       : start_hidden,
+    cfg["GENERAL"] = {
+            "autoplay"          : autoplay,
+            "language"          : language,
+            "messagesender"     : message_sender,
+            "recordsdirectory"  : recs_dir,
+            "recordsprefix"     : re.sub("%", "%%", recs_prefix),
+            "starthidden"       : start_hidden,
             }
-    cfg['APPEARANCE'] = {
-            'bgcolors'          : ':'.join(bg_colors),
-            'csspath'           : css_path,
-            'font'              : font,
-            'fontcolor'         : font_color,
-            'selectedbgcolor'   : selected_bg_color,
-            'selectedfont'      : selected_font,
-            'selectedfontcolor' : selected_font_color,
-            'usecss'            : use_css,
+    cfg["APPEARANCE"] = {
+            "bgcolors"          : ":".join(bg_colors),
+            "csspath"           : css_path,
+            "font"              : font,
+            "fontcolor"         : font_color,
+            "selectedbgcolor"   : selected_bg_color,
+            "selectedfont"      : selected_font,
+            "selectedfontcolor" : selected_font_color,
+            "usecss"            : use_css,
             }
-    cfg['NETWORK'] = {
-            'proxyid'           : proxy_id,
-            'proxypw'           : proxy_pw,
-            'proxyrequired'     : proxy_required,
-            'proxyuri'          : proxy_uri,
-            'streamurl'         : stream_url,
+    cfg["NETWORK"] = {
+            "proxyid"           : proxy_id,
+            "proxypw"           : proxy_pw,
+            "proxyrequired"     : proxy_required,
+            "proxyuri"          : proxy_uri,
+            "streamurl"         : stream_url,
             }
-    with open(CONFIG_FILE, 'w') as configfile:
+    with open(CONFIG_FILE, "w") as configfile:
         cfg.write(configfile)
 
 def setup():
     """ Setup configuration.
         Create config file if does not exist """
     if not os.path.exists(CONFIG_FILE):
-        init()
+        _init()
         save()
     else:
-        load()
+        _load()

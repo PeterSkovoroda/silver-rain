@@ -30,8 +30,6 @@ class Player():
     """ Base class for player instances """
     def __init__(self, err_func):
         self.playing = False
-        self.muted = 0
-        self.volume = 100
         # Set error callbacks
         self._error_callback = err_func
 
@@ -89,6 +87,8 @@ class SilverPlayer(Player):
 
     def __init__(self, err_func):
         Player.__init__(self, err_func)
+        self.muted = False
+        self.volume = 100
 
         # Create GStream pipeline
         self._pipe = Gst.Pipeline.new(self.__name__)
@@ -146,7 +146,23 @@ class SilverPlayer(Player):
 
     def set_volume(self, value):
         """ Set player volume [0-100] """
-        self._pipe.get_by_name("volume").set_property("volume", value / 100.)
+        self.volume = value
+        self._pipe.get_by_name("volume").set_property("volume",
+                                                      self.volume / 100.)
+        self.muted = False
+
+    def mute(self):
+        """ Mute """
+        if self.muted:
+            return
+        self._pipe.get_by_name("volume").set_property("volume", 0.)
+        self.muted = True
+
+    def unmute(self):
+        """ Restore previous volume level """
+        if not self.muted:
+            return
+        self.set_volume(self.volume)
 
     def _play(self, stream=None):
         if stream:
@@ -170,6 +186,7 @@ class SilverPlayer(Player):
 
     def _on_config_changed(self):
         src = self._pipe.get_by_name("source")
+        src.set_property("location", config.stream_url)
         if config.proxy_required:
             src.set_property("proxy", config.proxy_uri)
             src.set_property("proxy-id", config.proxy_id)
@@ -256,6 +273,7 @@ class SilverRecorder(Player):
 
     def _on_config_changed(self):
         src = self._pipe.get_by_name("source")
+        src.set_property("location", config.stream_url)
         if config.proxy_required:
             src.set_property("proxy", config.proxy_uri)
             src.set_property("proxy-id", config.proxy_id)
@@ -264,4 +282,3 @@ class SilverRecorder(Player):
             src.set_property("proxy", "")
             src.set_property("proxy-id", "")
             src.set_property("proxy-pw", "")
-        src.set_property("location", config.stream_url)
