@@ -32,7 +32,6 @@ from silver.globals import ICON
 from silver.gui.common import create_menuitem
 from silver.gui.common import get_playback_label
 from silver.gui.common import get_record_label
-from silver.translations import _
 
 class StatusIcon():
     """ Status icon """

@@ -20,8 +20,6 @@ Boston, MA 02110-1301 USA
 
 from gi.repository import Gtk
 
-from silver.translations import _
-
 def create_menuitem(text, icon):
     """ Create menu item with icon """
     icontheme = Gtk.IconTheme.get_default()

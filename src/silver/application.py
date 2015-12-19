@@ -38,7 +38,6 @@ from silver.player import SilverPlayer
 from silver.player import SilverRecorder
 from silver.schedule import SilverSchedule
 from silver.timer import Timer
-from silver.translations import _
 
 class SilverApp():
     """ Application """

@@ -1,2 +1,12 @@
 # List of source files which contain translatable strings.
-src/silver/main.py
+src/silver/application.py
+src/silver/gui/common.py
+src/silver/gui/controlpanel.py
+src/silver/gui/menubar.py
+src/silver/gui/messenger.py
+src/silver/gui/notifications.py
+src/silver/gui/preferences.py
+src/silver/gui/schedtree.py
+src/silver/gui/selection.py
+src/silver/gui/statusicon.py
+src/silver/translations.py

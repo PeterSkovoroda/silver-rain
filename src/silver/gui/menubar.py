@@ -21,7 +21,6 @@ Boston, MA 02110-1301 USA
 from gi.repository import Gtk
 
 from silver.gui.common import create_menuitem
-from silver.translations import _
 
 class Menubar(Gtk.MenuBar):
     """ Simple menubar with hotkeys """

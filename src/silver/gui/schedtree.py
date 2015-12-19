@@ -26,7 +26,6 @@ import silver.config as config
 from silver.gui.common import create_menuitem
 from silver.msktz import MSK
 from silver.schedule import SCHED_WEEKDAY_LIST
-from silver.translations import _
 
 class SchedTree(Gtk.TreeView):
     """ Schedule TreeView """

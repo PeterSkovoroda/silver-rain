@@ -22,7 +22,6 @@ from gi.repository import Gtk
 from datetime import datetime
 
 from silver.msktz import MSK
-from silver.translations import WEEKDAY_LIST
 
 class Selection(Gtk.Box):
     """ Selection buttons """
@@ -31,7 +30,10 @@ class Selection(Gtk.Box):
         self.set_spacing(0)
         self._app = app
         self._selection_buttons = []
-        for day in WEEKDAY_LIST:
+        self._WEEKDAY_LIST = [ _("Monday"), _("Tuesday"), _("Wednesday"),
+                               _("Thursday"), _("Friday"), _("Saturday"),
+                               _("Sunday") ]
+        for day in self._WEEKDAY_LIST:
             button = Gtk.Button(day)
             button.set_focus_on_click(True)
             button.set_size_request(80, 0)
@@ -48,5 +50,5 @@ class Selection(Gtk.Box):
 
     def _on_clicked(self, button):
         """ Refilter treeview by selected weekday """
-        wd = WEEKDAY_LIST.index(button.get_label())
+        wd = self._WEEKDAY_LIST.index(button.get_label())
         self._app.refilter(wd)

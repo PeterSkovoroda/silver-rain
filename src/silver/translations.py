@@ -20,20 +20,16 @@ Boston, MA 02110-1301 USA
 
 import gettext
 
-from . import config
-from gettext import gettext as _
+import silver.config as config
 
 LANGUAGES_LIST      = ["English", "Русский"]
 TRANSLATIONS_LIST   = ["en", "ru"]
 
-WEEKDAY_LIST = [_("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
-                _("Friday"), _("Saturday"), _("Sunday")]
-
 def set_translation():
+    """ Install _() function """
     if config.language:
         lang = gettext.translation("silver-rain",
                 languages=[TRANSLATIONS_LIST[config.language]])
         lang.install()
     else:
-        global _
-        _ = lambda s: s
+        gettext.install("silver-rain")

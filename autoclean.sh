@@ -10,4 +10,5 @@ rm -rf Makefile.in aclocal.m4 autom4te.cache/ configure data/Makefile.in \
 	config.sub po/boldquot.sed po/en@boldquot.header po/en@quot.header \
 	po/insert-header.sin po/Makefile.in.in po/Makevars.template \
 	po/quot.sed po/remove-potcdate.sin po/ru.gmo po/Rules-quot \
-	po/silver-rain.pot po/stamp-po m4 src/silver/gui/Makefile.in
+	po/silver-rain.pot po/stamp-po m4 src/silver/gui/Makefile.in \
+	src/silver/__pycache__ src/silver/gui/__pycache__

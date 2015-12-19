@@ -27,7 +27,6 @@ from silver.globals import STREAM_URL_LIST
 from silver.gui.common import rgba_to_hex
 from silver.gui.dialog import show_dialog
 from silver.translations import LANGUAGES_LIST
-from silver.translations import _
 
 class Preferences(Gtk.Dialog):
     """ Preferences dialog """

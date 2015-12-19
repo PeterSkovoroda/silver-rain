@@ -20,8 +20,6 @@ Boston, MA 02110-1301 USA
 
 from gi.repository import Notify
 
-from silver.translations import _
-
 class Notifications(Notify.Notification):
     """ Notifications """
     def __init__(self):

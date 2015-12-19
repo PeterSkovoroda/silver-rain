@@ -23,7 +23,6 @@ from gi.repository import Gtk
 from silver.gui.common import create_toolbutton
 from silver.gui.common import get_playback_label
 from silver.gui.common import get_volume_label
-from silver.translations import _
 
 class ControlPanel(Gtk.Box):
     """ Playback control panel """

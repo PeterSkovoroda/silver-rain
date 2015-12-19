@@ -27,7 +27,6 @@ import silver.config as config
 from silver.globals import ICON
 from silver.globals import SILVER_RAIN_URL
 from silver.gui.dialog import show_dialog
-from silver.translations import _
 
 COLOR_TEXTVIEW_BORDER   = "#7C7C7C"
 COLOR_INVALID           = "#FF4545"
