@@ -49,8 +49,6 @@ class SilverApp():
         self._schedule = SilverSchedule()
         # On event timer
         self._t_event = Timer(self.update_now_playing)
-        # Recorder timer
-        self._t_recorder = Timer(self.stop_record)
         # Menubar
         self._menubar = Menubar(self)
         # Selection
@@ -76,7 +74,6 @@ class SilverApp():
 
     def clean(self):
         self._t_event.cancel()
-        self._t_recorder.cancel()
         self._player.clean()
         self._recorder.clean()
 
@@ -211,8 +208,6 @@ class SilverApp():
         name = self._schedule.get_event_title()
         # Start recorder
         self._recorder.start(name)
-        # Set timer
-        self._t_recorder.start(self._schedule.get_event_end())
         # Update interface
         self._menubar.update_recorder_menu(True)
         self._status_icon.update_recorder_menu(True)
@@ -221,8 +216,6 @@ class SilverApp():
         """ Update interface, stop recorder """
         # Stop recorder
         self._recorder.stop()
-        # Cancel timer
-        self._t_recorder.cancel()
         # Update interface
         self._menubar.update_recorder_menu(False)
         self._status_icon.update_recorder_menu(False)
@@ -291,7 +284,10 @@ class SilverApp():
         t.start()
 
     def update_now_playing(self):
-        """ Update label, bg of current event, show notifications """
+        """ Update label, mark current event, show notifications """
+        # Stop recorder
+        if self._recorder.playing:
+            self.stop_record()
         # Reset TreeView line
         self.refilter(self._schedule.get_event_weekday())
         self._sched_tree.reset_current()
