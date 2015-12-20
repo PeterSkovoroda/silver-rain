@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-20 01:14+0300\n"
+"POT-Creation-Date: 2015-12-20 15:54+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -77,24 +77,24 @@ msgstr "Радио"
 msgid "Help"
 msgstr "Помощь"
 
-#: src/silver/gui/messenger.py:58
+#: src/silver/gui/messenger.py:59
 msgid "Send message to the studio"
 msgstr "Отправить сообщение в студию"
 
-#: src/silver/gui/messenger.py:73 src/silver/gui/preferences.py:155
+#: src/silver/gui/messenger.py:74 src/silver/gui/preferences.py:155
 msgid "Name e-mail/phone number"
 msgstr "Имя, e-mail/номер телефона"
 
-#: src/silver/gui/messenger.py:112 src/silver/gui/messenger.py:209
-#: src/silver/gui/messenger.py:211
+#: src/silver/gui/messenger.py:113 src/silver/gui/messenger.py:210
+#: src/silver/gui/messenger.py:212
 msgid "Send"
 msgstr "Отправить"
 
-#: src/silver/gui/messenger.py:169 src/silver/gui/messenger.py:187
+#: src/silver/gui/messenger.py:170 src/silver/gui/messenger.py:188
 msgid "Couldn't send message"
 msgstr "Не удалось отправить сообщение"
 
-#: src/silver/gui/messenger.py:179
+#: src/silver/gui/messenger.py:180
 msgid "Message sent"
 msgstr "Сообщение отправлено"
 
