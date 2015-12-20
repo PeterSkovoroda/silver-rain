@@ -20,6 +20,7 @@ Boston, MA 02110-1301 USA
 
 from gi.repository import Gdk, GObject, Gtk
 import logging
+import re
 import requests
 import urllib
 
