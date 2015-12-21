@@ -18,7 +18,7 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import GdkPixbuf, Gtk
+from gi.repository import GdkPixbuf, Gtk, Gdk
 import json
 import logging
 import os
@@ -38,6 +38,7 @@ import silver.config as config
 from silver.globals import ICON
 from silver.globals import IMG_DIR
 from silver.globals import SCHED_FILE
+from silver.gui.common import hex_to_rgba
 from silver.msktz import MSK
 
 SCHED_URL       = "http://silver.ru/programms/"
@@ -154,6 +155,12 @@ class SilverSchedule():
             str = ""
         return str
 
+    def get_event_bg(self):
+        file = ""
+        if not self._SCHEDULE_ERROR:
+            file = self._event["background"]
+        return file
+
     def update_event(self):
         """ Update current event """
         if not len(self._sched_day):
@@ -190,7 +197,7 @@ class SilverSchedule():
         self._SCHEDULE_ERROR = False
         return True
 
-    def fill_tree_strore(self, store):
+    def fill_tree_store(self, store):
         """ Fill TreeStore object """
         it = None
         font = config.font
@@ -217,24 +224,26 @@ class SilverSchedule():
                 # Insert program
                 if item["is_main"]:
                     # Main event
-                    bg_color = config.bg_colors[bg_dark]
+                    bg_color = hex_to_rgba(config.bg_colors[bg_dark])
+                    bg_color.alpha = config.bg_alpha[bg_dark]
                     # Insert item
                     it = store.append(None, [item["weekday"], item["is_main"],
                                              item["time"], item["title"],
                                              item["url"], host, icon,
                                              bg_color, fg_color, font,
-                                             False])
+                                             bg_dark, False])
                     # Alternate row color
                     bg_dark = not bg_dark
                     ch_dark = bg_dark
                 else:
                     # Child event
-                    bg_color = config.bg_colors[ch_dark]
+                    bg_color = hex_to_rgba(config.bg_colors[ch_dark])
+                    bg_color.alpha = config.bg_alpha[ch_dark]
                     # Insert item
                     store.append(it, [item["weekday"], item["is_main"],
                                  item["time"], item["title"], item["url"],
                                  host, icon, bg_color, fg_color, font,
-                                 False])
+                                 ch_dark, False])
                     # Alternate row color
                     ch_dark = not ch_dark
 
@@ -272,6 +281,7 @@ class SilverSchedule():
         session.headers["User-Agent"] = USER_AGENT
         # Default event icon
         music_icon_name = ""
+        music_background = ""
         # Weekdays parser
         wd_name_list = {"Вс" : [6], "Пн" : [0], "Вт" : [1], "Ср" : [2],
                         "Чт" : [3], "Пт" : [4], "Сб" : [5],
@@ -312,39 +322,20 @@ class SilverSchedule():
                 continue
             # Get icon
             icon_src = obj[0][0][0].attrib['src'].split("?")[0]
-            if icon_src.split(".")[-1] not in ["jpg", "jpeg", "png"]:
-                icon_name = ""
-            else:
-                if icon_src[:7] != "http://":
-                    if icon_src[:2] == "//":
-                        # //url/name.png
-                        icon_src = "http:" + icon_src
-                    elif icon_src[0] == "/":
-                        # /name.png
-                        icon_src = SILVER_RAIN_URL + icon_src
-                    else:
-                        # url/name.png
-                        icon_src = "http://" + icon_src
-                icon_name = IMG_DIR + icon_src.split("/")[-1]
-                # Download icon if it doesn't exist
-                if not os.path.exists(icon_name):
-                    try:
-                        urllib.request.urlretrieve(icon_src, icon_name)
-                    except urllib.error.URLError as e:
-                        err = "Couldn't download icon from url: " + icon_src
-                        logging.error(err)
-                        logging.error(str(e))
-                        icon_name = ""
+            icon_name = self._get_icon(icon_src)
             # Get title
             title = obj[1][0][0].text
-            # Don't parse music. Just save icon location
-            if title == MUSIC:
-                music_icon_name = icon_name
-                continue
             # Get program url
             url = obj[1][0][0].attrib['href']
             url = re.sub(r'^.*(/programms/.*?/).*$', r'\1', url)
             url = SILVER_RAIN_URL + url
+            # Download background
+            background = self._get_background(url)
+            # Don't parse music. Just save icon location
+            if title == MUSIC:
+                music_icon_name = icon_name
+                music_background = background
+                continue
             # Get hosts
             host = []
             if len(obj[2]):
@@ -383,6 +374,7 @@ class SilverSchedule():
                     program["url"] = url
                     program["host"] = host
                     program["icon"] = icon_name
+                    program["background"] = background
                     program["start"] = it[2]
                     program["end"] = it[3]
                     self._sched_week[weekday].append(program)
@@ -421,6 +413,7 @@ class SilverSchedule():
                     program["url"] = MUSIC_URL
                     program["host"] = []
                     program["icon"] = music_icon_name
+                    program["background"] = music_background
                     program["weekday"] = SCHED_WEEKDAY_LIST[wd]
                     program["time"] = str_time(time, item["start"])
                     program["start"] = time
@@ -438,6 +431,7 @@ class SilverSchedule():
                 program["url"] = MUSIC_URL
                 program["host"] = []
                 program["icon"] = music_icon_name
+                program["background"] = music_background
                 program["weekday"] = SCHED_WEEKDAY_LIST[wd]
                 program["time"] = str_time(last["end"], 86400.0)
                 program["start"] = last["end"]
@@ -449,3 +443,58 @@ class SilverSchedule():
         # Save sched to file
         self._sched_write_to_file()
         return True
+
+    def _get_icon(self, src):
+        """ Download icon from url """
+        name = ""
+        if src.split(".")[-1] not in ["jpg", "jpeg", "png"]:
+            return name
+        if src[:7] != "http://":
+            if src[:2] == "//":
+                # //url/name.png
+                src = "http:" + src
+            elif src[0] == "/":
+                # /name.png
+                src = SILVER_RAIN_URL + src
+            else:
+                # url/name.png
+                src = "http://" + src
+        name = IMG_DIR + src.split("/")[-1]
+        # Download icon if it doesn't exist
+        if not os.path.exists(name):
+            try:
+                urllib.request.urlretrieve(src, name)
+            except urllib.error.URLError as e:
+                err = "Couldn't download icon from url: " + src
+                logging.error(err)
+                logging.error(str(e))
+                name = ""
+        return name
+
+    def _get_background(self, program_page):
+        """ Download program background """
+        name = ""
+        session = requests.Session()
+        session.headers["User-Agent"] = USER_AGENT
+        try:
+            resp = session.get(program_page)
+            if resp.status_code != 200:
+                logging.error("Couldn't reach server. Code:", resp.status_code)
+                return name
+            # Get image src
+            div = r'<div class="program-detail">.*?<div class="title".*?div>'
+            found = re.findall(div, resp.text)
+            src = re.sub(r'.*<img src="(.*?)\?.*?".*', r'\1', found[0])
+            name = self._get_icon(src)
+
+        except requests.exceptions.RequestException as e:
+            logging.error(str(e))
+
+        except ValueError as e:
+            logging.error("Unexpected response")
+            logging.error(str(e))
+
+        except IndexError:
+            logging.error("Background not found")
+
+        return name

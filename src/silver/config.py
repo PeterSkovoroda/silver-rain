@@ -42,9 +42,11 @@ class Default():
     use_css             = True
     css_path            = ""
     stream_url          = STREAM_URL_LIST[0]
-    bg_colors           = ["white", "gray95"]
+    bg_colors           = ["#FFFFFF", "#F2F2F2"]
+    bg_alpha            = [0.87, 0.87]
     font_color          = "black"
     selected_bg_color   = "#FF4545"
+    selected_alpha      = 0.95
     selected_font_color = "white"
     font_family         = font_probe()
     font_size           = "11"
@@ -76,10 +78,14 @@ def _init():
     stream_url = Default.stream_url
     global bg_colors
     bg_colors = Default.bg_colors
+    global bg_alpha
+    bg_alpha = Default.bg_alpha
     global font_color
     font_color = Default.font_color
     global selected_bg_color
     selected_bg_color = Default.selected_bg_color
+    global selected_alpha
+    selected_alpha = Default.selected_alpha
     global selected_font_color
     selected_font_color = Default.selected_font_color
     global font
@@ -132,12 +138,19 @@ def _load():
     global bg_colors
     bg_colors = cfg.get("APPEARANCE", "bgcolors",
                     fallback=":".join(Default.bg_colors)).split(":")
+    global bg_alpha
+    fallback = ":".join("%.2f" % x for x in Default.bg_alpha)
+    bg_alpha = [float(x) for x in (cfg.get("APPEARANCE", "bgalpha",
+                    fallback=fallback).split(":"))]
     global font_color
     font_color = cfg.get("APPEARANCE", "fontcolor",
                     fallback=Default.font_color)
     global selected_bg_color
     selected_bg_color = cfg.get("APPEARANCE", "selectedbgcolor",
                     fallback=Default.selected_bg_color)
+    global selected_alpha
+    selected_alpha = float(cfg.get("APPEARANCE", "selectedalpha",
+                    fallback=Default.selected_alpha))
     global selected_font_color
     selected_font_color = cfg.get("APPEARANCE", "selectedfontcolor",
                     fallback=Default.selected_font_color)
@@ -177,10 +190,12 @@ def save():
             }
     cfg["APPEARANCE"] = {
             "bgcolors"          : ":".join(bg_colors),
+            "bgalpha"           : ":".join("%.2f" % x for x in bg_alpha),
             "csspath"           : css_path,
             "font"              : font,
             "fontcolor"         : font_color,
             "selectedbgcolor"   : selected_bg_color,
+            "selectedalpha"     : selected_alpha,
             "selectedfont"      : selected_font,
             "selectedfontcolor" : selected_font_color,
             "usecss"            : use_css,

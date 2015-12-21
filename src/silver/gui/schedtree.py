@@ -18,12 +18,13 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import Gtk, GdkPixbuf
+from gi.repository import Gtk, GdkPixbuf, Gdk
 from datetime import datetime
 import subprocess
 
 import silver.config as config
 from silver.gui.common import create_menuitem
+from silver.gui.common import hex_to_rgba
 from silver.msktz import MSK
 from silver.schedule import SCHED_WEEKDAY_LIST
 
@@ -34,14 +35,15 @@ class SchedTree(Gtk.TreeView):
         self.set_grid_lines(Gtk.TreeViewGridLines.HORIZONTAL)
         self.connect("button-release-event", self._on_button_release_event)
         self._weekday_filter = datetime.now(MSK()).strftime("%A")
-        self._cell_bg_old = ""
-        self._cell_fg_old = ""
+        self._marked = False
+        self._marked_pos = 0
         self._sched = sched
         # Init model
         self._init_model()
         # Icon
         renderer = Gtk.CellRendererPixbuf()
-        column = Gtk.TreeViewColumn(" ", renderer, pixbuf=6)
+        column = Gtk.TreeViewColumn("", renderer, pixbuf=6,
+                                    cell_background_rgba=7)
         renderer.set_alignment(1, 0.5)
         self.append_column(column)
 
@@ -50,8 +52,8 @@ class SchedTree(Gtk.TreeView):
         renderer.set_alignment(0.5, 0.5)
         renderer.set_property('height', 50)
         # Time
-        column = Gtk.TreeViewColumn(_("Time"), renderer, text=2, background=7,
-                                    foreground=8, font=9)
+        column = Gtk.TreeViewColumn(_("Time"), renderer, text=2,
+                                    background_rgba=7, foreground=8, font=9)
         column.set_alignment(0.5)
         column.set_min_width(10)
         self.append_column(column)
@@ -59,15 +61,15 @@ class SchedTree(Gtk.TreeView):
         renderer.set_alignment(0, 0.5)
         renderer.set_property("wrap_mode", Gtk.WrapMode.WORD)
         renderer.set_property("wrap_width", 200)
-        column = Gtk.TreeViewColumn(_("Title"), renderer, text=3, background=7,
-                                    foreground=8, font=9)
+        column = Gtk.TreeViewColumn(_("Title"), renderer, text=3,
+                                    background_rgba=7, foreground=8, font=9)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
         self.append_column(column)
         # Host
-        column = Gtk.TreeViewColumn(_("Host"), renderer, text=5, background=7,
-                                    foreground=8, font=9)
+        column = Gtk.TreeViewColumn(_("Host"), renderer, text=5,
+                                    background_rgba=7, foreground=8, font=9)
         column.set_alignment(0.5)
         column.set_min_width(50)
         column.set_resizable(True)
@@ -78,22 +80,22 @@ class SchedTree(Gtk.TreeView):
         self._weekday_filter = SCHED_WEEKDAY_LIST[wd]
         self._model.refilter()
 
-    def reset_current(self):
+    def reset_marked(self):
         """ Reset marked row """
-        if not self._cell_bg_old:
+        if not self._marked:
             # Nothing to reset
             return
         # Get current position
-        pos = self._sched.get_event_position()
-        path = Gtk.TreePath(pos)
+        path = Gtk.TreePath(self._marked_pos)
         iter = self._model.get_iter(path)
-        # Set old colors and font
-        self._model[iter][7] = self._cell_bg_old
-        self._model[iter][8] = self._cell_fg_old
+        # Set original colors and font
+        dark = self._model[iter][10]
+        bg_color = hex_to_rgba(config.bg_colors[dark])
+        bg_color.alpha = config.bg_alpha[dark]
+        self._model[iter][7] = bg_color
+        self._model[iter][8] = config.font_color
         self._model[iter][9] = config.font
-        # Delete backup
-        self._cell_bg_old = ""
-        self._cell_fg_old = ""
+        self._marked = False
 
     def mark_current(self):
         """ Mark current event """
@@ -101,23 +103,25 @@ class SchedTree(Gtk.TreeView):
         pos = self._sched.get_event_position()
         path = Gtk.TreePath(pos)
         iter = self._model.get_iter(path)
-        # Backup original style
-        self._cell_bg_old = self._model[iter][7]
-        self._cell_fg_old = self._model[iter][8]
         # Set current row color
-        self._model[iter][7] = config.selected_bg_color
+        marked_color = hex_to_rgba(config.selected_bg_color)
+        marked_color.alpha = config.selected_alpha
+        self._model[iter][7] = marked_color
         self._model[iter][8] = config.selected_font_color
         self._model[iter][9] = config.selected_font
         # Scroll to current cell
         self.scroll_to_cell(path, use_align=True, row_align=0.5)
+        # Backup position
+        self._marked = True
+        self._marked_pos = pos
 
     def check_recorder(self):
         """ Return true if set """
         pos = self._sched.get_event_position()
         path = Gtk.TreePath(pos)
         iter = self._model.get_iter(path)
-        if self._model[iter][10]:
-            self._model[iter][10] = False
+        if self._model[iter][11]:
+            self._model[iter][11] = False
             return True
         return False
 
@@ -134,15 +138,15 @@ class SchedTree(Gtk.TreeView):
                               str,              #  4 URL
                               str,              #  5 Host
                               GdkPixbuf.Pixbuf, #  6 Icon
-                              str,              #  7 BackgroundColor
+                              Gdk.RGBA,         #  7 BackgroundColor
                               str,              #  8 FontColor
                               str,              #  9 Font
-                              bool)             # 10 Recorder set
+                              bool,             # 10 IsDark
+                              bool)             # 11 Recorder set
         self._model = store.filter_new()
         self._model.set_visible_func(self._model_func)
-        self._sched.fill_tree_strore(store)
-        self._cell_bg_old = ""
-        self._cell_fg_old = ""
+        self._sched.fill_tree_store(store)
+        self._marked = False
         self.set_model(self._model)
 
     def _model_func(self, model, iter, data):
@@ -164,7 +168,7 @@ class SchedTree(Gtk.TreeView):
         self._popup.append(url)
         # Record program
         if model.get_value(iter, 1):
-            if not model.get_value(iter, 10):
+            if not model.get_value(iter, 11):
                 rec = create_menuitem(_("Record program"), "media-record")
                 rec.connect("activate", self._on_record_set, model, iter)
             else:
@@ -175,10 +179,10 @@ class SchedTree(Gtk.TreeView):
         self._popup.popup(None, None, None, None, event.button, event.time)
 
     def _on_record_set(self, button, model, iter):
-        model.set_value(iter, 10, True)
+        model.set_value(iter, 11, True)
 
     def _on_record_cancel(self, button, model, iter):
-        model.set_value(iter, 10, False)
+        model.set_value(iter, 11, False)
 
     def _on_url(self, button, url):
         subprocess.Popen(["xdg-open", url], stdout=subprocess.PIPE)

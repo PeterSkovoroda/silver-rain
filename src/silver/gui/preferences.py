@@ -168,7 +168,9 @@ class Preferences(Gtk.Dialog):
         colors.attach(text, 0, 0, 1, 1)
         color = Gdk.RGBA()
         color.parse(config.bg_colors[0])
+        color.alpha = config.bg_alpha[0]
         self._bg_color_light = Gtk.ColorButton.new_with_rgba(color)
+        self._bg_color_light.set_use_alpha(True)
         self._bg_color_light.connect("color-set",
                                   self._on_bg_color_light_changed)
         colors.attach_next_to(self._bg_color_light, text,
@@ -179,7 +181,9 @@ class Preferences(Gtk.Dialog):
         text.set_size_request(180, -1)
         colors.attach(text, 0, 1, 1, 1)
         color.parse(config.bg_colors[1])
+        color.alpha = config.bg_alpha[1]
         self._bg_color_dark = Gtk.ColorButton.new_with_rgba(color)
+        self._bg_color_dark.set_use_alpha(True)
         self._bg_color_dark.connect("color-set",
                                   self._on_bg_color_dark_changed)
         colors.attach_next_to(self._bg_color_dark, text,
@@ -190,7 +194,9 @@ class Preferences(Gtk.Dialog):
         text.set_size_request(180, -1)
         colors.attach(text, 0, 2, 1, 1)
         color.parse(config.selected_bg_color)
+        color.alpha = config.selected_alpha
         self._selection_color = Gtk.ColorButton.new_with_rgba(color)
+        self._selection_color.set_use_alpha(True)
         self._selection_color.connect("color-set",
                                   self._on_selection_color_changed)
         colors.attach_next_to(self._selection_color, text,
@@ -389,16 +395,19 @@ class Preferences(Gtk.Dialog):
 
     def _on_bg_color_light_changed(self, widget):
         config.bg_colors[0] = rgba_to_hex(widget.get_rgba())
+        config.bg_alpha[0] = widget.get_rgba().alpha
         self._appearance_changed = True
         self._changed = True
 
     def _on_bg_color_dark_changed(self, widget):
         config.bg_colors[1] = rgba_to_hex(widget.get_rgba())
+        config.bg_alpha[1] = widget.get_rgba().alpha
         self._appearance_changed = True
         self._changed = True
 
     def _on_selection_color_changed(self, widget):
         config.selected_bg_color = rgba_to_hex(widget.get_rgba())
+        config.selected_alpha = widget.get_rgba().alpha
         self._appearance_changed = True
         self._changed = True
 
@@ -427,14 +436,19 @@ class Preferences(Gtk.Dialog):
         color = Gdk.RGBA()
         # BG colors
         color.parse(config.Default.bg_colors[0])
+        color.alpha = config.Default.bg_alpha[0]
         self._bg_color_light.set_rgba(color)
         color.parse(config.Default.bg_colors[1])
+        color.alpha = config.Default.bg_alpha[1]
         self._bg_color_dark.set_rgba(color)
         config.bg_colors = config.Default.bg_colors
+        config.bg_alpha = config.Default.bg_alpha
         # Selection color
         color.parse(config.Default.selected_bg_color)
+        color.alpha = config.Default.selected_alpha
         self._selection_color.set_rgba(color)
         config.selected_bg_color = config.Default.selected_bg_color
+        config.selected_alpha = config.Default.selected_alpha
         # Font
         self._font.set_font_name(config.Default.font)
         config.font = config.Default.font

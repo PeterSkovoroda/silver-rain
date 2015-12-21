@@ -261,6 +261,8 @@ class SilverApp():
             self._selection.update()
             # Update treeview
             self._sched_tree.mark_current()
+            # Set background
+            self._window.set_background(self._schedule.get_event_bg())
 
         def error():
             t.join()
@@ -288,17 +290,19 @@ class SilverApp():
         # Stop recorder
         if self._recorder.playing:
             self.stop_record()
-        # Reset TreeView line
         self.refilter(self._schedule.get_event_weekday())
-        self._sched_tree.reset_current()
         # Update event
         self._schedule.update_event()
-        # Update treeview
-        self._selection.update()
-        self._sched_tree.mark_current()
         # Check if should be recorded
         if self._sched_tree.check_recorder():
             self.record()
+        # Reset TreeView line
+        self._sched_tree.reset_marked()
+        # Update treeview
+        self._selection.update()
+        self._sched_tree.mark_current()
+        # Update background
+        self._window.set_background(self._schedule.get_event_bg())
         # Update statusicon tooltip
         title = self._schedule.get_event_title()
         host = self._schedule.get_event_host()

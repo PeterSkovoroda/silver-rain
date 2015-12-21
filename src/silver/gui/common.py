@@ -18,7 +18,7 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import Gtk
+from gi.repository import Gdk, Gtk
 
 def create_menuitem(text, icon):
     """ Create menu item with icon """
@@ -44,6 +44,14 @@ def rgba_to_hex(rgba):
     g = int(rgba.green * 255)
     b = int(rgba.blue * 255)
     return "#{0:02x}{1:02x}{2:02x}".format(r, g, b)
+
+def hex_to_rgba(hex):
+    """ Return RGBA """
+    rgba = Gdk.RGBA()
+    rgba.red = int(hex[1:3], 16) / 255
+    rgba.green = int(hex[3:5], 16) / 255
+    rgba.blue = int(hex[5:7], 16) / 255
+    return rgba
 
 def get_playback_label(play=True):
     """ Return text and icon for playback menu/button """

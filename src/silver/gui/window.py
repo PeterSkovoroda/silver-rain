@@ -18,7 +18,7 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import Gtk
+from gi.repository import Gtk, GdkPixbuf
 
 from silver.globals import ICON
 
@@ -29,7 +29,8 @@ class MainWindow(Gtk.Window):
         self.hidden = True
         self.set_border_width(0)
         self.set_icon_name(ICON)
-        self.set_default_size(650, 450)
+        self.set_size_request(650, 450)
+        self.set_resizable(False)
         self.connect("delete-event", self._on_delete_event)
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         # Menubar
@@ -44,7 +45,14 @@ class MainWindow(Gtk.Window):
                                          Gtk.PolicyType.AUTOMATIC)
         self._scrolled_window.set_min_content_height(100)
         self._scrolled_window.show()
-        vbox.pack_start(self._scrolled_window, True, True, 0)
+        # Background
+        self._overlay = Gtk.Overlay()
+        self._img = Gtk.Image()
+        self._img.show()
+        self._overlay.add(self._img)
+        self._overlay.add_overlay(self._scrolled_window)
+        self._overlay.show()
+        vbox.pack_start(self._overlay, True, True, 0)
         # Selection
         vbox.pack_start(selection, False, False, 0)
         # Controls
@@ -61,3 +69,12 @@ class MainWindow(Gtk.Window):
         self.hidden = True
         window.hide()
         return True
+
+    def set_background(self, file):
+        """ Set background image """
+        if not file:
+            return
+        w = self._overlay.get_allocation().width
+        h = self._overlay.get_allocation().height
+        pb = GdkPixbuf.Pixbuf.new_from_file_at_size(file, w, h)
+        self._img.set_from_pixbuf(pb)

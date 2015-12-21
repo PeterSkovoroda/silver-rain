@@ -18,9 +18,10 @@ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA
 """
 
-from gi.repository import Gtk, Gdk
+from gi.repository import Gdk, Gtk
 
 import silver.config as config
+from silver.gui.common import rgba_to_hex
 
 __all__ = ["css_load"]
 
@@ -33,6 +34,10 @@ GtkScale.slider:hover {
     background-image: -gtk-gradient(linear, left top, left bottom,
     from (shade(mix(@theme_bg_color, shade(@silver_rain_red, 0.9), 0.4), 1.2)),
     to (shade(mix(@theme_bg_color, shade(@silver_rain_red, 0.9), 0.4),0.97)));
+}
+
+GtkTreeView {
+    background-color: transparent;
 }
 
 .menubar .menuitem .scale.highlight.left,
@@ -62,17 +67,30 @@ GtkScale.slider:hover {
 }
 """
 
+_treeview_selected = """
+GtkTreeView:selected {{
+    background-color: {0};
+}}
+"""
+
+def color_probe():
+    """ Get system default selection color """
+    s = Gtk.TreeView().get_style_context()
+    return rgba_to_hex(s.lookup_color('selected_bg_color')[1])
+
 def css_load():
     """ Load style """
     if not config.use_css:
         return
-    style_provider = Gtk.CssProvider()
+
     if config.css_path:
         with open(config.css_path, 'rb') as css:
             css_data = css.read()
     else:
         css_data = _silver_style
+        css_data += bytes(_treeview_selected.format(color_probe()), 'utf-8')
 
+    style_provider = Gtk.CssProvider()
     style_provider.load_from_data(css_data)
     Gtk.StyleContext.add_provider_for_screen(
             Gdk.Screen.get_default(),
