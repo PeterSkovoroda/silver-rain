@@ -157,7 +157,7 @@ class SilverSchedule():
 
     def get_event_bg(self):
         file = ""
-        if not self._SCHEDULE_ERROR:
+        if not self._SCHEDULE_ERROR and config.background_image:
             file = self._event["background"]
         return file
 

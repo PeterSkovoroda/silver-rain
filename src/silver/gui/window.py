@@ -72,9 +72,11 @@ class MainWindow(Gtk.Window):
 
     def set_background(self, file):
         """ Set background image """
-        if not file:
-            return
         w = self._overlay.get_allocation().width
         h = self._overlay.get_allocation().height
-        pb = GdkPixbuf.Pixbuf.new_from_file_at_size(file, w, h)
+        if not file:
+            pb = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, w, h)
+            pb.fill(0xffffffff)
+        else:
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(file, w, h)
         self._img.set_from_pixbuf(pb)

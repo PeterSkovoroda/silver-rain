@@ -124,6 +124,7 @@ class SilverApp():
             self._selection.update()
             self._sched_tree.update_model()
             self._sched_tree.mark_current()
+            self._window.set_background(self._schedule.get_event_bg())
         if "NETWORK" in apply:
             # Update player
             if self._player.playing:

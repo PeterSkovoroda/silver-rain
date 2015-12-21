@@ -42,6 +42,7 @@ class Default():
     use_css             = True
     css_path            = ""
     stream_url          = STREAM_URL_LIST[0]
+    background_image    = True
     bg_colors           = ["#FFFFFF", "#F2F2F2"]
     bg_alpha            = [0.87, 0.87]
     font_color          = "black"
@@ -76,6 +77,8 @@ def _init():
     css_path = Default.css_path
     global stream_url
     stream_url = Default.stream_url
+    global background_image
+    background_image = Default.background_image
     global bg_colors
     bg_colors = Default.bg_colors
     global bg_alpha
@@ -135,6 +138,9 @@ def _load():
     global css_path
     css_path = cfg.get("APPEARANCE", "csspath",
                     fallback=Default.css_path)
+    global background_image
+    background_image = cfg.getboolean("APPEARANCE", "backgroundimage",
+                    fallback=Default.background_image)
     global bg_colors
     bg_colors = cfg.get("APPEARANCE", "bgcolors",
                     fallback=":".join(Default.bg_colors)).split(":")
@@ -189,6 +195,7 @@ def save():
             "starthidden"       : start_hidden,
             }
     cfg["APPEARANCE"] = {
+            "backgroundimage"   : background_image,
             "bgcolors"          : ":".join(bg_colors),
             "bgalpha"           : ":".join("%.2f" % x for x in bg_alpha),
             "csspath"           : css_path,

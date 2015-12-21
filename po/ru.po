@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-21 22:28+0300\n"
+"POT-Creation-Date: 2015-12-22 00:00+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/silver/application.py:271
+#: src/silver/application.py:272
 msgid "Couldn't update schedule"
 msgstr "Не удалось обновить расписание"
 
@@ -122,7 +122,7 @@ msgstr "Язык:"
 msgid "Requires restart"
 msgstr "Требуется перезапуск приложения"
 
-#: src/silver/gui/preferences.py:121 src/silver/gui/preferences.py:319
+#: src/silver/gui/preferences.py:121 src/silver/gui/preferences.py:327
 msgid "General"
 msgstr "Основные"
 
@@ -146,75 +146,83 @@ msgstr "Подпись:"
 msgid "Messenger"
 msgstr "SMS-портал"
 
-#: src/silver/gui/preferences.py:165
+#: src/silver/gui/preferences.py:166
+msgid "Show background image"
+msgstr "Показывать обложку"
+
+#: src/silver/gui/preferences.py:170
+msgid "Background"
+msgstr "Фон"
+
+#: src/silver/gui/preferences.py:173
 msgid "Background color:"
 msgstr "Цвет фона:"
 
-#: src/silver/gui/preferences.py:179
+#: src/silver/gui/preferences.py:187
 msgid "Alternate background color:"
 msgstr "Альтернативный цвет фона:"
 
-#: src/silver/gui/preferences.py:192
+#: src/silver/gui/preferences.py:200
 msgid "Selection color:"
 msgstr "Цвет выделенной области:"
 
-#: src/silver/gui/preferences.py:204
+#: src/silver/gui/preferences.py:212
 msgid "Colors"
 msgstr "Цвета"
 
-#: src/silver/gui/preferences.py:207
+#: src/silver/gui/preferences.py:215
 msgid "Font:"
 msgstr "Шрифт:"
 
-#: src/silver/gui/preferences.py:222
+#: src/silver/gui/preferences.py:230
 msgid "Selection font:"
 msgstr "Шрифт выделенной области:"
 
-#: src/silver/gui/preferences.py:238
+#: src/silver/gui/preferences.py:246
 msgid "Fonts"
 msgstr "Шрифты"
 
-#: src/silver/gui/preferences.py:240
+#: src/silver/gui/preferences.py:248
 msgid "Reset default settings"
 msgstr "Восстановить стандартные настройки"
 
-#: src/silver/gui/preferences.py:249
+#: src/silver/gui/preferences.py:257
 msgid "Stream url:"
 msgstr "Адрес стрима:"
 
-#: src/silver/gui/preferences.py:266 src/silver/gui/preferences.py:321
+#: src/silver/gui/preferences.py:274 src/silver/gui/preferences.py:329
 msgid "Network"
 msgstr "Соединение"
 
-#: src/silver/gui/preferences.py:270
+#: src/silver/gui/preferences.py:278
 msgid "Use proxy"
 msgstr "Использовать прокси"
 
-#: src/silver/gui/preferences.py:275
+#: src/silver/gui/preferences.py:283
 msgid "URI:"
 msgstr "URI:"
 
-#: src/silver/gui/preferences.py:287
+#: src/silver/gui/preferences.py:295
 msgid "Username:"
 msgstr "Username:"
 
-#: src/silver/gui/preferences.py:300
+#: src/silver/gui/preferences.py:308
 msgid "Password:"
 msgstr "Password:"
 
-#: src/silver/gui/preferences.py:313
+#: src/silver/gui/preferences.py:321
 msgid "Proxy"
 msgstr "Proxy"
 
-#: src/silver/gui/preferences.py:320
+#: src/silver/gui/preferences.py:328
 msgid "Appearance"
 msgstr "Внешний вид"
 
-#: src/silver/gui/preferences.py:382
+#: src/silver/gui/preferences.py:390
 msgid "Error"
 msgstr "Ошибка"
 
-#: src/silver/gui/preferences.py:383
+#: src/silver/gui/preferences.py:391
 msgid "Invalid recordings storage location"
 msgstr "Невозможно использовать данный директорий для записи"
 

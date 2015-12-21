@@ -33,7 +33,7 @@ class Preferences(Gtk.Dialog):
     def __init__(self, parent):
         Gtk.Dialog.__init__(self)
         self.set_title("Silver Rain: Preferences")
-        self.set_size_request(400, 300)
+        self.set_size_request(400, 480)
         self.set_transient_for(parent)
         self.set_resizable(False)
         # Flags
@@ -160,6 +160,14 @@ class Preferences(Gtk.Dialog):
         ## Appearance ##
         ################
         page_appearance = create_page()
+        # Background image
+        background = create_prefs_grid()
+        bg_image = Gtk.CheckButton()
+        bg_image.set_label(_("Show background image"))
+        bg_image.set_active(config.background_image)
+        bg_image.connect("toggled", self._on_bg_image_changed)
+        background.attach(bg_image, 0, 0, 2, 1)
+        pack_prefs_box(page_appearance, _("Background"), background)
         # Background
         colors = create_prefs_grid()
         text = Gtk.Label(_("Background color:"))
@@ -391,6 +399,11 @@ class Preferences(Gtk.Dialog):
     def _on_message_header_changed(self, entry):
         config.message_sender = entry.get_text()
         self._im_changed = True
+        self._changed = True
+
+    def _on_bg_image_changed(self, button):
+        config.background_image = button.get_active()
+        self._appearance_changed = True
         self._changed = True
 
     def _on_bg_color_light_changed(self, widget):
