@@ -44,6 +44,7 @@ class SchedTree(Gtk.TreeView):
         renderer = Gtk.CellRendererPixbuf()
         column = Gtk.TreeViewColumn("", renderer, pixbuf=6,
                                     cell_background_rgba=7)
+        column.set_fixed_width(94)
         renderer.set_alignment(1, 0.5)
         self.append_column(column)
 

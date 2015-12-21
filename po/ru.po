@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-21 19:32+0300\n"
+"POT-Creation-Date: 2015-12-21 22:28+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -30,7 +30,7 @@ msgid "Stop"
 msgstr "Остановить"
 
 #: src/silver/gui/common.py:69 src/silver/gui/menubar.py:46
-#: src/silver/gui/schedtree.py:172
+#: src/silver/gui/schedtree.py:173
 msgid "Record program"
 msgstr "Записать программу"
 
@@ -218,23 +218,23 @@ msgstr "Ошибка"
 msgid "Invalid recordings storage location"
 msgstr "Невозможно использовать данный директорий для записи"
 
-#: src/silver/gui/schedtree.py:55
+#: src/silver/gui/schedtree.py:56
 msgid "Time"
 msgstr "Время"
 
-#: src/silver/gui/schedtree.py:64
+#: src/silver/gui/schedtree.py:65
 msgid "Title"
 msgstr "Название"
 
-#: src/silver/gui/schedtree.py:71
+#: src/silver/gui/schedtree.py:72
 msgid "Host"
 msgstr "Ведущие"
 
-#: src/silver/gui/schedtree.py:164
+#: src/silver/gui/schedtree.py:165
 msgid "Program page"
 msgstr "Страница программы"
 
-#: src/silver/gui/schedtree.py:175
+#: src/silver/gui/schedtree.py:176
 msgid "Don't record"
 msgstr "Не записывать"
 
