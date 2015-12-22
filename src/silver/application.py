@@ -124,7 +124,11 @@ class SilverApp():
             self._selection.update()
             self._sched_tree.update_model()
             self._sched_tree.mark_current()
-            self._window.set_background(self._schedule.get_event_bg())
+            cover = self._schedule.get_event_cover()
+            self._window.set_background(cover)
+            # Update covers
+            if config.background_image and not cover:
+                self.update_schedule_covers()
         if "NETWORK" in apply:
             # Update player
             if self._player.playing:
@@ -263,7 +267,12 @@ class SilverApp():
             # Update treeview
             self._sched_tree.mark_current()
             # Set background
-            self._window.set_background(self._schedule.get_event_bg())
+            if config.background_image:
+                cover = self._schedule.get_event_cover()
+                self._window.set_background(cover)
+                # Update covers
+                if not cover or refresh:
+                    self.update_schedule_covers(refresh)
 
         def error():
             t.join()
@@ -286,6 +295,24 @@ class SilverApp():
         t = threading.Thread(target=init_sched)
         t.start()
 
+    def update_schedule_covers(self, refresh=False):
+        def update_covers():
+            self._schedule.update_covers(refresh)
+            GObject.idle_add(cleanup)
+
+        def cleanup():
+            t.join()
+            # Set background
+            self._window.set_background(self._schedule.get_event_cover())
+            # Reset status
+            self._panel.status_set_playing()
+            title = self._schedule.get_event_title()
+            self._panel.status_set_text(title)
+
+        self._panel.status_set_downloading_covers()
+        t = threading.Thread(target=update_covers)
+        t.start()
+
     def update_now_playing(self):
         """ Update label, mark current event, show notifications """
         # Stop recorder
@@ -303,7 +330,7 @@ class SilverApp():
         self._selection.update()
         self._sched_tree.mark_current()
         # Update background
-        self._window.set_background(self._schedule.get_event_bg())
+        self._window.set_background(self._schedule.get_event_cover())
         # Update statusicon tooltip
         title = self._schedule.get_event_title()
         host = self._schedule.get_event_host()

@@ -119,6 +119,13 @@ class ControlPanel(Gtk.Box):
         self._spinner.start()
         self.status_set_text(_("Updating schedule..."))
 
+    def status_set_downloading_covers(self):
+        """ Show spinner and "Updating" message """
+        self._refresh.hide()
+        self._spinner.show()
+        self._spinner.start()
+        self.status_set_text(_("Downloading covers..."))
+
     def status_set_playing(self):
         """ Hide spinner and show currently playing """
         self._spinner.stop()

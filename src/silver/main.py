@@ -31,7 +31,6 @@ import signal
 
 import silver.config as config
 from silver.application import SilverApp
-from silver.globals import APP_DIR
 from silver.globals import IMG_DIR
 from silver.gui.css import css_load
 from silver.translations import set_translation
@@ -56,9 +55,8 @@ def let_it_rain():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     Notify.init("silver-rain")
     # Create system directories
-    for dir in [APP_DIR, IMG_DIR]:
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+    if not os.path.exists(IMG_DIR):
+        os.makedirs(IMG_DIR)
     # Initialize config
     config.setup()
     # Create directory for recordings

@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-22 00:00+0300\n"
+"POT-Creation-Date: 2015-12-22 19:29+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/silver/application.py:272
+#: src/silver/application.py:281
 msgid "Couldn't update schedule"
 msgstr "Не удалось обновить расписание"
 
@@ -59,6 +59,10 @@ msgstr "Обновить расписание"
 #: src/silver/gui/controlpanel.py:120
 msgid "Updating schedule..."
 msgstr "Обновление расписания..."
+
+#: src/silver/gui/controlpanel.py:127
+msgid "Downloading covers..."
+msgstr "Загрузка обложек..."
 
 #: src/silver/gui/menubar.py:79 src/silver/gui/preferences.py:51
 #: src/silver/gui/statusicon.py:112

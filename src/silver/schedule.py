@@ -19,6 +19,7 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import GdkPixbuf, Gtk, Gdk
+import glob
 import json
 import logging
 import os
@@ -155,10 +156,10 @@ class SilverSchedule():
             str = ""
         return str
 
-    def get_event_bg(self):
+    def get_event_cover(self):
         file = ""
         if not self._SCHEDULE_ERROR and config.background_image:
-            file = self._event["background"]
+            file = self._event["cover"]
         return file
 
     def update_event(self):
@@ -196,6 +197,32 @@ class SilverSchedule():
         self.update_event()
         self._SCHEDULE_ERROR = False
         return True
+
+    def update_covers(self, force_refresh=False):
+        """ Retrieve covers """
+        covers = {}
+        for wd in range(7):
+            for item in self._sched_week[wd]:
+                if not item["is_main"]:
+                    continue
+                elif item["title"] in covers:
+                    # If already downloaded
+                    item["cover"] = covers[item["title"]]
+                    continue
+                cover_path = IMG_DIR + item["title"] + "-cover."
+                # Check if already exists
+                covers_exist = glob.glob(cover_path + "*")
+                if not covers_exist or force_refresh:
+                    if covers_exist:
+                        os.remove(covers_exist[0])
+                    path = self._get_cover(item["url"])
+                    cover_path += path.split(".")[-1]
+                    os.rename(path, cover_path)
+                else:
+                    cover_path = covers_exist[0]
+                item["cover"] = cover_path
+                covers[item["title"]] = cover_path
+        self._sched_write_to_file()
 
     def fill_tree_store(self, store):
         """ Fill TreeStore object """
@@ -281,7 +308,6 @@ class SilverSchedule():
         session.headers["User-Agent"] = USER_AGENT
         # Default event icon
         music_icon_name = ""
-        music_background = ""
         # Weekdays parser
         wd_name_list = {"Вс" : [6], "Пн" : [0], "Вт" : [1], "Ср" : [2],
                         "Чт" : [3], "Пт" : [4], "Сб" : [5],
@@ -329,12 +355,9 @@ class SilverSchedule():
             url = obj[1][0][0].attrib['href']
             url = re.sub(r'^.*(/programms/.*?/).*$', r'\1', url)
             url = SILVER_RAIN_URL + url
-            # Download background
-            background = self._get_background(url)
             # Don't parse music. Just save icon location
             if title == MUSIC:
                 music_icon_name = icon_name
-                music_background = background
                 continue
             # Get hosts
             host = []
@@ -374,7 +397,7 @@ class SilverSchedule():
                     program["url"] = url
                     program["host"] = host
                     program["icon"] = icon_name
-                    program["background"] = background
+                    program["cover"] = ""
                     program["start"] = it[2]
                     program["end"] = it[3]
                     self._sched_week[weekday].append(program)
@@ -413,7 +436,7 @@ class SilverSchedule():
                     program["url"] = MUSIC_URL
                     program["host"] = []
                     program["icon"] = music_icon_name
-                    program["background"] = music_background
+                    program["cover"] = ""
                     program["weekday"] = SCHED_WEEKDAY_LIST[wd]
                     program["time"] = str_time(time, item["start"])
                     program["start"] = time
@@ -431,7 +454,7 @@ class SilverSchedule():
                 program["url"] = MUSIC_URL
                 program["host"] = []
                 program["icon"] = music_icon_name
-                program["background"] = music_background
+                program["cover"] = ""
                 program["weekday"] = SCHED_WEEKDAY_LIST[wd]
                 program["time"] = str_time(last["end"], 86400.0)
                 program["start"] = last["end"]
@@ -471,8 +494,8 @@ class SilverSchedule():
                 name = ""
         return name
 
-    def _get_background(self, program_page):
-        """ Download program background """
+    def _get_cover(self, program_page):
+        """ Download program cover """
         name = ""
         session = requests.Session()
         session.headers["User-Agent"] = USER_AGENT
