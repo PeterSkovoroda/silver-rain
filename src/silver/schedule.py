@@ -209,19 +209,8 @@ class SilverSchedule():
                     # If already downloaded
                     item["cover"] = covers[item["title"]]
                     continue
-                cover_path = IMG_DIR + item["title"] + "-cover."
-                # Check if already exists
-                covers_exist = glob.glob(cover_path + "*")
-                if not covers_exist or force_refresh:
-                    if covers_exist:
-                        os.remove(covers_exist[0])
-                    path = self._get_cover(item["url"])
-                    cover_path += path.split(".")[-1]
-                    os.rename(path, cover_path)
-                else:
-                    cover_path = covers_exist[0]
-                item["cover"] = cover_path
-                covers[item["title"]] = cover_path
+                item["cover"] = self._get_cover(item["url"])
+                covers[item["title"]] = item["cover"]
         self._sched_write_to_file()
 
     def fill_tree_store(self, store):
