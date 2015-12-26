@@ -247,7 +247,7 @@ class SilverSchedule():
                                              item["time"], item["title"],
                                              item["url"], host, icon,
                                              bg_color, fg_color, font,
-                                             bg_dark, False])
+                                             bg_dark, False, False])
                     # Alternate row color
                     bg_dark = not bg_dark
                     ch_dark = bg_dark
@@ -259,7 +259,7 @@ class SilverSchedule():
                     store.append(it, [item["weekday"], item["is_main"],
                                  item["time"], item["title"], item["url"],
                                  host, icon, bg_color, fg_color, font,
-                                 ch_dark, False])
+                                 ch_dark, False, False])
                     # Alternate row color
                     ch_dark = not ch_dark
 

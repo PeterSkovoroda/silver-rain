@@ -126,6 +126,16 @@ class SchedTree(Gtk.TreeView):
             return True
         return False
 
+    def check_playback(self):
+        """ Return true if set """
+        pos = self._sched.get_event_position()
+        path = Gtk.TreePath(pos)
+        iter = self._model.get_iter(path)
+        if self._model[iter][12]:
+            self._model[iter][12] = False
+            return True
+        return False
+
     def update_model(self):
         """ Create new model """
         self._init_model()
@@ -143,7 +153,8 @@ class SchedTree(Gtk.TreeView):
                               str,              #  8 FontColor
                               str,              #  9 Font
                               bool,             # 10 IsDark
-                              bool)             # 11 Recorder set
+                              bool,             # 11 Recorder set
+                              bool)             # 12 Playback set
         self._model = store.filter_new()
         self._model.set_visible_func(self._model_func)
         self._sched.fill_tree_store(store)
@@ -167,8 +178,16 @@ class SchedTree(Gtk.TreeView):
         event_url = model.get_value(iter, 4)
         url.connect("activate", self._on_url, event_url)
         self._popup.append(url)
-        # Record program
         if model.get_value(iter, 1):
+            # Play program
+            if not model.get_value(iter, 12):
+                play = create_menuitem(_("Play program"), "media-playback-start")
+                play.connect("activate", self._on_play_set, model, iter)
+            else:
+                play = create_menuitem(_("Don't play"), "gtk-cancel")
+                play.connect("activate", self._on_play_cancel, model, iter)
+            self._popup.append(play)
+            # Record program
             if not model.get_value(iter, 11):
                 rec = create_menuitem(_("Record program"), "media-record")
                 rec.connect("activate", self._on_record_set, model, iter)
@@ -184,6 +203,12 @@ class SchedTree(Gtk.TreeView):
 
     def _on_record_cancel(self, button, model, iter):
         model.set_value(iter, 11, False)
+
+    def _on_play_set(self, button, model, iter):
+        model.set_value(iter, 12, True)
+
+    def _on_play_cancel(self, button, model, iter):
+        model.set_value(iter, 12, False)
 
     def _on_url(self, button, url):
         subprocess.Popen(["xdg-open", url], stdout=subprocess.PIPE)

@@ -19,7 +19,9 @@ Boston, MA 02110-1301 USA
 """
 
 from gi.repository import Gtk
+import subprocess
 
+from silver.globals import SILVER_RAIN_URL
 from silver.gui.common import create_menuitem
 
 class Menubar(Gtk.MenuBar):
@@ -107,11 +109,19 @@ class Menubar(Gtk.MenuBar):
         key, mod = Gtk.accelerator_parse("F1")
         about.add_accelerator("activate", self.accel_group,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
+        # silver.ru
+        silver = create_menuitem("Official website", "web-browser")
+        silver.set_size_request(90, -1)
+        silver.connect("activate", self._on_silver)
+        key, mod = Gtk.accelerator_parse("F2")
+        silver.add_accelerator("activate", self.accel_group,
+                                          key, mod, Gtk.AccelFlags.VISIBLE)
         # Help Menu
         help_menu = Gtk.Menu()
         help = Gtk.MenuItem(_("Help"))
         help.set_submenu(help_menu)
         help_menu.append(about)
+        help_menu.append(silver)
 
         self.append(radio)
         self.append(help)
@@ -165,3 +175,6 @@ class Menubar(Gtk.MenuBar):
 
     def _on_about(self, button):
         self._app.about()
+
+    def _on_silver(self, button):
+        subprocess.Popen(["xdg-open", SILVER_RAIN_URL], stdout=subprocess.PIPE)

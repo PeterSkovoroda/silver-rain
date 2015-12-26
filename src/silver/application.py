@@ -324,6 +324,9 @@ class SilverApp():
         # Check if should be recorded
         if self._sched_tree.check_recorder():
             self.record()
+        # Check if should start player
+        if self._sched_tree.check_playback():
+            self.play()
         # Reset TreeView line
         self._sched_tree.reset_marked()
         # Update treeview

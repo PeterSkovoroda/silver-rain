@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-22 19:29+0300\n"
+"POT-Creation-Date: 2015-12-26 16:57+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -21,20 +21,20 @@ msgstr ""
 msgid "Couldn't update schedule"
 msgstr "Не удалось обновить расписание"
 
-#: src/silver/gui/common.py:59 src/silver/gui/menubar.py:32
+#: src/silver/gui/common.py:59 src/silver/gui/menubar.py:34
 msgid "Play"
 msgstr "Играть"
 
-#: src/silver/gui/common.py:62 src/silver/gui/menubar.py:39
+#: src/silver/gui/common.py:62 src/silver/gui/menubar.py:41
 msgid "Stop"
 msgstr "Остановить"
 
-#: src/silver/gui/common.py:69 src/silver/gui/menubar.py:46
-#: src/silver/gui/schedtree.py:173
+#: src/silver/gui/common.py:69 src/silver/gui/menubar.py:48
+#: src/silver/gui/schedtree.py:192
 msgid "Record program"
 msgstr "Записать программу"
 
-#: src/silver/gui/common.py:72 src/silver/gui/menubar.py:52
+#: src/silver/gui/common.py:72 src/silver/gui/menubar.py:54
 msgid "Stop recording"
 msgstr "Остановить запись"
 
@@ -42,17 +42,17 @@ msgstr "Остановить запись"
 msgid "Unmute"
 msgstr "Включить звук"
 
-#: src/silver/gui/common.py:82 src/silver/gui/menubar.py:61
+#: src/silver/gui/common.py:82 src/silver/gui/menubar.py:63
 #: src/silver/gui/statusicon.py:105
 msgid "Mute"
 msgstr "Выключить звук"
 
-#: src/silver/gui/controlpanel.py:40 src/silver/gui/menubar.py:73
+#: src/silver/gui/controlpanel.py:40 src/silver/gui/menubar.py:75
 #: src/silver/gui/statusicon.py:109
 msgid "Send message"
 msgstr "Отправить сообщение"
 
-#: src/silver/gui/controlpanel.py:45 src/silver/gui/menubar.py:67
+#: src/silver/gui/controlpanel.py:45 src/silver/gui/menubar.py:69
 msgid "Update schedule"
 msgstr "Обновить расписание"
 
@@ -64,20 +64,20 @@ msgstr "Обновление расписания..."
 msgid "Downloading covers..."
 msgstr "Загрузка обложек..."
 
-#: src/silver/gui/menubar.py:79 src/silver/gui/preferences.py:51
+#: src/silver/gui/menubar.py:81 src/silver/gui/preferences.py:51
 #: src/silver/gui/statusicon.py:112
 msgid "Preferences"
 msgstr "Настройки"
 
-#: src/silver/gui/menubar.py:85 src/silver/gui/statusicon.py:115
+#: src/silver/gui/menubar.py:87 src/silver/gui/statusicon.py:115
 msgid "Quit"
 msgstr "Выход"
 
-#: src/silver/gui/menubar.py:96
+#: src/silver/gui/menubar.py:98
 msgid "Radio"
 msgstr "Радио"
 
-#: src/silver/gui/menubar.py:112
+#: src/silver/gui/menubar.py:121
 msgid "Help"
 msgstr "Помощь"
 
@@ -242,11 +242,19 @@ msgstr "Название"
 msgid "Host"
 msgstr "Ведущие"
 
-#: src/silver/gui/schedtree.py:165
+#: src/silver/gui/schedtree.py:176
 msgid "Program page"
 msgstr "Страница программы"
 
-#: src/silver/gui/schedtree.py:176
+#: src/silver/gui/schedtree.py:184
+msgid "Play program"
+msgstr "Проигрывать"
+
+#: src/silver/gui/schedtree.py:187
+msgid "Don't play"
+msgstr "Не проигрывать"
+
+#: src/silver/gui/schedtree.py:195
 msgid "Don't record"
 msgstr "Не записывать"
 
