@@ -214,7 +214,7 @@ class SilverSchedule():
         self._SCHEDULE_ERROR = False
         return True
 
-    def update_covers(self, force_refresh=False):
+    def update_covers(self):
         """ Retrieve covers """
         covers = {}
         for wd in range(7):

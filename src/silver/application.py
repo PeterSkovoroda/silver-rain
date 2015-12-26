@@ -272,7 +272,7 @@ class SilverApp():
                 self._window.set_background(cover)
                 # Update covers
                 if not cover or refresh:
-                    self.update_schedule_covers(refresh)
+                    self.update_schedule_covers()
 
         def error():
             t.join()
@@ -295,9 +295,10 @@ class SilverApp():
         t = threading.Thread(target=init_sched)
         t.start()
 
-    def update_schedule_covers(self, refresh=False):
+    def update_schedule_covers(self):
+        """ Update program covers """
         def update_covers():
-            self._schedule.update_covers(refresh)
+            self._schedule.update_covers()
             GObject.idle_add(cleanup)
 
         def cleanup():
