@@ -318,14 +318,13 @@ class SilverApp():
         # Stop recorder
         if self._recorder.playing:
             self.stop_record()
-        self.refilter(self._schedule.get_event_weekday())
         # Update event
         self._schedule.update_event()
         # Check if should be recorded
-        if self._sched_tree.check_recorder():
+        if self._schedule.get_record_status():
             self.record()
         # Check if should start player
-        if self._sched_tree.check_playback():
+        if self._schedule.get_play_status():
             self.play()
         # Reset TreeView line
         self._sched_tree.reset_marked()

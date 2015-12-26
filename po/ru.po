@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-26 16:57+0300\n"
+"POT-Creation-Date: 2015-12-26 18:20+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -30,7 +30,7 @@ msgid "Stop"
 msgstr "Остановить"
 
 #: src/silver/gui/common.py:69 src/silver/gui/menubar.py:48
-#: src/silver/gui/schedtree.py:192
+#: src/silver/gui/schedtree.py:172
 msgid "Record program"
 msgstr "Записать программу"
 
@@ -242,19 +242,19 @@ msgstr "Название"
 msgid "Host"
 msgstr "Ведущие"
 
-#: src/silver/gui/schedtree.py:176
+#: src/silver/gui/schedtree.py:156
 msgid "Program page"
 msgstr "Страница программы"
 
-#: src/silver/gui/schedtree.py:184
+#: src/silver/gui/schedtree.py:164
 msgid "Play program"
 msgstr "Проигрывать"
 
-#: src/silver/gui/schedtree.py:187
+#: src/silver/gui/schedtree.py:167
 msgid "Don't play"
 msgstr "Не проигрывать"
 
-#: src/silver/gui/schedtree.py:195
+#: src/silver/gui/schedtree.py:174
 msgid "Don't record"
 msgstr "Не записывать"
 

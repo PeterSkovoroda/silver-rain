@@ -66,7 +66,6 @@ def parse_time(str):
         x = datetime.strptime(str, "%H:%M")
     except ValueError:
         # except 24:00
-        # Fuck timedelta and python-floating-point-approximation shit
         # Just return the correct value
         return 86400.0
     d = timedelta(hours=x.hour, minutes=x.minute)
@@ -79,16 +78,19 @@ class SilverSchedule():
         _event           - currently playing
 
         Schedule list[weekday(0-6)]:
-            0   Weekday             str
-            1   IsParent            bool
-            2   Time  (HH:MM-HH:MM) str
-            3   Title               str
-            4   URL                 str
-            5   Host                [str]
-            6   Icon                str
-            7   start (seconds)     float
-            8   end   (seconds)     float
-            9   Icon URL            str
+            position            int
+            weekday             str
+            is_parent           bool
+            time  (HH:MM-HH:MM) str
+            title               str
+            url                 str
+            host                [str]
+            icon                str
+            start (seconds)     float
+            end   (seconds)     float
+            cover               str
+            record              bool
+            play                bool
     """
     def __init__(self):
         self._sched_week = [ [] for x in range(7) ]
@@ -161,6 +163,20 @@ class SilverSchedule():
         if not self._SCHEDULE_ERROR and config.background_image:
             file = self._event["cover"]
         return file
+
+    def get_record_status(self):
+        """ Return True if should be recorded """
+        if not self._SCHEDULE_ERROR:
+            return self._event["record"]
+        else:
+            return False
+
+    def get_play_status(self):
+        """ Return True if should start playing """
+        if not self._SCHEDULE_ERROR:
+            return self._event["play"]
+        else:
+            return False
 
     def update_event(self):
         """ Update current event """
@@ -247,7 +263,8 @@ class SilverSchedule():
                                              item["time"], item["title"],
                                              item["url"], host, icon,
                                              bg_color, fg_color, font,
-                                             bg_dark, False, False])
+                                             bg_dark, item["record"],
+                                             item["play"]])
                     # Alternate row color
                     bg_dark = not bg_dark
                     ch_dark = bg_dark
@@ -262,6 +279,32 @@ class SilverSchedule():
                                  ch_dark, False, False])
                     # Alternate row color
                     ch_dark = not ch_dark
+
+    def set_recorder(self, status, wd, time):
+        """ Set recorder status """
+        for item in self._sched_week[wd]:
+            if not item["is_main"]:
+                continue
+            if item["time"] == time:
+                item["record"] = status
+                break
+        else:
+            logging("Program not found")
+            return
+        self._sched_write_to_file()
+
+    def set_playback(self, status, wd, time):
+        """ Set playback flag """
+        for item in self._sched_week[wd]:
+            if not item["is_main"]:
+                continue
+            if item["time"] == time:
+                item["play"] = status
+                break
+        else:
+            logging("Program not found")
+            return
+        self._sched_write_to_file()
 
     def _sched_gen_daily_agenda(self):
         """ Create a list of main events for today """
@@ -389,6 +432,8 @@ class SilverSchedule():
                     program["cover"] = ""
                     program["start"] = it[2]
                     program["end"] = it[3]
+                    program["play"] = False
+                    program["record"] = False
                     self._sched_week[weekday].append(program)
 
         for wd in range(7):
@@ -430,6 +475,8 @@ class SilverSchedule():
                     program["time"] = str_time(time, item["start"])
                     program["start"] = time
                     program["end"] = item["start"]
+                    program["play"] = False
+                    program["record"] = False
                     self._sched_week[wd].insert(pos, program)
                     pos += 1
                 time = item["end"]
@@ -448,6 +495,8 @@ class SilverSchedule():
                 program["time"] = str_time(last["end"], 86400.0)
                 program["start"] = last["end"]
                 program["end"] = 86400.0
+                program["play"] = False
+                program["record"] = False
                 self._sched_week[wd].insert(pos, program)
             # Sort again
             self._sched_week[wd].sort(key = lambda x : \

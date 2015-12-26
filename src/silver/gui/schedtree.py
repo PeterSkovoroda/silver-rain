@@ -116,26 +116,6 @@ class SchedTree(Gtk.TreeView):
         self._marked = True
         self._marked_pos = pos
 
-    def check_recorder(self):
-        """ Return true if set """
-        pos = self._sched.get_event_position()
-        path = Gtk.TreePath(pos)
-        iter = self._model.get_iter(path)
-        if self._model[iter][11]:
-            self._model[iter][11] = False
-            return True
-        return False
-
-    def check_playback(self):
-        """ Return true if set """
-        pos = self._sched.get_event_position()
-        path = Gtk.TreePath(pos)
-        iter = self._model.get_iter(path)
-        if self._model[iter][12]:
-            self._model[iter][12] = False
-            return True
-        return False
-
     def update_model(self):
         """ Create new model """
         self._init_model()
@@ -181,34 +161,35 @@ class SchedTree(Gtk.TreeView):
         if model.get_value(iter, 1):
             # Play program
             if not model.get_value(iter, 12):
-                play = create_menuitem(_("Play program"), "media-playback-start")
-                play.connect("activate", self._on_play_set, model, iter)
+                play = create_menuitem(_("Play program"),
+                                       "media-playback-start")
             else:
                 play = create_menuitem(_("Don't play"), "gtk-cancel")
-                play.connect("activate", self._on_play_cancel, model, iter)
+            play.connect("activate", self._on_play, model, iter)
             self._popup.append(play)
             # Record program
             if not model.get_value(iter, 11):
                 rec = create_menuitem(_("Record program"), "media-record")
-                rec.connect("activate", self._on_record_set, model, iter)
             else:
                 rec = create_menuitem(_("Don't record"), "gtk-cancel")
-                rec.connect("activate", self._on_record_cancel, model, iter)
+            rec.connect("activate", self._on_record, model, iter)
             self._popup.append(rec)
         self._popup.show_all()
         self._popup.popup(None, None, None, None, event.button, event.time)
 
-    def _on_record_set(self, button, model, iter):
-        model.set_value(iter, 11, True)
+    def _on_record(self, button, model, iter):
+        rec = not model.get_value(iter, 11)
+        wd = SCHED_WEEKDAY_LIST.index(model.get_value(iter, 0))
+        time = model.get_value(iter, 2)
+        self._sched.set_recorder(rec, wd, time)
+        model.set_value(iter, 11, rec)
 
-    def _on_record_cancel(self, button, model, iter):
-        model.set_value(iter, 11, False)
-
-    def _on_play_set(self, button, model, iter):
-        model.set_value(iter, 12, True)
-
-    def _on_play_cancel(self, button, model, iter):
-        model.set_value(iter, 12, False)
+    def _on_play(self, button, model, iter):
+        play = not model.get_value(iter, 12)
+        wd = SCHED_WEEKDAY_LIST.index(model.get_value(iter, 0))
+        time = model.get_value(iter, 2)
+        self._sched.set_playback(play, wd, time)
+        model.set_value(iter, 12, play)
 
     def _on_url(self, button, url):
         subprocess.Popen(["xdg-open", url], stdout=subprocess.PIPE)
