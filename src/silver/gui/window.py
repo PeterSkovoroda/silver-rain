@@ -78,5 +78,5 @@ class MainWindow(Gtk.Window):
             pb = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, w, h)
             pb.fill(0xffffffff)
         else:
-            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(file, w, h)
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(file, w, -1)
         self._img.set_from_pixbuf(pb)
