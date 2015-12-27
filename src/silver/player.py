@@ -262,7 +262,7 @@ class SilverRecorder(Player):
             sys.exit(-1)
 
     def _stop(self):
-        ret = self._pipe.set_state(Gst.State.READY)
+        ret = self._pipe.set_state(Gst.State.NULL)
         if ret == Gst.StateChangeReturn.FAILURE:
             self._error_callback("error", "Couldn't change state on pipeline")
             self.clean()
