@@ -181,14 +181,14 @@ class SchedTree(Gtk.TreeView):
         rec = not model.get_value(iter, 11)
         wd = SCHED_WEEKDAY_LIST.index(model.get_value(iter, 0))
         time = model.get_value(iter, 2)
-        self._sched.set_recorder(rec, wd, time)
+        self._sched.set_record_status(rec, wd, time)
         model.set_value(iter, 11, rec)
 
     def _on_play(self, button, model, iter):
         play = not model.get_value(iter, 12)
         wd = SCHED_WEEKDAY_LIST.index(model.get_value(iter, 0))
         time = model.get_value(iter, 2)
-        self._sched.set_playback(play, wd, time)
+        self._sched.set_play_status(play, wd, time)
         model.set_value(iter, 12, play)
 
     def _on_url(self, button, url):

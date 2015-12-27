@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.0\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2015-12-26 18:20+0300\n"
+"POT-Creation-Date: 2015-12-28 00:56+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -43,12 +43,12 @@ msgid "Unmute"
 msgstr "Включить звук"
 
 #: src/silver/gui/common.py:82 src/silver/gui/menubar.py:63
-#: src/silver/gui/statusicon.py:105
+#: src/silver/gui/statusicon.py:104
 msgid "Mute"
 msgstr "Выключить звук"
 
 #: src/silver/gui/controlpanel.py:40 src/silver/gui/menubar.py:75
-#: src/silver/gui/statusicon.py:109
+#: src/silver/gui/statusicon.py:108
 msgid "Send message"
 msgstr "Отправить сообщение"
 
@@ -65,17 +65,21 @@ msgid "Downloading covers..."
 msgstr "Загрузка обложек..."
 
 #: src/silver/gui/menubar.py:81 src/silver/gui/preferences.py:51
-#: src/silver/gui/statusicon.py:112
+#: src/silver/gui/statusicon.py:111
 msgid "Preferences"
 msgstr "Настройки"
 
-#: src/silver/gui/menubar.py:87 src/silver/gui/statusicon.py:115
+#: src/silver/gui/menubar.py:87 src/silver/gui/statusicon.py:114
 msgid "Quit"
 msgstr "Выход"
 
 #: src/silver/gui/menubar.py:98
 msgid "Radio"
 msgstr "Радио"
+
+#: src/silver/gui/menubar.py:113
+msgid "Official website"
+msgstr "Сайт радиостанции"
 
 #: src/silver/gui/menubar.py:121
 msgid "Help"
@@ -102,7 +106,7 @@ msgstr "Не удалось отправить сообщение"
 msgid "Message sent"
 msgstr "Сообщение отправлено"
 
-#: src/silver/gui/notifications.py:27 src/silver/gui/statusicon.py:132
+#: src/silver/gui/notifications.py:27 src/silver/gui/statusicon.py:131
 msgid "Silver Rain"
 msgstr "Серебряный Дождь"
 
@@ -112,11 +116,11 @@ msgstr "Остановлено"
 
 #: src/silver/gui/preferences.py:88
 msgid "Autoplay on start up"
-msgstr "Начинать воспроизведение при старте"
+msgstr "Начинать воспроизведение при запуске"
 
 #: src/silver/gui/preferences.py:94
 msgid "Start hidden"
-msgstr "Сворачивать в трей при запуске"
+msgstr "Запускать свернутым"
 
 #: src/silver/gui/preferences.py:100
 msgid "Language:"
@@ -131,16 +135,16 @@ msgid "General"
 msgstr "Основные"
 
 #: src/silver/gui/preferences.py:124
-msgid "Recordings directory path:"
-msgstr "Путь для сохранения:"
+msgid "Save to:"
+msgstr "Сохранять в:"
 
 #: src/silver/gui/preferences.py:134
-msgid "Recordings prefix:"
+msgid "File prefix:"
 msgstr "Префикс:"
 
 #: src/silver/gui/preferences.py:144
 msgid "Recordings"
-msgstr "Записи"
+msgstr "Записанные программы"
 
 #: src/silver/gui/preferences.py:147
 msgid "Default message sender:"
@@ -286,6 +290,6 @@ msgstr "Суббота"
 msgid "Sunday"
 msgstr "Воскресенье"
 
-#: src/silver/gui/statusicon.py:90
+#: src/silver/gui/statusicon.py:89
 msgid "Activate"
 msgstr "Активировать"

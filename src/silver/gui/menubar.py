@@ -110,7 +110,7 @@ class Menubar(Gtk.MenuBar):
         about.add_accelerator("activate", self.accel_group,
                                           key, mod, Gtk.AccelFlags.VISIBLE)
         # silver.ru
-        silver = create_menuitem("Official website", "web-browser")
+        silver = create_menuitem(_("Official website"), "web-browser")
         silver.set_size_request(90, -1)
         silver.connect("activate", self._on_silver)
         key, mod = Gtk.accelerator_parse("F2")

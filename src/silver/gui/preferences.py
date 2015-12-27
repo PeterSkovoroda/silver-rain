@@ -121,7 +121,7 @@ class Preferences(Gtk.Dialog):
         pack_prefs_box(page_general, _("General"), general)
         ## Recordings
         recordings = create_prefs_grid()
-        text = Gtk.Label(_("Recordings directory path:"))
+        text = Gtk.Label(_("Save to:"))
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         recordings.attach(text, 0, 0, 1, 1)
@@ -131,7 +131,7 @@ class Preferences(Gtk.Dialog):
         recs_dir.connect("file-set", self._on_recs_dir_changed)
         recordings.attach_next_to(recs_dir, text,
                                   Gtk.PositionType.RIGHT, 1, 1)
-        text = Gtk.Label(_("Recordings prefix:"))
+        text = Gtk.Label(_("File prefix:"))
         text.set_alignment(0, 0.5)
         text.set_size_request(180, -1)
         recordings.attach(text, 0, 1, 1, 1)

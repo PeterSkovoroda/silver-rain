@@ -280,7 +280,7 @@ class SilverSchedule():
                     # Alternate row color
                     ch_dark = not ch_dark
 
-    def set_recorder(self, status, wd, time):
+    def set_record_status(self, status, wd, time):
         """ Set recorder status """
         for item in self._sched_week[wd]:
             if not item["is_main"]:
@@ -293,7 +293,7 @@ class SilverSchedule():
             return
         self._sched_write_to_file()
 
-    def set_playback(self, status, wd, time):
+    def set_play_status(self, status, wd, time):
         """ Set playback flag """
         for item in self._sched_week[wd]:
             if not item["is_main"]:
