@@ -23,7 +23,6 @@ import textwrap
 
 try:
     from gi.repository import AppIndicator3 as appindicator
-    import appindicator.IndicatorCategory.SYSTEM_SERVICES as APP_CATEGORY
     APP_INDICATOR = True
 except ImportError:
     APP_INDICATOR = False
@@ -210,7 +209,7 @@ class StatusIcon():
     def _appindicator_init(self):
         """ Unity appindicator """
         self._status_icon = appindicator.Indicator.new("SilverRain", ICON,
-                                                       APP_CATEGORY)
+                                appindicator.IndicatorCategory.SYSTEM_SERVICES)
         self._status_icon.set_status(appindicator.IndicatorStatus.ACTIVE)
         self._status_icon.connect("scroll-event", self._appindicator_on_scroll)
         # Popup menu
