@@ -29,7 +29,7 @@ class MainWindow(Gtk.Window):
         self.hidden = True
         self.set_border_width(0)
         self.set_icon_name(ICON)
-        self.set_size_request(650, 450)
+        self.set_size_request(656, 450)
         self.set_resizable(False)
         self.connect("delete-event", self._on_delete_event)
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
