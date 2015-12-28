@@ -24,3 +24,6 @@ install-data-hook:
 	$(update_icon_cache)
 uninstall-hook:
 	$(update_icon_cache)
+
+EXTRA_DIST = $(icon16_DATA) $(icon22_DATA) $(icon24_DATA) $(icon32_DATA) \
+	$(icon48_DATA) $(icon64_DATA) $(icon128_DATA) $(icon256_DATA)
