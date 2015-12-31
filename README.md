@@ -35,9 +35,7 @@ Dependencies / Зависимости
 * GStreamer 1.0
 * GStreamer 1.0 plugins base, good, ugly
 * GTK+3  
-
-### Fedora / OpenSuSE
-* gnome-icon-theme
+* gnome-icon-theme (Fedora/OpenSuSE)
 
 Installation / Установка
 ------------
