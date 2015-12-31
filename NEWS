@@ -1,0 +1,17 @@
+Version 1.0.0 (2015.12.31):
+===========================
+
+First release
+
+Features:
+  - Custom stream location
+  - Schedule
+  - Recorder
+  - Messenger
+  - Awesome background images
+
+TODO:
+  - Come up with new send message method instead of rude POST request
+  - Add SOCKS proxy support
+  - Add RIKHTER FM ONLINE project
+  - Add past broadcasts browser
