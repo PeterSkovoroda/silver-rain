@@ -1,22 +1,18 @@
-silver-rain
+Silver-rain
 ===========
 
-Unofficial Silver Rain radio application for Linux
-Неофициальное приложение радиостанции Серебряный Дождь для Linux
-* [website] (http://silver.ru)
+Unofficial [Silver Rain] (http://silver.ru) radio application for Linux  
+Неофициальное приложение радиостанции [Серебряный Дождь] (http://silver.ru) для Linux
 
 ### Features / Функции
-* Listen live
+* Listen live  
   Слушать онлайн
-* Browse schedule
+* Browse schedule  
   Просматривать сетку вещания
-* Record your favourite programms
+* Record your favorite programms  
   Записывать любимые программы
-* Send messages to the studio
+* Send messages to the studio  
   Отправлять сообщения в студию
-
-Also it doesn't look like "cute little receiver"
-Приложение не "в виде симпатичного приемничка" 
 
 License / Лицензия
 -------
@@ -38,8 +34,9 @@ Dependencies / Зависимости
 * python3-gobject python3-requests python3-requests
 * GStreamer 1.0
 * GStreamer 1.0 plugins base, good, ugly
-* GTK+3
-### Fedora/OpenSuSE
+* GTK+3  
+
+### Fedora / OpenSuSE
 * gnome-icon-theme
 
 Installation / Установка
