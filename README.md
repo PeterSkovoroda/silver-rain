@@ -1,13 +1,24 @@
-Silver Rain
+silver-rain
 ===========
 
-Silver Rain radio application for Linux
-* Official website: http://silver.ru
+Unofficial Silver Rain radio application for Linux
+Неофициальное приложение радиостанции Серебряный Дождь для Linux
+* [website] (http://silver.ru)
 
-### Features
-* TBD
+### Features / Функции
+* Listen live
+  Слушать онлайн
+* Browse schedule
+  Просматривать сетку вещания
+* Record your favourite programms
+  Записывать любимые программы
+* Send messages to the studio
+  Отправлять сообщения в студию
 
-License
+Also it doesn't look like "cute little receiver"
+Приложение не "в виде симпатичного приемничка" 
+
+License / Лицензия
 -------
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU
 General Public License as published by the Free Software Foundation; either version 2 of the
@@ -21,27 +32,24 @@ You should have received a copy of the GNU General Public License along with thi
 write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,
 USA.
 
-Dependencies
+Dependencies / Зависимости
 ------------
 * Python 3
+* python3-gobject python3-requests python3-requests
 * GStreamer 1.0
-* GStreamer 1.0 plugins base
-* GStreamer 1.0 plugins good
-* GStreamer 1.0 plugins ugly
+* GStreamer 1.0 plugins base, good, ugly
 * GTK+3
+### Fedora/OpenSuSE
+* gnome-icon-theme
 
-Installation
+Installation / Установка
 ------------
 ### Ubuntu
-TBD
+
+    sudo dpkg -i silver-rain_<version>.deb
+    sudo apt-get -f install
 
 ### Compiling from source using autotools
-
-Get the code:
-
-    git clone https://github.com/petrskovoroda/silver-rain.git && cd silver-rain
-
-Compile and install:
 
     ./autogen.sh --prefix=/usr
     make
