@@ -39,10 +39,6 @@ Dependencies / Зависимости
 
 Installation / Установка
 ------------
-### Ubuntu
-
-    sudo dpkg -i silver-rain_<version>.deb
-    sudo apt-get -f install
 
 ### Compiling from source using autotools
 
