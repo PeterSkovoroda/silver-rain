@@ -58,7 +58,7 @@ def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
     s_h, s_m = divmod(int(start), 3600)
     e_h, e_m = divmod(int(end), 3600)
-    return "{0:0=2d}:{1:0=2d}-{2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
+    return "{0:0=2d}:{1:0=2d} - {2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
 
 def parse_time(str):
     """ Return time in seconds """
@@ -356,6 +356,7 @@ class SilverSchedule():
             xhtml = re.sub(r, r'\1', resp.text)
             # Handle unclosed img tags /* xhtml style */
             xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
+            xhtml = re.sub(r'<br>', r'<br/>', xhtml)
             root = etree.fromstring(xhtml)
 
         except requests.exceptions.RequestException as e:
@@ -399,20 +400,25 @@ class SilverSchedule():
                     host.append(it[0][0].text.strip())
             # Get schedule
             sched = []
+            # Expecting "WD: HH:MM - HH:MM" format
+            sched_list = []
             for it in obj[3][0]:
-                # Expecting "WD, WD, WD : HH:MM-HH:MM" format
-                weekday, time = it.text.split(' : ')
-                wd_list = weekday.split(', ')
+                sched_list.append(it.text)
+                i = 0
+                while i < len(it) - 1:
+                    sched_list.append(it[i].tail)
+                    i = i+1
+            for it in sched_list:
+                weekday, time = it.split(': ')
                 start, end = time.split('-')
-                for wd in wd_list:
-                    #  Weekday number,
-                    #  HH:MM,
-                    #  start in seconds,
-                    #  end in seconds
-                    sched.append([ wd_name_list[wd.strip()],
-                                   time,
-                                   parse_time(start),
-                                   parse_time(end) ])
+                #  Weekday number,
+                #  HH:MM,
+                #  start in seconds,
+                #  end in seconds
+                sched.append([ wd_name_list[weekday.strip()],
+                               time,
+                               parse_time(start.strip()),
+                               parse_time(end.strip()) ])
             # Event type
             is_main = False
             if sched[0][3] - sched[0][2] >= 3600:
