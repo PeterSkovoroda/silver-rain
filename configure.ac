@@ -15,7 +15,7 @@
 # Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
 # Boston, MA 02110-1301 USA
 
-AC_INIT([silver], [1.0.0])
+AC_INIT([silver], [1.0.2])
 AM_INIT_AUTOMAKE([foreign])
 AM_PATH_PYTHON(3.3)
 

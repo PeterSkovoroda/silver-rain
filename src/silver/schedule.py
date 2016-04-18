@@ -411,6 +411,10 @@ class SilverSchedule():
             for it in sched_list:
                 weekday, time = it.split(': ')
                 start, end = time.split('-')
+                if start.strip() == "24:00":
+                    start = "00:00"
+                if end.strip() == "00:00":
+                    end = "24:00"
                 #  Weekday number,
                 #  HH:MM,
                 #  start in seconds,
@@ -421,9 +425,20 @@ class SilverSchedule():
                                parse_time(end.strip()) ])
             # Event type
             is_main = False
-            if sched[0][3] - sched[0][2] >= 3600:
-                # At least 1 hour
+            length = sched[0][3] - sched[0][2];
+            if length >= 3000:
+                # At least 50 minutes
                 is_main = True
+
+                # round to hours
+                #FIXME: That's rude, but I don't have time right now
+                hrs, mins = divmod(length, 3600)
+                if mins:
+                    for it in sched:
+                        it[2] = it[2] - it[2] % 3600
+                        it[3] = it[2] + (hrs + 1) * 3600
+                        it[1] = str_time(it[2], it[3])
+
             # Insert
             for it in sched:
                 for weekday in it[0]:
