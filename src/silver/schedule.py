@@ -566,7 +566,7 @@ class SilverSchedule():
             # Get image src
             div = r'<div class="program-detail">.*?<div class="title".*?div>'
             found = re.findall(div, resp.text)
-            src = re.sub(r'.*<img src="(.*?)\?.*?".*', r'\1', found[0])
+            src = re.sub(r'.*<img src="([^\?"]+)\??.*?".*', r'\1', found[0])
             name = self._get_icon(src)
 
         except requests.exceptions.RequestException as e:
