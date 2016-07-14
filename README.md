@@ -34,7 +34,7 @@ Dependencies / Зависимости
 * python3-gobject python3-requests python3-requests
 * GStreamer 1.0
 * GStreamer 1.0 plugins base, good, ugly
-* GTK+3 (<3.20)
+* GTK+3
 * gnome-icon-theme (Fedora/OpenSuSE)
 
 Installation / Установка

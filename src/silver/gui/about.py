@@ -56,7 +56,7 @@ class About(Gtk.Dialog):
         <a href='https://github.com/petrskovoroda/silver-rain'>here</a>"""
         s = re.sub(r'\s+', r' ', s)
         s += "\n"
-        s += "Copyright \xa9 2015 Petr Skovoroda"
+        s += "Copyright \xa9 2015-2016 Petr Skovoroda"
         copyright = Gtk.Label()
         copyright.set_markup(s)
         copyright.set_selectable(True)

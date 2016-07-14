@@ -71,6 +71,33 @@ def parse_time(str):
     d = timedelta(hours=x.hour, minutes=x.minute)
     return d.total_seconds()
 
+def parse_weekday(str):
+    """ Return list from string """
+    wd_parsed = []
+    wd_list = str.split(", ")
+    wd_name_list = {"Вс" : 6, "Пн" : 0, "Вт" : 1, "Ср" : 2,
+                    "Чт" : 3, "Пт" : 4, "Сб" : 5}
+    for wd in wd_list :
+        x = wd.split('-')
+        if len(x) > 1:
+            wd_parsed += list(range(wd_name_list[x[0]], wd_name_list[x[1]]+1))
+        elif x == "По будням" :
+            wd_parsed += list(range(0,5))
+        elif x == "По выходным" :
+            wd_parsed += [5, 6]
+        else :
+            wd_parsed += [ wd_name_list[x[0].strip()] ]
+    return wd_parsed
+
+def parse_hosts(hosts):
+    """ Return formatted string from list """
+    if len(hosts) > 1 :
+        str = ", ".join(hosts[:-1])
+        str += " и " + hosts[-1]
+    else :
+        str = ''.join(hosts)
+    return str
+
 class SilverSchedule():
     """
         _sched_week      - full schedule
@@ -153,7 +180,7 @@ class SilverSchedule():
     def get_event_host(self):
         """ Return host """
         if not self._SCHEDULE_ERROR:
-            str = " и ".join(self._event["host"])
+            str = parse_hosts(self._event["host"])
         else:
             str = ""
         return str
@@ -252,7 +279,7 @@ class SilverSchedule():
                     sz = 60
                 icon = icon.scale_simple(sz, sz, GdkPixbuf.InterpType.BILINEAR)
                 # Join hosts
-                host = " и ".join(item["host"])
+                host = parse_hosts(item["host"])
                 # Insert program
                 if item["is_main"]:
                     # Main event
@@ -357,6 +384,7 @@ class SilverSchedule():
             # Handle unclosed img tags /* xhtml style */
             xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
             xhtml = re.sub(r'<br>', r'<br/>', xhtml)
+            xhtml = re.sub(r'&nbsp;', r'', xhtml)
             root = etree.fromstring(xhtml)
 
         except requests.exceptions.RequestException as e:
@@ -397,19 +425,39 @@ class SilverSchedule():
             if len(obj[2]):
                 # If hosts presented
                 for it in obj[2][0]:
-                    host.append(it[0][0].text.strip())
+                    h = it[0][0].text.strip()
+                    # Show name first
+                    h = h.split(' ')
+                    h.insert(0, h.pop())
+                    h = ' '.join(h)
+                    host.append(h)
             # Get schedule
-            sched = []
             # Expecting "WD: HH:MM - HH:MM" format
+            sched = []
             sched_list = []
+            wd_list_prev = []
+
             for it in obj[3][0]:
                 sched_list.append(it.text)
                 i = 0
                 while i < len(it) - 1:
                     sched_list.append(it[i].tail)
-                    i = i+1
+                    i += 1
+
             for it in sched_list:
-                weekday, time = it.split(': ')
+                # Remove extra comma
+                if it[-1] == ',' :
+                    it = it[:-1]
+                # Split wd and time
+                try:
+                    weekday, time = it.split(': ')
+                    wd_list = parse_weekday(weekday)
+                    wd_list_prev = wd_list
+                except ValueError:
+                    # No weekday, use previous
+                    wd_list = wd_list_prev
+                    time = it
+
                 start, end = time.split('-')
                 if start.strip() == "24:00":
                     start = "00:00"
@@ -419,7 +467,7 @@ class SilverSchedule():
                 #  HH:MM,
                 #  start in seconds,
                 #  end in seconds
-                sched.append([ wd_name_list[weekday.strip()],
+                sched.append([ wd_list,
                                time,
                                parse_time(start.strip()),
                                parse_time(end.strip()) ])
@@ -458,24 +506,62 @@ class SilverSchedule():
                     self._sched_week[weekday].append(program)
 
         for wd in range(7):
-            # Sort schedule by start/parent
-            self._sched_week[wd].sort(key = lambda x : \
-                                         (x["start"], -x["is_main"]))
-            # Remove duplicates
-            prev = {}
-            for item in self._sched_week[wd]:
-                if (prev and prev["title"] == item["title"]
-                         and prev["end"] >= item["start"]):
-                    # If there are two identical programms in a row
-                    # I can't resolve more complicated errors
-                    # I just hope they will never happen
+            # Sort schedule by parent/start/end
+            self._sched_week[wd].sort(key = lambda x : (-x["is_main"], \
+                                                        x["start"], -x["end"]))
+            # Fix common errors
+            i = 1
+            while i < len(self._sched_week[wd]):
+                item = self._sched_week[wd][i]
+                prev = self._sched_week[wd][i-1]
+                next = {}
+
+                # Fix only main items
+                if not item["is_main"] :
+                    break
+
+                # Join duplicates
+                if (prev["end"] >= item["start"] and
+                        prev["title"] == item["title"]) :
+
                     if prev["end"] > item["end"]:
                         item["end"] = prev["end"]
+
                     if prev["start"] < item["start"]:
                         item["start"] = prev["start"]
+
                     item["time"] = str_time(item["start"], item["end"])
-                    self._sched_week[wd].remove(prev)
-                prev = item
+
+                    self._sched_week[wd][i] = item
+                    self._sched_week[wd].pop(i-1)
+                    continue
+
+                # Fix one main program inside another
+                elif (prev["end"] > item["start"] and
+                        prev["end"] >= item["end"]) :
+
+                    if (prev["end"] > item["end"]) :
+                        # Divide bigger one in two
+                        next = prev
+                        next["start"] = item["end"]
+                        next["time"] = str_time(next["start"], next["end"])
+                        self._sched_week[wd].insert(i+1, next)
+
+                    if (prev["start"] < item["start"]) :
+                        prev["end"] = item["start"]
+                        prev["time"] = str_time(prev["start"], prev["end"])
+                        self._sched_week[wd][i-1] = prev
+                    else :
+                        # Delete left one
+                        self._sched_week[wd].pop(i-1)
+                        i -= 1
+
+                    if len(next) : i += 1
+                i += 1
+
+            # Sort schedule by start/parent
+            self._sched_week[wd].sort(key = lambda x : \
+                                      (x["start"], -x["is_main"]))
             # Fill spaces with music
             time = 0.0
             pos = 0

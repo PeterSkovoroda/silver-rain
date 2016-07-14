@@ -40,6 +40,10 @@ GtkTreeView {
     background-color: transparent;
 }
 
+textview text {
+    background-color: transparent;
+}
+
 .menubar .menuitem .scale.highlight.left,
 .scale.highlight.left {
     background-image: -gtk-gradient(linear, left top, left bottom,
