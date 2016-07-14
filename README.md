@@ -31,7 +31,7 @@ USA.
 Dependencies / Зависимости
 ------------
 * Python 3
-* python3-gobject python3-requests python3-requests
+* python3-gobject python3-requests
 * GStreamer 1.0
 * GStreamer 1.0 plugins base, good, ugly
 * GTK+3
