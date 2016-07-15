@@ -426,9 +426,10 @@ class SilverSchedule():
                 # If hosts presented
                 for it in obj[2][0]:
                     h = it[0][0].text.strip()
-                    # Show name first
                     h = h.split(' ')
-                    h.insert(0, h.pop())
+                    if len(h) == 2 :
+                        # Show name first
+                        h.insert(0, h.pop())
                     h = ' '.join(h)
                     host.append(h)
             # Get schedule
