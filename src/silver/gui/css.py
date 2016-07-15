@@ -40,7 +40,7 @@ GtkTreeView {
     background-color: transparent;
 }
 
-textview text {
+.view {
     background-color: transparent;
 }
 
@@ -75,12 +75,19 @@ _treeview_selected = """
 GtkTreeView:selected {{
     background-color: {0};
 }}
+
+.view:focus,
+.view:selected {{
+    background-color: {0};
+}}
 """
 
 def color_probe():
     """ Get system default selection color """
     s = Gtk.TreeView().get_style_context()
-    return rgba_to_hex(s.lookup_color('selected_bg_color')[1])
+    found, color = s.lookup_color('theme_selected_bg_color')
+    if not found : color = s.lookup_color('selected_bg_color')[1]
+    return rgba_to_hex(color)
 
 def css_load():
     """ Load style """
