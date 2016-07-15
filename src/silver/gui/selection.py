@@ -42,11 +42,12 @@ class Selection(Gtk.Box):
             self._selection_buttons.append(button)
         self.show_all()
 
-    def update(self):
+    def update(self, dt=datetime.now(MSK())):
         """ Select today's section """
-        wd = datetime.now(MSK()).weekday()
+        wd = dt.weekday()
         self._selection_buttons[wd].clicked()
         self._selection_buttons[wd].grab_focus()
+        return dt
 
     def _on_clicked(self, button):
         """ Refilter treeview by selected weekday """

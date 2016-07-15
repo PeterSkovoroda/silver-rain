@@ -121,7 +121,7 @@ class SilverApp():
             self._messenger.update_sender()
         if "APPEARANCE" in apply:
             # Update schedule
-            self._selection.update()
+            self._dt = self._selection.update()
             self._sched_tree.update_model()
             self._sched_tree.mark_current()
             cover = self._schedule.get_event_cover()
@@ -263,7 +263,7 @@ class SilverApp():
             # Start timer
             self._t_event.start(self._schedule.get_event_end())
             # Show agenda for today
-            self._selection.update()
+            self._dt = self._selection.update()
             # Update treeview
             self._sched_tree.mark_current()
             # Set background
@@ -327,10 +327,12 @@ class SilverApp():
         # Check if should start player
         if self._schedule.get_play_status():
             self.play()
+        # Display current agenda
+        self._dt = self._selection.update(dt=self._dt)
         # Reset TreeView line
         self._sched_tree.reset_marked()
         # Update treeview
-        self._selection.update()
+        self._dt = self._selection.update()
         self._sched_tree.mark_current()
         # Update background
         self._window.set_background(self._schedule.get_event_cover())
