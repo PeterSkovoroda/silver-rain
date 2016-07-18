@@ -42,8 +42,10 @@ class Selection(Gtk.Box):
             self._selection_buttons.append(button)
         self.show_all()
 
-    def update(self, dt=datetime.now(MSK())):
+    def update(self, dt=None):
         """ Select today's section """
+        if dt is None:
+            dt = datetime.now(MSK())
         wd = dt.weekday()
         self._selection_buttons[wd].clicked()
         self._selection_buttons[wd].grab_focus()
