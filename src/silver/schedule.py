@@ -54,6 +54,18 @@ SCHED_WEEKDAY_LIST = ["Monday", "Tuesday", "Wednesday", "Thursday",
 MUSIC = "Музыка"
 MUSIC_URL = "http://silver.ru/programms/muzyka/"
 
+# Temporary fix for August
+VIETNAM = "Доброе Утро, Вьетнам"
+VIETNAM_ICON_SRC = "http://www.silver.ru/upload/resize_cache/iblock/05a/"
+VIETNAM_ICON_SRC += "140_140_2/height_05aaf9f76c182c62a1659ba9863dfd52.jpg"
+VIETNAM_URL = "http://silver.ru/programms/dobroeytrovietnam/"
+VIETNAM_COVER = "http://www.silver.ru/upload/medialibrary/c60/"
+VIETNAM_COVER += "c60b18a42950f631158796007d815da9.jpg"
+
+BEST = "The Best of the Best"
+BEST_ICON_SRC = "http://www.silver.ru/upload/iblock/ce4/"
+BEST_ICON_SRC += "ce4a74406d2b6db664d4e874f24b7812.jpg"
+
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
     s_h, s_m = divmod(int(start), 3600)
@@ -407,11 +419,18 @@ class SilverSchedule():
             if not len(obj[3]):
                 # Event happens randomly or never
                 continue
-            # Get icon
-            icon_src = obj[0][0][0].attrib['src'].split("?")[0]
-            icon_name = self._get_icon(icon_src)
             # Get title
             title = obj[1][0][0].text
+            # Get icon
+            icon_src = obj[0][0][0].attrib['src'].split("?")[0]
+
+            # Temporary fix for August
+            if title == VIETNAM:
+                icon_src = VIETNAM_ICON_SRC
+            elif title == BEST:
+                icon_src = BEST_ICON_SRC
+
+            icon_name = self._get_icon(icon_src)
             # Get program url
             url = obj[1][0][0].attrib['href']
             url = re.sub(r'^.*(/programms/.*?/).*$', r'\1', url)
@@ -643,6 +662,12 @@ class SilverSchedule():
     def _get_cover(self, program_page):
         """ Download program cover """
         name = ""
+
+        # Temporary fix for August
+        if program_page == VIETNAM_URL:
+            name = self._get_icon(VIETNAM_COVER)
+            return name
+
         session = requests.Session()
         session.headers["User-Agent"] = USER_AGENT
         try:
