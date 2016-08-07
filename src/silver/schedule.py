@@ -232,7 +232,8 @@ class SilverSchedule():
     def get_event_icon(self):
         """ Return pixbuf """
         if not self._SCHEDULE_ERROR and self._event["icon"]:
-            pb = GdkPixbuf.Pixbuf.new_from_file(self._event["icon"])
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(self._event["icon"],
+                                                        width=90, height=90)
         else:
             icontheme = Gtk.IconTheme.get_default()
             pb = icontheme.load_icon(ICON, 256, 0)
