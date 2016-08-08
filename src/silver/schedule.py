@@ -66,7 +66,7 @@ VIETNAM_COVER += "c60b18a42950f631158796007d815da9.jpg"
 BEST = "The Best of the Best"
 BEST_ICON_SRC = "http://www.silver.ru/upload/iblock/ce4/"
 BEST_ICON_SRC += "ce4a74406d2b6db664d4e874f24b7812.jpg"
-BEST_URL = "http://www.silver.ru/programms/bestofthebest/"
+BEST_URL = "http://www.silver.ru/events/Bestofthebestavgustovskiekanikuly"
 
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
@@ -124,13 +124,15 @@ def get_august_best_schedule():
             logging.error("Couldn't reach server. Code:", resp.status_code)
             return schedule
         # Get table
-        r = r'^.*<h3>Расписание.*?<\/h3>\ (<dd>.*?<\/dd>).*$'
+        r = r'^.*(<dd>.*?<\/dd>).*$'
         xhtml = re.sub(r, r'\1', resp.text)
         # Handle unclosed img tags /* xhtml style */
         xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
         xhtml = re.sub(r'<b>.*?</b>', r'', xhtml)
-        xhtml = re.sub(r'<br>', r'', xhtml)
+        xhtml = re.sub(r'<br>', r'\n', xhtml)
         xhtml = re.sub(r'&nbsp;', r'', xhtml)
+        xhtml = re.sub(r'<a href.*?>', r'', xhtml)
+        xhtml = re.sub(r'</a>', r'', xhtml)
         root = etree.fromstring(xhtml)
 
     except requests.exceptions.RequestException as e:
@@ -148,15 +150,16 @@ def get_august_best_schedule():
         return schedule
 
     # Parse xhtml text
+    sched = ""
     for obj in root:
-        if not len(obj):
-            if len(obj.text) > 1:
-                str = re.sub(r'^.*?:.*?:[0-9]{2}', r'', obj.text)
-                schedule.append(str.strip())
+        if not len(obj) and len(obj.text) > 1:
+            sched += obj.text
+
+    for obj in sched.split("\n"):
+        if len(obj) < 2:
             continue
-        str = obj[0].text
-        str += obj[0].tail
-        schedule.append(str.strip())
+        s = re.sub(r'^.*?[\.:].*?[\.:][0-9]{2}', r'', obj)
+        schedule.append(s.strip())
 
     return schedule
 
