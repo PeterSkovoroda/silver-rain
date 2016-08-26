@@ -124,16 +124,17 @@ def get_august_best_schedule():
             logging.error("Couldn't reach server. Code:", resp.status_code)
             return schedule
         # Get table
-        r = r'^.*(<dd>.*?<\/dd>).*$'
+        r = r'^.*(<div class="news-text">.*?<\/div>).*$'
         xhtml = re.sub(r, r'\1', resp.text)
         # Handle unclosed img tags /* xhtml style */
-        xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
+        xhtml = re.sub(r'<img.*?"\s*>', r'', xhtml)
+        xhtml = re.sub(r'<span.*?>.*?<\/span>', r'', xhtml)
         xhtml = re.sub(r'<b>.*?</b>', r'', xhtml)
         xhtml = re.sub(r'<br>', r'\n', xhtml)
         xhtml = re.sub(r'&nbsp;', r'', xhtml)
         xhtml = re.sub(r'<a href.*?>', r'', xhtml)
         xhtml = re.sub(r'</a>', r'', xhtml)
-        root = etree.fromstring(xhtml)
+        xhtml = re.sub(r'<h[1-3]>.*?<\/h[1-3]>', r'', xhtml)
 
     except requests.exceptions.RequestException as e:
         logging.error(str(e))
@@ -150,14 +151,8 @@ def get_august_best_schedule():
         return schedule
 
     # Parse xhtml text
-    sched = ""
-    for obj in root:
-        if not len(obj) and len(obj.text) > 1:
-            sched += obj.text
-
-    for obj in sched.split("\n"):
-        if len(obj) < 2:
-            continue
+    sched = re.findall(r'[0-9]{2}.[0-9]{2} - [0-9]{2}.[0-9]{2}.*', xhtml)
+    for obj in sched:
         s = re.sub(r'^.*?[\.:].*?[\.:][0-9]{2}', r'', obj)
         schedule.append(s.strip())
 
