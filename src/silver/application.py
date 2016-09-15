@@ -211,10 +211,6 @@ class SilverApp():
         """ Update interface, start recorder """
         # Get name
         name = self._schedule.get_event_title()
-        # Temporary fix for August
-        if name == "The Best of the Best":
-            name += " - "
-            name += self._schedule.get_event_host()
         # Start recorder
         self._recorder.start(name)
         # Update interface

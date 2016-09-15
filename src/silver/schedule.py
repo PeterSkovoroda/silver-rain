@@ -54,20 +54,6 @@ SCHED_WEEKDAY_LIST = ["Monday", "Tuesday", "Wednesday", "Thursday",
 MUSIC = "Музыка"
 MUSIC_URL = "http://silver.ru/programms/muzyka/"
 
-# Temporary fix for August
-VIETNAM = "Доброе Утро, Вьетнам"
-VIETNAM_HOST = "Нарек Арутюнянц"
-VIETNAM_ICON_SRC = "http://www.silver.ru/upload/resize_cache/iblock/05a/"
-VIETNAM_ICON_SRC += "140_140_2/height_05aaf9f76c182c62a1659ba9863dfd52.jpg"
-VIETNAM_URL = "http://silver.ru/programms/dobroeytrovietnam/"
-VIETNAM_COVER = "http://www.silver.ru/upload/medialibrary/c60/"
-VIETNAM_COVER += "c60b18a42950f631158796007d815da9.jpg"
-
-BEST = "The Best of the Best"
-BEST_ICON_SRC = "http://www.silver.ru/upload/iblock/ce4/"
-BEST_ICON_SRC += "ce4a74406d2b6db664d4e874f24b7812.jpg"
-BEST_URL = "http://www.silver.ru/events/Bestofthebestavgustovskiekanikuly"
-
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
     s_h, s_m = divmod(int(start), 3600)
@@ -111,52 +97,6 @@ def parse_hosts(hosts):
     else :
         str = ''.join(hosts)
     return str
-
-# Temporary fix for August
-def get_august_best_schedule():
-    schedule = []
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
-    try:
-        # Download schedule
-        resp = session.get(BEST_URL)
-        if resp.status_code != 200:
-            logging.error("Couldn't reach server. Code:", resp.status_code)
-            return schedule
-        # Get table
-        r = r'^.*(<div class="news-text">.*?<\/div>).*$'
-        xhtml = re.sub(r, r'\1', resp.text)
-        # Handle unclosed img tags /* xhtml style */
-        xhtml = re.sub(r'<img.*?"\s*>', r'', xhtml)
-        xhtml = re.sub(r'<span.*?>.*?<\/span>', r'', xhtml)
-        xhtml = re.sub(r'<b>.*?</b>', r'', xhtml)
-        xhtml = re.sub(r'<br>', r'\n', xhtml)
-        xhtml = re.sub(r'&nbsp;', r'', xhtml)
-        xhtml = re.sub(r'<a href.*?>', r'', xhtml)
-        xhtml = re.sub(r'</a>', r'', xhtml)
-        xhtml = re.sub(r'<h[1-3]>.*?<\/h[1-3]>', r'', xhtml)
-
-    except requests.exceptions.RequestException as e:
-        logging.error(str(e))
-        return schedule
-
-    except ValueError as e:
-        logging.error("Unexpected response")
-        logging.error(str(e))
-        return schedule
-
-    except etree.XMLSyntaxError as e:
-        logging.error("Syntax error")
-        logging.error(str(e))
-        return schedule
-
-    # Parse xhtml text
-    sched = re.findall(r'[0-9]{2}.[0-9]{2} - [0-9]{2}.[0-9]{2}.*', xhtml)
-    for obj in sched:
-        s = re.sub(r'^.*?[\.:].*?[\.:][0-9]{2}', r'', obj)
-        schedule.append(s.strip())
-
-    return schedule
 
 class SilverSchedule():
     """
@@ -462,9 +402,6 @@ class SilverSchedule():
             logging.error(str(e))
             return False
 
-        # Temporary fix for August
-        best_schedule = get_august_best_schedule()
-
         # Parse xhtml text
         for obj in root:
             # If time not presented
@@ -475,13 +412,6 @@ class SilverSchedule():
             title = obj[1][0][0].text
             # Get icon
             icon_src = obj[0][0][0].attrib['src'].split("?")[0]
-
-            # Temporary fix for August
-            if title == VIETNAM:
-                icon_src = VIETNAM_ICON_SRC
-            elif title == BEST:
-                icon_src = BEST_ICON_SRC
-
             icon_name = self._get_icon(icon_src)
             # Get program url
             url = obj[1][0][0].attrib['href']
@@ -503,11 +433,6 @@ class SilverSchedule():
                         h.insert(0, h.pop())
                     h = ' '.join(h)
                     host.append(h)
-
-            # Temporary fix for August
-            if title == VIETNAM:
-                host = [VIETNAM_HOST]
-
             # Get schedule
             # Expecting "WD: HH:MM - HH:MM" format
             sched = []
@@ -685,12 +610,6 @@ class SilverSchedule():
             # Sort again
             self._sched_week[wd].sort(key = lambda x : \
                                          (x["start"], -x["is_main"]))
-
-            # Temporary fix for August
-            for item in self._sched_week[wd]:
-                if item["title"] == BEST and len(best_schedule):
-                    item["host"] = [best_schedule.pop(0)]
-
         # Save sched to file
         self._sched_write_to_file()
         return True
@@ -725,12 +644,6 @@ class SilverSchedule():
     def _get_cover(self, program_page):
         """ Download program cover """
         name = ""
-
-        # Temporary fix for August
-        if program_page == VIETNAM_URL:
-            name = self._get_icon(VIETNAM_COVER)
-            return name
-
         session = requests.Session()
         session.headers["User-Agent"] = USER_AGENT
         try:
