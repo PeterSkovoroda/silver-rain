@@ -37,6 +37,8 @@ class Timer():
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
         timeout = int(time - now)
+        if timeout < 0:
+            timeout += 86400
         self._t = threading.Timer(timeout, self._on_timeout)
         self._t.start()
 

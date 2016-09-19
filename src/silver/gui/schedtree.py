@@ -134,7 +134,8 @@ class SchedTree(Gtk.TreeView):
                               str,              #  9 Font
                               bool,             # 10 IsDark
                               bool,             # 11 Recorder set
-                              bool)             # 12 Playback set
+                              bool,             # 12 Playback set
+                              bool)             # 13 IsMerged
         self._model = store.filter_new()
         self._model.set_visible_func(self._model_func)
         self._sched.fill_tree_store(store)
@@ -143,7 +144,10 @@ class SchedTree(Gtk.TreeView):
 
     def _model_func(self, model, iter, data):
         """ Filter by weekday """
-        return model[iter][0] == self._weekday_filter
+        prev_day = SCHED_WEEKDAY_LIST.index(self._weekday_filter)
+        prev_day = SCHED_WEEKDAY_LIST[prev_day - 1]
+        return (model[iter][0] == self._weekday_filter) or \
+                (model[iter][13] and model[iter][0] == prev_day)
 
     def _on_button_release_event(self, widget, event):
         """ Open menu on right click """

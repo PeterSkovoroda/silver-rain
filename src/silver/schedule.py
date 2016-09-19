@@ -57,7 +57,9 @@ MUSIC_URL = "http://silver.ru/programms/muzyka/"
 def str_time(start, end):
     """ Return time in HH:MM-HH:MM """
     s_h, s_m = divmod(int(start), 3600)
+    s_m = int(s_m / 60)
     e_h, e_m = divmod(int(end), 3600)
+    e_m = int(e_m / 60)
     return "{0:0=2d}:{1:0=2d} - {2:0=2d}:{3:0=2d}".format(s_h, s_m, e_h, e_m)
 
 def parse_time(str):
@@ -108,6 +110,7 @@ class SilverSchedule():
             position            int
             weekday             str
             is_parent           bool
+            is_merged           bool
             time  (HH:MM-HH:MM) str
             title               str
             url                 str
@@ -145,6 +148,13 @@ class SilverSchedule():
             return self._event["url"]
         else:
             return "http://silver.ru/"
+
+    def get_event_merged_status(self):
+        """ Return end time in seconds """
+        if not self._SCHEDULE_ERROR:
+            return self._event["is_merged"]
+        else:
+            return False
 
     def get_event_end(self):
         """ Return end time in seconds """
@@ -220,7 +230,8 @@ class SilverSchedule():
         if not force_refresh and os.path.exists(SCHED_FILE):
             # Read from file
             self._sched_load_from_file()
-        else:
+
+        if self._SCHEDULE_ERROR:
             # Backup
             sched_week_bak = self._sched_week
             sched_day_bak = self._sched_day
@@ -292,7 +303,7 @@ class SilverSchedule():
                                              item["url"], host, icon,
                                              bg_color, fg_color, font,
                                              bg_dark, item["record"],
-                                             item["play"]])
+                                             item["play"], item["is_merged"]])
                     # Alternate row color
                     bg_dark = not bg_dark
                     ch_dark = bg_dark
@@ -304,7 +315,7 @@ class SilverSchedule():
                     store.append(it, [item["weekday"], item["is_main"],
                                  item["time"], item["title"], item["url"],
                                  host, icon, bg_color, fg_color, font,
-                                 ch_dark, False, False])
+                                 ch_dark, False, False, False])
                     # Alternate row color
                     ch_dark = not ch_dark
 
@@ -340,13 +351,19 @@ class SilverSchedule():
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
         position = 0
+
+        for it in reversed(self._sched_week[today.weekday() - 1]):
+            if it["is_main"]:
+                if it["is_merged"]: position = 1
+                break
+
         for item in self._sched_week[today.weekday()]:
             if not item["is_main"]:
                 continue
             else:
                 item["position"] = position
                 position += 1
-            if item["end"] <= now:
+            if item["end"] <= now and not item["is_merged"]:
                 # Already ended. Skip
                 continue
             self._sched_day.append(item)
@@ -355,6 +372,15 @@ class SilverSchedule():
         """ Load schedule from file """
         with open(SCHED_FILE, "r") as f:
             self._sched_week = json.load(f)
+        # Check integrity
+        self._SCHEDULE_ERROR = False
+        program = self._sched_week[0][0]
+        keys = ["weekday", "is_main", "is_merged", "time", "title", "url",
+                "host", "icon", "cover", "start", "end", "play", "record"]
+        for key in keys:
+            if key not in program.keys():
+                self._SCHEDULE_ERROR = True
+                break
 
     def _sched_write_to_file(self):
         """ Save schedule on disk """
@@ -410,6 +436,9 @@ class SilverSchedule():
                 continue
             # Get title
             title = obj[1][0][0].text
+            # Event type
+            is_main = False
+            is_merged = False
             # Get icon
             icon_src = obj[0][0][0].attrib['src'].split("?")[0]
             icon_name = self._get_icon(icon_src)
@@ -450,8 +479,8 @@ class SilverSchedule():
                 # Remove extra comma
                 if it[-1] == ',' :
                     it = it[:-1]
-                # Split wd and time
                 try:
+                    # Split wd and time
                     weekday, time = it.split(': ')
                     wd_list = parse_weekday(weekday)
                     wd_list_prev = wd_list
@@ -460,34 +489,41 @@ class SilverSchedule():
                     wd_list = wd_list_prev
                     time = it
 
+                # Parse time
                 start, end = time.split('-')
                 if start.strip() == "24:00":
                     start = "00:00"
                 if end.strip() == "00:00":
                     end = "24:00"
+
+                # Convert into seconds
+                start = parse_time(start.strip())
+                end = parse_time(end.strip())
+
+                # Calculate length
+                length = end - start
+                if length < 0:
+                    length = 86400 - length
+                    is_merged = True
+
+                if length >= 3000:
+                    # At least 50 minutes
+                    is_main = True
+                    # Round to hours
+                    #FIXME: That's rude, but I don't have time right now
+                    hrs, mins = divmod(length, 3600)
+                    if mins:
+                        start = start - start % 3600
+                        end = start + (hrs + 1) * 3600
+
+                # Convert into string
+                time = str_time(start, end)
+
                 #  Weekday number,
                 #  HH:MM,
                 #  start in seconds,
                 #  end in seconds
-                sched.append([ wd_list,
-                               time,
-                               parse_time(start.strip()),
-                               parse_time(end.strip()) ])
-            # Event type
-            is_main = False
-            length = sched[0][3] - sched[0][2];
-            if length >= 3000:
-                # At least 50 minutes
-                is_main = True
-
-                # round to hours
-                #FIXME: That's rude, but I don't have time right now
-                hrs, mins = divmod(length, 3600)
-                if mins:
-                    for it in sched:
-                        it[2] = it[2] - it[2] % 3600
-                        it[3] = it[2] + (hrs + 1) * 3600
-                        it[1] = str_time(it[2], it[3])
+                sched.append([ wd_list, time, start, end ])
 
             # Insert
             for it in sched:
@@ -495,6 +531,7 @@ class SilverSchedule():
                     program = {}
                     program["weekday"] = SCHED_WEEKDAY_LIST[weekday]
                     program["is_main"] = is_main
+                    program["is_merged"] = is_merged
                     program["time"] = it[1]
                     program["title"] = title
                     program["url"] = url
@@ -564,17 +601,28 @@ class SilverSchedule():
             # Sort schedule by start/parent
             self._sched_week[wd].sort(key = lambda x : \
                                       (x["start"], -x["is_main"]))
-            # Fill spaces with music
+
             time = 0.0
-            pos = 0
             last = {"end" : 0}
+
+            # Find first program
+            for it in reversed(self._sched_week[wd - 1]):
+                if it["is_main"]:
+                    if it["is_merged"]: time = it["end"]
+                    break
+
+            # Fill spaces with music
+            sched_week_with_music = []
+
             for item in self._sched_week[wd]:
                 if not item["is_main"]:
+                    sched_week_with_music.append(item)
                     continue
                 if item["start"] > time:
-                    # If doesn't start right after the last one
+                    # If doesn't start right after the previous one
                     program = {}
                     program["is_main"] = True
+                    program["is_merged"] = False
                     program["title"] = MUSIC
                     program["url"] = MUSIC_URL
                     program["host"] = []
@@ -586,15 +634,15 @@ class SilverSchedule():
                     program["end"] = item["start"]
                     program["play"] = False
                     program["record"] = False
-                    self._sched_week[wd].insert(pos, program)
-                    pos += 1
+                    sched_week_with_music.append(program)
                 time = item["end"]
-                pos += 1
+                sched_week_with_music.append(item)
                 last = item
             # Check if last event doesn't go till 24:00
-            if last["end"] < 86400.0:
+            if last["end"] < 86400.0 and not last["is_merged"]:
                 program = {}
                 program["is_main"] = True
+                program["is_merged"] = False
                 program["title"] = MUSIC
                 program["url"] = MUSIC_URL
                 program["host"] = []
@@ -606,10 +654,11 @@ class SilverSchedule():
                 program["end"] = 86400.0
                 program["play"] = False
                 program["record"] = False
-                self._sched_week[wd].insert(pos, program)
+                sched_week_with_music.append(program)
+            self._sched_week[wd] = sched_week_with_music
             # Sort again
             self._sched_week[wd].sort(key = lambda x : \
-                                         (x["start"], -x["is_main"]))
+                                         (x["start"], -x["is_main"], x["end"]))
         # Save sched to file
         self._sched_write_to_file()
         return True
