@@ -351,11 +351,17 @@ class SilverSchedule():
         now = timedelta(hours=today.hour, minutes=today.minute,
                         seconds=today.second).total_seconds()
         position = 0
+        self._sched_day = deque()
 
         for it in reversed(self._sched_week[today.weekday() - 1]):
-            if it["is_main"]:
-                if it["is_merged"]: position = 1
-                break
+            if not it["is_main"]:
+                continue
+            if it["is_merged"]:
+                if it["end"] > now:
+                    self._sched_day.append(it)
+                    self._sched_day[0]["position"] = position
+                position += 1
+            break
 
         for item in self._sched_week[today.weekday()]:
             if not item["is_main"]:
