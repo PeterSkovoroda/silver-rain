@@ -482,6 +482,8 @@ class SilverSchedule():
                     i += 1
 
             for it in sched_list:
+                if not it:
+                    continue
                 # Remove extra comma
                 if it[-1] == ',' :
                     it = it[:-1]
