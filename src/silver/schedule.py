@@ -441,7 +441,7 @@ class SilverSchedule():
                 # Event happens randomly or never
                 continue
             # Get title
-            title = obj[1][0][0].text
+            title = obj[1][0][0].text.strip()
             # Event type
             is_main = False
             is_merged = False
@@ -503,6 +503,16 @@ class SilverSchedule():
                     start = "00:00"
                 if end.strip() == "00:00":
                     end = "24:00"
+
+                # Fix Mixtape
+                #XXX: This is ridiculous
+                # Maybe better try to retrieve schedule from the same source,
+                # the win version does.
+                if title == "Mixtape" and wd_list == [4,5] and \
+                   time.strip() == "04:00 - 05:00":
+                    wd_list = [5,6]
+                    start = "01:00"
+                    end = "05:00"
 
                 # Convert into seconds
                 start = parse_time(start.strip())
