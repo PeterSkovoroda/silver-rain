@@ -52,6 +52,7 @@ class StatusIcon():
         self._status_icon.set_from_icon_name(ICON)
         # Default events
         self._status_icon.connect("activate", self._on_activate)
+        self._status_icon.connect("button-press-event", self._on_button)
         self._status_icon.connect("scroll-event", self._on_scroll)
         # Popup menu
         self._status_icon.connect("popup-menu", self._on_popup)
@@ -200,6 +201,11 @@ class StatusIcon():
             return (Gtk.StatusIcon.position_menu(menu, x, y, icon))
         self._popup_menu.popup(None, None, pos_func,
                                self._status_icon, button, time)
+
+    def _on_button(self, icon, event):
+        """ Toggle playback on middle button """
+        if event.button == 2:
+            self._on_playback(None)
 
     def _on_scroll(self, icon, data):
         """ Change volume by scrolling on status icon """

@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: silver-rain 1.0.6\n"
 "Report-Msgid-Bugs-To: petrskovoroda@gmail.com\n"
-"POT-Creation-Date: 2016-09-19 21:06+0300\n"
+"POT-Creation-Date: 2016-10-05 21:06+0300\n"
 "PO-Revision-Date: 2015-11-03 12:17+0300\n"
 "Last-Translator: Petr Skovoroda <petrskovoroda@gmail.com>\n"
 "Language: ru\n"
@@ -43,12 +43,12 @@ msgid "Unmute"
 msgstr "Включить звук"
 
 #: src/silver/gui/common.py:82 src/silver/gui/menubar.py:63
-#: src/silver/gui/statusicon.py:104
+#: src/silver/gui/statusicon.py:105
 msgid "Mute"
 msgstr "Выключить звук"
 
 #: src/silver/gui/controlpanel.py:40 src/silver/gui/menubar.py:75
-#: src/silver/gui/statusicon.py:108
+#: src/silver/gui/statusicon.py:109
 msgid "Send message"
 msgstr "Отправить сообщение"
 
@@ -65,11 +65,11 @@ msgid "Downloading covers..."
 msgstr "Загрузка обложек..."
 
 #: src/silver/gui/menubar.py:81 src/silver/gui/preferences.py:51
-#: src/silver/gui/statusicon.py:111
+#: src/silver/gui/statusicon.py:112
 msgid "Preferences"
 msgstr "Настройки"
 
-#: src/silver/gui/menubar.py:87 src/silver/gui/statusicon.py:114
+#: src/silver/gui/menubar.py:87 src/silver/gui/statusicon.py:115
 msgid "Quit"
 msgstr "Выход"
 
@@ -106,7 +106,7 @@ msgstr "Не удалось отправить сообщение"
 msgid "Message sent"
 msgstr "Сообщение отправлено"
 
-#: src/silver/gui/notifications.py:27 src/silver/gui/statusicon.py:131
+#: src/silver/gui/notifications.py:27 src/silver/gui/statusicon.py:132
 msgid "Silver Rain"
 msgstr "Серебряный Дождь"
 
@@ -290,6 +290,6 @@ msgstr "Суббота"
 msgid "Sunday"
 msgstr "Воскресенье"
 
-#: src/silver/gui/statusicon.py:89
+#: src/silver/gui/statusicon.py:90
 msgid "Activate"
 msgstr "Активировать"
