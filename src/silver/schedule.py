@@ -275,9 +275,9 @@ class SilverSchedule():
         fg_color = config.font_color
         icontheme = Gtk.IconTheme.get_default()
 
+        bg_dark = False
+        ch_dark = False
         for wd in range(7):
-            bg_dark = False
-            ch_dark = False
             for item in self._sched_week[wd]:
                 # Get pixbuf
                 if item["icon"]:
