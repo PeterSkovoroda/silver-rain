@@ -521,7 +521,7 @@ class SilverSchedule():
                 # Calculate length
                 length = end - start
                 if length < 0:
-                    length = 86400 - length
+                    length = 86400 + length
                     is_merged = True
 
                 if length >= 3000:
@@ -533,6 +533,8 @@ class SilverSchedule():
                     if mins:
                         start = start - start % 3600
                         end = start + (hrs + 1) * 3600
+                        if is_merged:
+                            end -= 86400
 
                 # Convert into string
                 time = str_time(start, end)
