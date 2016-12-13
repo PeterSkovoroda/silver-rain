@@ -34,6 +34,5 @@ CONFIG_FILE = APP_DIR + "config.ini"
 ICON = "silver-rain"
 # Network
 SILVER_RAIN_URL = "http://silver.ru"
-STREAM_URL_LIST = [ "http://radiosilver.corbina.net:8000/silver128a.mp3",
-                    "http://radiosilver.corbina.net:8000/silver48a.mp3",
-                    "http://icecast.silver.cdnvideo.ru/silver" ]
+STREAM_URL_LIST = [ "http://radiosilver.corbina.net:8000/silver128b.mp3",
+                    "http://radiosilver.corbina.net:8000/silver48b.mp3" ]
