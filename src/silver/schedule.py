@@ -508,7 +508,7 @@ class SilverSchedule():
                 #XXX: This is ridiculous
                 # Maybe better try to retrieve schedule from the same source,
                 # the win version does.
-                if title == "Mixtape" and wd_list == [4,5] and \
+                if title == "Mixtape" and wd_list == [4] and \
                    time.strip() == "04:00 - 05:00":
                     wd_list = [5,6]
                     start = "01:00"
