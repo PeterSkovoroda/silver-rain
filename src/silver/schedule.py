@@ -412,7 +412,7 @@ class SilverSchedule():
                 logging.error("Couldn't reach server. Code:", resp.status_code)
                 return False
             # Get table
-            r = r'^.*<div\ class="program-list">.*?(<tbody>.*?<\/tbody>).*$'
+            r = r'^.*<div\ class="program-list.*?(<tbody>.*?<\/tbody>).*$'
             xhtml = re.sub(r, r'\1', resp.text)
             # Handle unclosed img tags /* xhtml style */
             xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
