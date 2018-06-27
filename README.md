@@ -14,7 +14,7 @@ Unofficial [Silver Rain] (http://silver.ru) radio application for Linux
 * Send messages to the studio  
   Отправлять сообщения в студию
 
-![screenshot](https://cloud.githubusercontent.com/assets/13828418/18830111/f276dbd0-83e7-11e6-9543-4cb503b5fc33.png)
+![screenshot](/images/screenshot.png)
 
 License / Лицензия
 -------
