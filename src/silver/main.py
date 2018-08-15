@@ -24,7 +24,9 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Notify", "0.7")
 from gi.repository import Gst, Gtk, GObject, Notify
 import dbus
-import dbus.glib
+from dbus.mainloop.glib import DBusGMainLoop
+DBusGMainLoop(set_as_default=True)
+
 import dbus.service
 import os
 import signal
@@ -50,7 +52,6 @@ class SilverService(dbus.service.Object):
         self.window.present()
 
 def let_it_rain():
-    GObject.threads_init()
     Gst.init(None)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     Notify.init("silver-rain")
