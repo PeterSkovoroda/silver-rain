@@ -27,6 +27,7 @@ import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 DBusGMainLoop(set_as_default=True)
 
+import argparse
 import dbus.service
 import os
 import signal
@@ -47,9 +48,16 @@ class SilverService(dbus.service.Object):
                                     '/org/SilverRain/Silver')
 
     @dbus.service.method(dbus_interface='org.SilverRain.Silver')
-
     def show_window(self):
         self.window.present()
+
+    @dbus.service.method(dbus_interface='org.SilverRain.Silver')
+    def play(self):
+        self.window.play()
+
+    @dbus.service.method(dbus_interface='org.SilverRain.Silver')
+    def stop(self):
+        self.window.stop()
 
 def let_it_rain():
     Gst.init(None)
@@ -84,7 +92,21 @@ def exec_main():
     if reply != dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER:
         object = bus.get_object("org.SilverRain.Silver",
                                 "/org/SilverRain/Silver")
-        method = object.get_dbus_method("show_window")
+        # Get command from arguments
+        parser = argparse.ArgumentParser(description='Silver Rain radio app')
+        parser.add_argument('command', choices=['play', 'stop', 'show'],
+                            nargs='?', default='show', const='show',
+                            help='run command')
+        args = parser.parse_args()
+        if args.command == 'show':
+            method = object.get_dbus_method("show_window")
+        elif args.command == 'play':
+            method = object.get_dbus_method("play")
+        elif args.command == 'stop':
+            method = object.get_dbus_method("stop")
+        else:
+            raise ValueError
+
         method()
     else:
         let_it_rain()
