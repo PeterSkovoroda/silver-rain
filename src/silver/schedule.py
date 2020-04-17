@@ -518,6 +518,11 @@ class SilverSchedule():
                 start = parse_time(start.strip())
                 end = parse_time(end.strip())
 
+                # Fix cultur multur
+                if title == "Культур-мультур weekend" and \
+                   (end <= start or end > start + 300):
+                    end = start + 300
+
                 # Calculate length
                 length = end - start
                 if length < 0:
@@ -718,7 +723,8 @@ class SilverSchedule():
         try:
             resp = session.get(program_page)
             if resp.status_code != 200:
-                logging.error("Couldn't reach server. Code:", resp.status_code)
+                logging.error(f"Couldn't get url '{program_page}'"
+                               " Code: {resp.status_code}")
                 return name
             # Get image src
             div = r'<div class="program-detail">.*?<div class="title".*?div>'
