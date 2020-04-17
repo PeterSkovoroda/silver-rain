@@ -1,8 +1,8 @@
 Silver-rain
 ===========
 
-Unofficial [Silver Rain] (http://silver.ru) radio application for Linux  
-Неофициальное приложение радиостанции [Серебряный Дождь] (http://silver.ru) для Linux
+Unofficial [Silver Rain](http://silver.ru) radio application for Linux  
+Неофициальное приложение радиостанции [Серебряный Дождь](http://silver.ru) для Linux
 
 ### Features / Функции
 * Listen live  
