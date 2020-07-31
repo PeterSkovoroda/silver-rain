@@ -519,7 +519,7 @@ class SilverSchedule():
                 end = parse_time(end.strip())
 
                 # Fix cultur multur
-                if title == "Культур-мультур weekend" and \
+                if (title == "Культур-мультур weekend" or title == "Культур-мультур") and \
                    (end <= start or end > start + 300):
                     end = start + 300
 
