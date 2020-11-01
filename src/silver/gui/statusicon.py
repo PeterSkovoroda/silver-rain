@@ -21,11 +21,13 @@ Boston, MA 02110-1301 USA
 from gi.repository import Gdk, Gtk
 import textwrap
 
-try:
-    from gi.repository import AppIndicator3 as appindicator
-    APP_INDICATOR = True
-except ImportError:
-    APP_INDICATOR = False
+APP_INDICATOR = False
+
+#try:
+#    from gi.repository import AppIndicator3 as appindicator
+#    APP_INDICATOR = True
+#except ImportError:
+#    APP_INDICATOR = False
 
 from silver.globals import ICON
 from silver.gui.common import create_menuitem

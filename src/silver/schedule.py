@@ -418,6 +418,7 @@ class SilverSchedule():
             xhtml = re.sub(r'(<img.*?"\s*)>', r'\1/>', xhtml)
             xhtml = re.sub(r'<br>', r'<br/>', xhtml)
             xhtml = re.sub(r'&nbsp;', r'', xhtml)
+            xhtml = re.sub(r'<!--.*?-->', r'', xhtml)
             root = etree.fromstring(xhtml)
 
         except requests.exceptions.RequestException as e:
@@ -498,7 +499,10 @@ class SilverSchedule():
                     time = it
 
                 # Parse time
-                start, end = time.split('-')
+                try:
+                    start, end = time.split('-')
+                except:
+                    continue
                 if start.strip() == "24:00":
                     start = "00:00"
                 if end.strip() == "00:00":
